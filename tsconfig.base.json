@@ -21,8 +21,8 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@archivision/infrastructure": ["libs/infrastructure/src/index.ts"],
-      "@archivision/shared": ["libs/shared/src/index.ts"]
+      "@archivision/infrastructure": ["libs/infrastructure/src/index"],
+      "@archivision/shared": ["libs/shared/src/index"]
     }
   },
   "exclude": ["node_modules", "dist"]

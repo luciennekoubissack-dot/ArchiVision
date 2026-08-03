@@ -8,7 +8,6 @@ COPY package*.json ./
 COPY nest-cli.json tsconfig*.json ./
 COPY libs/ libs/
 COPY apps/api/ apps/api/
-COPY prisma/ prisma/
 
 RUN npm ci --ignore-scripts
 
@@ -32,8 +31,8 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY prisma/schema.prisma ./prisma/schema.prisma
+COPY apps/api/prisma/schema.prisma ./apps/api/prisma/schema.prisma
 
 EXPOSE 3000
 
-CMD ["node", "dist/apps/api/main.js"]
+CMD ["node", "dist/apps/api/src/main.js"]

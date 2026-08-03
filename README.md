@@ -123,7 +123,7 @@ Couverture actuelle : `auth`, `organisation`, `archimate`, `urbanisation` (unita
 ## Exécution avec Docker
 
 ```bash
-docker-compose -f docker/docker-compose.yml up --build
+docker-compose up --build
 ```
 
 Stack v1 : PostgreSQL + API uniquement (pas de Redis, pas de service temps réel, pas de worker).

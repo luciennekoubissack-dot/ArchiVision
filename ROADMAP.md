@@ -15,15 +15,24 @@ Ce document liste ce qui reste à faire pour amener ArchiVision d'un backend "r�
 
 ---
 
-## Phase 1 — Finaliser le backend v1
+## Phase 1 — Finaliser le backend v1 ✅ (2026-08-03)
 
-- **Auth** : compléter le flux (register si nécessaire, refresh token ou expiration gérée côté client), tests unitaires/e2e pour `auth.service` et `jwt.strategy`.
-- **Organisation** : vérifier couverture complète du controller (actuellement seul le service est testé), ajouter tests controller/e2e.
-- **ArchiMate & Urbanisation** : ajouter tests unitaires (`archimate.service`, `urbanisation.service`) — inexistants pour l'instant.
-- **Validation** : vérifier que tous les DTO utilisent bien `class-validator` avec des règles complètes (formats, longueurs, enums).
-- **Gestion d'erreurs** : filtre d'exceptions global NestJS pour réponses d'erreur cohérentes.
-- **Décision multi-tenant** : trancher explicitement — soit on assume que le v1 est mono-tenant (ce que dit le `docker-compose.yml`) et on retire/désactive `TenantGuard`, soit on ajoute réellement `tenantId` au schéma Prisma et on branche le guard. Actuellement c'est un entre-deux non documenté.
-- **Documentation** : corriger le README pour refléter l'état réel (retirer ou déplacer dans une section "vision future" les mentions de `apps/realtime`, `apps/worker`, CQRS, Kubernetes, etc. qui n'existent pas dans le code).
+- ~~**Auth** : tests unitaires/e2e pour `auth.service` et `jwt.strategy`.~~ Fait — `auth.service.spec.ts`, `auth.controller.spec.ts` (HTTP), `jwt.strategy.spec.ts`.
+- ~~**Organisation** : ajouter tests controller/e2e.~~ Fait — `organisation.controller.spec.ts`.
+- ~~**ArchiMate & Urbanisation** : ajouter tests unitaires.~~ Fait — `archimate.service.spec.ts`, `urbanisation.service.spec.ts`.
+- ~~**Validation** : DTO avec `class-validator`.~~ Fait — tous les DTO (dont `LoginDto`) valident formats/enums/longueurs.
+- ~~**Gestion d'erreurs** : filtre d'exceptions global.~~ Fait — `HttpExceptionFilter`, testé.
+- ~~**Décision multi-tenant**~~ Tranché : v1 mono-tenant. `TenantGuard`, `RolesGuard`, `tenant-scoping.extension.ts` étaient déjà non branchés (dead code) et ont été supprimés du dépôt le 2026-08-03 (ils n'étaient plus que des stubs marqués "à supprimer manuellement"). Le multi-tenant réel reste en phase 4.
+- ~~**Documentation**~~ README à jour avec l'état réel.
+
+**86/86 tests passent, `npm run build` et `npm run start:dev` fonctionnent.** Corrections apportées le 2026-08-03 :
+- `apps/api/tsconfig.app.json` avait un `rootDir` invalide (antislash JSON) qui cassait totalement `npm run build` (45 erreurs TS6059) dès que tous les modules ont été branchés — `npm test` ne l'exposait pas car Jest compile via `ts-jest`/`moduleNameMapper`, pas via `tsc`.
+- `tsconfig.base.json` mappait `@archivision/*` vers les fichiers `.ts` sources (extension incluse) ; à l'exécution le JS compilé tentait de `require()` un fichier `.ts` inexistant pour Node. Chemins corrigés sans extension.
+- `AuthModule` n'importait pas `PrismaModule` → tests HTTP en échec.
+- `import * as bcrypt from 'bcrypt'` cassait `jest.spyOn(bcrypt, 'compare')` (namespace TypeScript gelé) → `import bcrypt from 'bcrypt'`.
+- `Dockerfile.api` copiait/exécutait le mauvais schéma Prisma (`prisma/` racine, legacy) et un mauvais chemin `main.js` (`dist/apps/api/apps/api/...` après le premier correctif) ; corrigé. Build Docker validé structurellement (étapes `COPY`/`npm ci` passent) mais non vérifié de bout en bout dans cet environnement (réseau instable pendant `npm ci` en conteneur).
+- Dossier `prisma/` racine (schéma legacy antérieur, non référencé par `package.json`) et paire `docker/Dockerfile.api` + `docker/docker-compose.yml` (Node 20, script `build:api` inexistant) supprimés — doublons morts des versions racine actuelles.
+- Fichiers `.js`/`.d.ts` parasites (résidus d'anciens builds ratés) nettoyés dans `apps/api/src` et `libs/*/src`.
 
 ## Phase 2 — Construire le frontend
 
