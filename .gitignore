@@ -1,0 +1,35 @@
+# Dépendances
+node_modules/
+**/node_modules/
+
+# Build
+dist/
+**/dist/
+out-tsc/
+
+# Environnement
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes locaux
+docker/data/
+
+# Angular cache
+.angular/
+apps/web/coverage/
+
+# Prisma
+prisma/migrations/*.sql.bak
+
+# TypeScript incremental
+*.tsbuildinfo

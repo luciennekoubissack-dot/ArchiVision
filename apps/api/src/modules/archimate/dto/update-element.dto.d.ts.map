@@ -1,0 +1,1 @@
+{"version":3,"file":"update-element.dto.d.ts","sourceRoot":"","sources":["update-element.dto.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,WAAW,EAAE,MAAM,gBAAgB,CAAC;AAE7C,qBAAa,gBAAgB;IAG3B,IAAI,CAAC,EAAE,WAAW,CAAC;IAKnB,GAAG,CAAC,EAAE,MAAM,CAAC;IAKb,WAAW,CAAC,EAAE,MAAM,CAAC;IAIrB,gBAAgB,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;CAClC"}

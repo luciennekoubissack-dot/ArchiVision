@@ -1,0 +1,30 @@
+import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { AuthService } from './auth.service';
+import { CurrentUser, AuthUser, Public } from '@archivision/shared';
+
+class LoginDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password!: string;
+}
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('login')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  login(@Body() dto: LoginDto) {
+    return this.authService.login(dto.email, dto.password);
+  }
+
+  @Get('me')
+  me(@CurrentUser() user: AuthUser) {
+    return this.authService.me(user.sub);
+  }
+}

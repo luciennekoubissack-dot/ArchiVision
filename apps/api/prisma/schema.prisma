@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth (hors référentiel métier — nécessaire pour l'authentification) ──────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  nom          String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Organisation ─────────────────────────────────────────────────────────────
+
+/// Représente l'entreprise modélisée (ex. K&B Groupe SARL).
+/// Champs : id, nom, description — exactement ce que définit referentiel.md.
+model Organisation {
+  id          String   @id @default(uuid())
+  nom         String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations inverses (Prisma les exige pour la navigation)
+  capacites    CapaciteMetier[]
+  elements     ElementArchimate[]
+  applications Application[]
+  zones        ZoneUrbanisation[]
+}
+
+// ─── CapaciteMetier ───────────────────────────────────────────────────────────
+
+/// Ce que l'organisation sait faire (ex. "Gestion des formations").
+/// Champs : id, nom, description, organisationId → Organisation
+model CapaciteMetier {
+  id             String       @id @default(uuid())
+  nom            String
+  description    String?
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  elements ElementArchimate[]
+}
+
+// ─── ArchiMate — couche Métier uniquement en v1 ───────────────────────────────
+
+/// 5 valeurs exactement — referentiel.md interdit d'en ajouter en v1.
+enum TypeElement {
+  ACTEUR_METIER
+  ROLE_METIER
+  PROCESSUS_METIER
+  SERVICE_METIER
+  OBJET_METIER
+}
+
+/// 4 valeurs exactement — referentiel.md interdit d'en ajouter en v1.
+enum TypeRelation {
+  ASSIGNATION
+  COMPOSITION
+  REALISATION
+  ASSOCIATION
+}
+
+/// Élément de la couche Métier ArchiMate.
+/// Champs : id, nom, type, description, capaciteMetierId (optionnel), organisationId
+model ElementArchimate {
+  id               String          @id @default(uuid())
+  nom              String
+  type             TypeElement
+  description      String?
+  organisationId   String
+  organisation     Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  capaciteMetierId String?
+  capacite         CapaciteMetier? @relation(fields: [capaciteMetierId], references: [id], onDelete: SetNull)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  relationsSource RelationArchimate[] @relation("RelationSource")
+  relationsTarget RelationArchimate[] @relation("RelationTarget")
+
+  @@index([organisationId])
+  @@index([type])
+}
+
+/// Lien typé entre deux éléments ArchiMate.
+/// Champs : id, type, sourceId → ElementArchimate, targetId → ElementArchimate
+model RelationArchimate {
+  id        String           @id @default(uuid())
+  type      TypeRelation
+  sourceId  String
+  source    ElementArchimate @relation("RelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId  String
+  target    ElementArchimate @relation("RelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@index([sourceId])
+  @@index([targetId])
+}
+
+// ─── Urbanisation ─────────────────────────────────────────────────────────────
+
+/// 3 valeurs de criticité.
+enum Criticite {
+  HAUTE
+  MOYENNE
+  BASSE
+}
+
+/// Application du portefeuille applicatif.
+/// Champs : id, nom, description, criticite, organisationId → Organisation
+model Application {
+  id             String       @id @default(uuid())
+  nom            String
+  description    String?
+  criticite      Criticite    @default(MOYENNE)
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  zones ApplicationZone[]
+
+  @@index([organisationId])
+}
+
+/// 3 niveaux de la hiérarchie d'urbanisation.
+enum TypeZone {
+  ZONE
+  QUARTIER
+  ILOT
+}
+
+/// Nœud de la hiérarchie Zone > Quartier > Îlot (auto-référencée).
+/// Champs : id, nom, type, parentId (nullable), organisationId → Organisation
+model ZoneUrbanisation {
+  id             String            @id @default(uuid())
+  nom            String
+  type           TypeZone
+  parentId       String?
+  parent         ZoneUrbanisation? @relation("ZoneHierarchie", fields: [parentId], references: [id])
+  organisationId String
+  organisation   Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  enfants      ZoneUrbanisation[] @relation("ZoneHierarchie")
+  applications ApplicationZone[]
+
+  @@index([organisationId])
+  @@index([parentId])
+}
+
+/// Table de jointure — affectation d'une application à un îlot du POS.
+/// Clé primaire composite (applicationId, zoneId).
+model ApplicationZone {
+  applicationId String
+  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  zoneId        String
+  zone          ZoneUrbanisation @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@id([applicationId, zoneId])
+}

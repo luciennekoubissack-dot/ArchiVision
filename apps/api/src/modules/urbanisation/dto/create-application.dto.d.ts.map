@@ -1,0 +1,1 @@
+{"version":3,"file":"create-application.dto.d.ts","sourceRoot":"","sources":["create-application.dto.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,SAAS,EAAE,MAAM,gBAAgB,CAAC;AAE3C,qBAAa,oBAAoB;IAE/B,cAAc,EAAG,MAAM,CAAC;IAKxB,GAAG,EAAG,MAAM,CAAC;IAKb,WAAW,CAAC,EAAE,MAAM,CAAC;IAIrB,SAAS,CAAC,EAAE,SAAS,CAAC;CACvB"}
