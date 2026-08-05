@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
-import { CreateOrganisationDto } from './dto/create-organisation.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
 
 const organisationSelect = {
   id: true,
   nom: true,
   description: true,
+  logoUrl: true,
+  secteur: true,
+  taille: true,
+  pays: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -15,52 +18,48 @@ const organisationSelect = {
 export class OrganisationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateOrganisationDto) {
-    return this.prisma.organisation.create({
-      data: dto,
-      select: organisationSelect,
-    });
-  }
-
-  findAll() {
-    return this.prisma.organisation.findMany({
-      select: organisationSelect,
-      orderBy: { nom: 'asc' },
-    });
-  }
-
-  async findOne(id: string) {
+  async findMine(organisationId: string) {
     const organisation = await this.prisma.organisation.findUnique({
-      where: { id },
+      where: { id: organisationId },
       select: organisationSelect,
     });
-
     if (!organisation) {
-      throw new NotFoundException(`Organisation ${id} introuvable`);
+      throw new NotFoundException('Organisation introuvable');
     }
-
     return organisation;
   }
 
-  async update(id: string, dto: UpdateOrganisationDto) {
-    await this.assertExists(id);
-
+  async updateMine(organisationId: string, dto: UpdateOrganisationDto) {
+    await this.findMine(organisationId);
     return this.prisma.organisation.update({
-      where: { id },
+      where: { id: organisationId },
       data: dto,
       select: organisationSelect,
     });
   }
 
-  async remove(id: string) {
-    await this.assertExists(id);
-    await this.prisma.organisation.delete({ where: { id } });
-  }
+  async exportReferentiel(organisationId: string) {
+    const [organisation, capacites, elements, relations, applications, zones] = await Promise.all([
+      this.prisma.organisation.findUnique({ where: { id: organisationId }, select: organisationSelect }),
+      this.prisma.capaciteMetier.findMany({ where: { organisationId } }),
+      this.prisma.elementArchimate.findMany({ where: { organisationId } }),
+      this.prisma.relationArchimate.findMany({ where: { source: { organisationId } } }),
+      this.prisma.application.findMany({ where: { organisationId } }),
+      this.prisma.zoneUrbanisation.findMany({ where: { organisationId } }),
+    ]);
 
-  private async assertExists(id: string) {
-    const count = await this.prisma.organisation.count({ where: { id } });
-    if (!count) {
-      throw new NotFoundException(`Organisation ${id} introuvable`);
+    if (!organisation) {
+      throw new NotFoundException('Organisation introuvable');
     }
+
+    return {
+      exportedAt: new Date().toISOString(),
+      organisation,
+      capacites,
+      elements,
+      relations,
+      applications,
+      zones,
+    };
   }
 }

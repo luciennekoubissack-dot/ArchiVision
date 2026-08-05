@@ -1,8 +1,9 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import bcrypt from 'bcrypt';
 import { PrismaService } from '@archivision/infrastructure';
+import { RoleUtilisateur } from '@prisma/client';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
@@ -13,14 +14,22 @@ describe('AuthService', () => {
     email: 'admin@archivision.local',
     passwordHash: '',
     nom: 'Admin',
+    organisationId: 'org-001',
+    role: RoleUtilisateur.ARCHITECTE,
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
+  };
+
+  const txMock = {
+    organisation: { create: jest.fn() },
+    user: { create: jest.fn() },
   };
 
   const prismaMock = {
     user: {
       findUnique: jest.fn(),
     },
+    $transaction: jest.fn((callback: (tx: typeof txMock) => unknown) => callback(txMock)),
   };
 
   const jwtMock = {
@@ -54,11 +63,13 @@ describe('AuthService', () => {
 
       expect(result).toEqual({
         accessToken: 'signed.jwt.token',
-        user: { id: mockUser.id, email: mockUser.email, nom: mockUser.nom },
+        user: { id: mockUser.id, email: mockUser.email, nom: mockUser.nom, role: mockUser.role },
       });
       expect(jwtMock.sign).toHaveBeenCalledWith({
         sub: mockUser.id,
         email: mockUser.email,
+        organisationId: mockUser.organisationId,
+        role: mockUser.role,
       });
     });
 
@@ -94,9 +105,59 @@ describe('AuthService', () => {
     });
   });
 
+  describe('register', () => {
+    const registerDto = {
+      organisationNom: 'Nouvelle Entreprise',
+      email: 'fondateur@nouvelle-entreprise.local',
+      password: 'MotDePasse123!',
+      nom: 'Fondateur',
+    };
+
+    it('crée une organisation et son premier utilisateur (rôle Architecte)', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+      const createdOrg = { id: 'org-002', nom: registerDto.organisationNom, description: null, secteur: null, taille: null, pays: null, logoUrl: null };
+      const createdUser = {
+        id: 'user-002',
+        email: registerDto.email,
+        nom: registerDto.nom,
+        organisationId: createdOrg.id,
+        role: RoleUtilisateur.ARCHITECTE,
+      };
+      txMock.organisation.create.mockResolvedValue(createdOrg);
+      txMock.user.create.mockResolvedValue(createdUser);
+      jwtMock.sign.mockReturnValue('signed.jwt.token');
+
+      const result = await service.register(registerDto);
+
+      expect(txMock.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            organisationId: createdOrg.id,
+            role: RoleUtilisateur.ARCHITECTE,
+          }),
+        }),
+      );
+      expect(result.accessToken).toBe('signed.jwt.token');
+      expect(result.organisation.id).toBe(createdOrg.id);
+      expect(result.user).toEqual({
+        id: createdUser.id,
+        email: createdUser.email,
+        nom: createdUser.nom,
+        role: RoleUtilisateur.ARCHITECTE,
+      });
+    });
+
+    it('lève ConflictException si l\'email est déjà utilisé', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+      expect(txMock.organisation.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('me', () => {
     it("retourne le profil de l'utilisateur courant", async () => {
-      const { passwordHash: _unused, ...profile } = mockUser;
+      const { passwordHash: _unused, organisationId: _org, ...profile } = mockUser;
       prismaMock.user.findUnique.mockResolvedValue(profile);
 
       const result = await service.me(mockUser.id);
@@ -104,7 +165,7 @@ describe('AuthService', () => {
       expect(result).toEqual(profile);
       expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: mockUser.id },
-        select: { id: true, email: true, nom: true, createdAt: true },
+        select: { id: true, email: true, nom: true, role: true, createdAt: true },
       });
     });
 

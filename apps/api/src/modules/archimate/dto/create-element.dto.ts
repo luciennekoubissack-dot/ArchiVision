@@ -2,9 +2,6 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'cla
 import { TypeElement } from '@prisma/client';
 
 export class CreateElementDto {
-  @IsUUID()
-  organisationId!: string;
-
   @IsEnum(TypeElement)
   type!: TypeElement;
 

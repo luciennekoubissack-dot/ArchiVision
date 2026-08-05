@@ -11,4 +11,24 @@ export class UpdateOrganisationDto {
   @IsOptional()
   @MaxLength(2000)
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  logoUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  secteur?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  taille?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  pays?: string;
 }

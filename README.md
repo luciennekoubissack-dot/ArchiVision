@@ -40,12 +40,14 @@ CRUD complet (`POST`, `GET`, `GET /:id`, `PATCH /:id`, `DELETE /:id`).
 - Capacités métier : CRUD complet
 - Éléments ArchiMate : CRUD complet, 5 types (`ACTEUR_METIER`, `ROLE_METIER`, `PROCESSUS_METIER`, `SERVICE_METIER`, `OBJET_METIER`)
 - Relations ArchiMate : création, liste, suppression, 4 types (`ASSIGNATION`, `COMPOSITION`, `REALISATION`, `ASSOCIATION`)
+- `GET /elements-archimate/generate-vue?organisationId=` : génère une vue ArchiMate de la couche Métier (SVG construit côté serveur, sans dépendance de rendu tierce) → `{ svg, elementCount, relationCount }`. Éléments disposés par type (une ligne par type), relations stylées selon leur sémantique (flèche pleine pour l'assignation, losange pour la composition, trait pointillé + triangle creux pour la réalisation, trait simple pour l'association).
 
 ### Urbanisation (`/applications`, `/zones-urbanisation`)
 
 - Applications du portefeuille (criticité HAUTE/MOYENNE/BASSE)
 - Zones d'urbanisation hiérarchiques (ZONE > QUARTIER > ÎLOT)
 - Affectation/désaffectation d'une application à une zone
+- `GET /zones-urbanisation/generate-vue?organisationId=` : génère le Plan d'Occupation des Sols (POS) en SVG — rectangles imbriqués Zone > Quartier > Îlot, applications affectées affichées en puces colorées par criticité → `{ svg, zoneCount, applicationCount }`.
 
 ### Health (`/health`)
 

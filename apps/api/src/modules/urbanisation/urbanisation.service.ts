@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
 import { TypeZone } from '@prisma/client';
 import { CreateApplicationDto } from './dto/create-application.dto';
@@ -13,8 +13,8 @@ export class UrbanisationService {
 
   // ─── Applications ─────────────────────────────────────────────────────────
 
-  createApplication(dto: CreateApplicationDto) {
-    return this.prisma.application.create({ data: dto });
+  createApplication(organisationId: string, dto: CreateApplicationDto) {
+    return this.prisma.application.create({ data: { ...dto, organisationId } });
   }
 
   findAllApplications(organisationId: string) {
@@ -27,7 +27,7 @@ export class UrbanisationService {
     });
   }
 
-  async findOneApplication(id: string) {
+  async findOneApplication(id: string, organisationId: string) {
     const app = await this.prisma.application.findUnique({
       where: { id },
       include: {
@@ -38,26 +38,28 @@ export class UrbanisationService {
         },
       },
     });
-    if (!app) throw new NotFoundException(`Application ${id} introuvable`);
+    if (!app || app.organisationId !== organisationId) {
+      throw new NotFoundException(`Application ${id} introuvable`);
+    }
     return app;
   }
 
-  async updateApplication(id: string, dto: UpdateApplicationDto) {
-    await this.assertApplicationExists(id);
+  async updateApplication(id: string, organisationId: string, dto: UpdateApplicationDto) {
+    await this.assertApplicationExists(id, organisationId);
     return this.prisma.application.update({ where: { id }, data: dto });
   }
 
-  async removeApplication(id: string) {
-    await this.assertApplicationExists(id);
+  async removeApplication(id: string, organisationId: string) {
+    await this.assertApplicationExists(id, organisationId);
     return this.prisma.application.delete({ where: { id } });
   }
 
   // ─── Zones d'urbanisation ─────────────────────────────────────────────────
 
-  createZone(dto: CreateZoneDto) {
+  createZone(organisationId: string, dto: CreateZoneDto) {
     return this.prisma.zoneUrbanisation.create({
       data: {
-        organisationId: dto.organisationId,
+        organisationId,
         nom: dto.nom,
         type: dto.type,
         ...(dto.parentId && { parentId: dto.parentId }),
@@ -88,7 +90,7 @@ export class UrbanisationService {
     });
   }
 
-  async findOneZone(id: string) {
+  async findOneZone(id: string, organisationId: string) {
     const zone = await this.prisma.zoneUrbanisation.findUnique({
       where: { id },
       include: {
@@ -103,12 +105,14 @@ export class UrbanisationService {
         },
       },
     });
-    if (!zone) throw new NotFoundException(`Zone ${id} introuvable`);
+    if (!zone || zone.organisationId !== organisationId) {
+      throw new NotFoundException(`Zone ${id} introuvable`);
+    }
     return zone;
   }
 
-  async updateZone(id: string, dto: UpdateZoneDto) {
-    await this.assertZoneExists(id);
+  async updateZone(id: string, organisationId: string, dto: UpdateZoneDto) {
+    await this.assertZoneExists(id, organisationId);
     return this.prisma.zoneUrbanisation.update({
       where: { id },
       data: {
@@ -118,18 +122,30 @@ export class UrbanisationService {
     });
   }
 
-  async removeZone(id: string) {
-    await this.assertZoneExists(id);
+  async removeZone(id: string, organisationId: string) {
+    await this.assertZoneExists(id, organisationId);
     return this.prisma.zoneUrbanisation.delete({ where: { id } });
   }
 
   // ─── Affectation application ↔ zone (POS) ────────────────────────────────
 
-  async affecter(dto: AffecterApplicationDto) {
-    await Promise.all([
-      this.assertApplicationExists(dto.applicationId),
-      this.assertZoneExists(dto.zoneId),
+  async affecter(organisationId: string, dto: AffecterApplicationDto) {
+    const [, zone] = await Promise.all([
+      this.assertApplicationExists(dto.applicationId, organisationId),
+      this.prisma.zoneUrbanisation.findUnique({
+        where: { id: dto.zoneId },
+        select: { type: true, organisationId: true },
+      }),
     ]);
+    if (!zone || zone.organisationId !== organisationId) {
+      throw new NotFoundException(`Zone ${dto.zoneId} introuvable`);
+    }
+    if (zone.type !== TypeZone.ILOT) {
+      throw new BadRequestException(
+        "Une application ne peut être affectée qu'à un îlot (référentiel POS) — la zone visée est de type " +
+          zone.type,
+      );
+    }
 
     const existe = await this.prisma.applicationZone.findUnique({
       where: {
@@ -150,7 +166,12 @@ export class UrbanisationService {
     });
   }
 
-  async desaffecter(applicationId: string, zoneId: string) {
+  async desaffecter(organisationId: string, applicationId: string, zoneId: string) {
+    await Promise.all([
+      this.assertApplicationExists(applicationId, organisationId),
+      this.assertZoneExists(zoneId, organisationId),
+    ]);
+
     const affectation = await this.prisma.applicationZone.findUnique({
       where: { applicationId_zoneId: { applicationId, zoneId } },
     });
@@ -162,13 +183,13 @@ export class UrbanisationService {
 
   // ─── Utilitaires ──────────────────────────────────────────────────────────
 
-  private async assertApplicationExists(id: string) {
-    const count = await this.prisma.application.count({ where: { id } });
+  private async assertApplicationExists(id: string, organisationId: string) {
+    const count = await this.prisma.application.count({ where: { id, organisationId } });
     if (!count) throw new NotFoundException(`Application ${id} introuvable`);
   }
 
-  private async assertZoneExists(id: string) {
-    const count = await this.prisma.zoneUrbanisation.count({ where: { id } });
+  private async assertZoneExists(id: string, organisationId: string) {
+    const count = await this.prisma.zoneUrbanisation.count({ where: { id, organisationId } });
     if (!count) throw new NotFoundException(`Zone ${id} introuvable`);
   }
 }

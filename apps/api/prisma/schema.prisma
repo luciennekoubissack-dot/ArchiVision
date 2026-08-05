@@ -8,13 +8,28 @@ datasource db {
 
 // ─── Auth (hors référentiel métier — nécessaire pour l'authentification) ──────
 
+/// 4 rôles v1 — voir docs/cahier.md section 3.
+enum RoleUtilisateur {
+  ARCHITECTE
+  DIRIGEANT
+  REPRESENTANT
+  COLLABORATEUR
+}
+
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  nom          String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String          @id @default(uuid())
+  email          String          @unique
+  passwordHash   String
+  nom            String
+  organisationId String
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  role           RoleUtilisateur
+  serviceId      String?
+  service        Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([organisationId])
 }
 
 // ─── Organisation ─────────────────────────────────────────────────────────────
@@ -25,6 +40,10 @@ model Organisation {
   id          String   @id @default(uuid())
   nom         String
   description String?
+  logoUrl     String?  @map("logo_url")
+  secteur     String?  @map("sector")
+  taille      String?  @map("size")
+  pays        String?  @map("country")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -33,6 +52,46 @@ model Organisation {
   elements     ElementArchimate[]
   applications Application[]
   zones        ZoneUrbanisation[]
+  users        User[]
+  services     Service[]
+  objectifs    Objectif[]
+}
+
+// ─── Service d'entreprise (département, hiérarchique) ─────────────────────────
+
+/// Unité organisationnelle (ex. "Direction Informatique" > "Service Support").
+/// À ne pas confondre avec ElementArchimate.type = SERVICE_METIER (service
+/// métier ArchiMate) — voir docs/cahier.md section 4.3.
+model Service {
+  id             String       @id @default(uuid())
+  nom            String
+  description    String?
+  parentId       String?
+  parent         Service?     @relation("ServiceHierarchie", fields: [parentId], references: [id])
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  enfants Service[] @relation("ServiceHierarchie")
+  membres User[]
+
+  @@index([organisationId])
+  @@index([parentId])
+}
+
+// ─── Objectif stratégique (version allégée) ────────────────────────────────────
+
+model Objectif {
+  id             String       @id @default(uuid())
+  nom            String
+  description    String?
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organisationId])
 }
 
 // ─── CapaciteMetier ───────────────────────────────────────────────────────────

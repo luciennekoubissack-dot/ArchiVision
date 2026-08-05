@@ -13,8 +13,8 @@ export class ArchimateService {
 
   // ─── CapaciteMetier ───────────────────────────────────────────────────────
 
-  createCapacite(dto: CreateCapaciteDto) {
-    return this.prisma.capaciteMetier.create({ data: dto });
+  createCapacite(organisationId: string, dto: CreateCapaciteDto) {
+    return this.prisma.capaciteMetier.create({ data: { ...dto, organisationId } });
   }
 
   findAllCapacites(organisationId: string) {
@@ -25,33 +25,38 @@ export class ArchimateService {
     });
   }
 
-  async findOneCapacite(id: string) {
+  async findOneCapacite(id: string, organisationId: string) {
     const capacite = await this.prisma.capaciteMetier.findUnique({
       where: { id },
       include: {
         elements: { orderBy: { nom: 'asc' } },
       },
     });
-    if (!capacite) throw new NotFoundException(`Capacité ${id} introuvable`);
+    if (!capacite || capacite.organisationId !== organisationId) {
+      throw new NotFoundException(`Capacité ${id} introuvable`);
+    }
     return capacite;
   }
 
-  async updateCapacite(id: string, dto: UpdateCapaciteDto) {
-    await this.assertCapaciteExists(id);
+  async updateCapacite(id: string, organisationId: string, dto: UpdateCapaciteDto) {
+    await this.assertCapaciteExists(id, organisationId);
     return this.prisma.capaciteMetier.update({ where: { id }, data: dto });
   }
 
-  async removeCapacite(id: string) {
-    await this.assertCapaciteExists(id);
+  async removeCapacite(id: string, organisationId: string) {
+    await this.assertCapaciteExists(id, organisationId);
     return this.prisma.capaciteMetier.delete({ where: { id } });
   }
 
   // ─── ElementArchimate ─────────────────────────────────────────────────────
 
-  createElement(dto: CreateElementDto) {
+  async createElement(organisationId: string, dto: CreateElementDto) {
+    if (dto.capaciteMetierId) {
+      await this.assertCapaciteExists(dto.capaciteMetierId, organisationId);
+    }
     return this.prisma.elementArchimate.create({
       data: {
-        organisationId: dto.organisationId,
+        organisationId,
         nom: dto.nom,
         type: dto.type,
         description: dto.description,
@@ -76,7 +81,7 @@ export class ArchimateService {
     });
   }
 
-  async findOneElement(id: string) {
+  async findOneElement(id: string, organisationId: string) {
     const element = await this.prisma.elementArchimate.findUnique({
       where: { id },
       include: {
@@ -89,12 +94,17 @@ export class ArchimateService {
         },
       },
     });
-    if (!element) throw new NotFoundException(`Élément ${id} introuvable`);
+    if (!element || element.organisationId !== organisationId) {
+      throw new NotFoundException(`Élément ${id} introuvable`);
+    }
     return element;
   }
 
-  async updateElement(id: string, dto: UpdateElementDto) {
-    await this.assertElementExists(id);
+  async updateElement(id: string, organisationId: string, dto: UpdateElementDto) {
+    await this.assertElementExists(id, organisationId);
+    if (dto.capaciteMetierId) {
+      await this.assertCapaciteExists(dto.capaciteMetierId, organisationId);
+    }
     return this.prisma.elementArchimate.update({
       where: { id },
       data: {
@@ -107,19 +117,19 @@ export class ArchimateService {
     });
   }
 
-  async removeElement(id: string) {
-    await this.assertElementExists(id);
+  async removeElement(id: string, organisationId: string) {
+    await this.assertElementExists(id, organisationId);
     // onDelete: Cascade sur les relations via le schéma Prisma
     return this.prisma.elementArchimate.delete({ where: { id } });
   }
 
   // ─── RelationArchimate ────────────────────────────────────────────────────
 
-  async createRelation(dto: CreateRelationDto) {
-    // Vérifier que source et target existent
+  async createRelation(organisationId: string, dto: CreateRelationDto) {
+    // Source et cible doivent toutes deux appartenir à l'organisation de l'appelant
     await Promise.all([
-      this.assertElementExists(dto.sourceId),
-      this.assertElementExists(dto.targetId),
+      this.assertElementExists(dto.sourceId, organisationId),
+      this.assertElementExists(dto.targetId, organisationId),
     ]);
 
     return this.prisma.relationArchimate.create({
@@ -142,21 +152,26 @@ export class ArchimateService {
     });
   }
 
-  async removeRelation(id: string) {
-    const relation = await this.prisma.relationArchimate.findUnique({ where: { id } });
-    if (!relation) throw new NotFoundException(`Relation ${id} introuvable`);
+  async removeRelation(id: string, organisationId: string) {
+    const relation = await this.prisma.relationArchimate.findUnique({
+      where: { id },
+      include: { source: { select: { organisationId: true } } },
+    });
+    if (!relation || relation.source.organisationId !== organisationId) {
+      throw new NotFoundException(`Relation ${id} introuvable`);
+    }
     return this.prisma.relationArchimate.delete({ where: { id } });
   }
 
   // ─── Utilitaires ──────────────────────────────────────────────────────────
 
-  private async assertCapaciteExists(id: string) {
-    const count = await this.prisma.capaciteMetier.count({ where: { id } });
+  private async assertCapaciteExists(id: string, organisationId: string) {
+    const count = await this.prisma.capaciteMetier.count({ where: { id, organisationId } });
     if (!count) throw new NotFoundException(`Capacité ${id} introuvable`);
   }
 
-  private async assertElementExists(id: string) {
-    const count = await this.prisma.elementArchimate.count({ where: { id } });
+  private async assertElementExists(id: string, organisationId: string) {
+    const count = await this.prisma.elementArchimate.count({ where: { id, organisationId } });
     if (!count) throw new NotFoundException(`Élément ${id} introuvable`);
   }
 }

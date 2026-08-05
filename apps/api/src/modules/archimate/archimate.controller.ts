@@ -11,45 +11,50 @@ import {
   Query,
 } from '@nestjs/common';
 import { ArchimateService } from './archimate.service';
+import { ArchimateViewService } from './archimate-view.service';
 import { TypeElement } from '@prisma/client';
 import { CreateCapaciteDto } from './dto/create-capacite.dto';
 import { UpdateCapaciteDto } from './dto/update-capacite.dto';
 import { CreateElementDto } from './dto/create-element.dto';
 import { UpdateElementDto } from './dto/update-element.dto';
 import { CreateRelationDto } from './dto/create-relation.dto';
+import { AuthUser, CurrentUser } from '@archivision/shared';
 
 @Controller()
 export class ArchimateController {
-  constructor(private readonly service: ArchimateService) {}
+  constructor(
+    private readonly service: ArchimateService,
+    private readonly viewService: ArchimateViewService,
+  ) {}
 
   // ── Capacités métier ──────────────────────────────────────────────────────
   // Convention : /capacites-metier
 
   @Post('capacites-metier')
   @HttpCode(HttpStatus.CREATED)
-  createCapacite(@Body() dto: CreateCapaciteDto) {
-    return this.service.createCapacite(dto);
+  createCapacite(@CurrentUser() user: AuthUser, @Body() dto: CreateCapaciteDto) {
+    return this.service.createCapacite(user.organisationId, dto);
   }
 
   @Get('capacites-metier')
-  findAllCapacites(@Query('organisationId') organisationId: string) {
-    return this.service.findAllCapacites(organisationId);
+  findAllCapacites(@CurrentUser() user: AuthUser) {
+    return this.service.findAllCapacites(user.organisationId);
   }
 
   @Get('capacites-metier/:id')
-  findOneCapacite(@Param('id') id: string) {
-    return this.service.findOneCapacite(id);
+  findOneCapacite(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.findOneCapacite(id, user.organisationId);
   }
 
   @Patch('capacites-metier/:id')
-  updateCapacite(@Param('id') id: string, @Body() dto: UpdateCapaciteDto) {
-    return this.service.updateCapacite(id, dto);
+  updateCapacite(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateCapaciteDto) {
+    return this.service.updateCapacite(id, user.organisationId, dto);
   }
 
   @Delete('capacites-metier/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  removeCapacite(@Param('id') id: string) {
-    return this.service.removeCapacite(id);
+  removeCapacite(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.removeCapacite(id, user.organisationId);
   }
 
   // ── Éléments ArchiMate ────────────────────────────────────────────────────
@@ -57,32 +62,34 @@ export class ArchimateController {
 
   @Post('elements-archimate')
   @HttpCode(HttpStatus.CREATED)
-  createElement(@Body() dto: CreateElementDto) {
-    return this.service.createElement(dto);
+  createElement(@CurrentUser() user: AuthUser, @Body() dto: CreateElementDto) {
+    return this.service.createElement(user.organisationId, dto);
   }
 
   @Get('elements-archimate')
-  findAllElements(
-    @Query('organisationId') organisationId: string,
-    @Query('type') type?: TypeElement,
-  ) {
-    return this.service.findAllElements(organisationId, type);
+  findAllElements(@CurrentUser() user: AuthUser, @Query('type') type?: TypeElement) {
+    return this.service.findAllElements(user.organisationId, type);
+  }
+
+  @Get('elements-archimate/generate-vue')
+  generateVue(@CurrentUser() user: AuthUser) {
+    return this.viewService.generate(user.organisationId);
   }
 
   @Get('elements-archimate/:id')
-  findOneElement(@Param('id') id: string) {
-    return this.service.findOneElement(id);
+  findOneElement(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.findOneElement(id, user.organisationId);
   }
 
   @Patch('elements-archimate/:id')
-  updateElement(@Param('id') id: string, @Body() dto: UpdateElementDto) {
-    return this.service.updateElement(id, dto);
+  updateElement(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateElementDto) {
+    return this.service.updateElement(id, user.organisationId, dto);
   }
 
   @Delete('elements-archimate/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  removeElement(@Param('id') id: string) {
-    return this.service.removeElement(id);
+  removeElement(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.removeElement(id, user.organisationId);
   }
 
   // ── Relations ArchiMate ───────────────────────────────────────────────────
@@ -90,18 +97,18 @@ export class ArchimateController {
 
   @Post('relations-archimate')
   @HttpCode(HttpStatus.CREATED)
-  createRelation(@Body() dto: CreateRelationDto) {
-    return this.service.createRelation(dto);
+  createRelation(@CurrentUser() user: AuthUser, @Body() dto: CreateRelationDto) {
+    return this.service.createRelation(user.organisationId, dto);
   }
 
   @Get('relations-archimate')
-  findAllRelations(@Query('organisationId') organisationId: string) {
-    return this.service.findAllRelations(organisationId);
+  findAllRelations(@CurrentUser() user: AuthUser) {
+    return this.service.findAllRelations(user.organisationId);
   }
 
   @Delete('relations-archimate/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  removeRelation(@Param('id') id: string) {
-    return this.service.removeRelation(id);
+  removeRelation(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.removeRelation(id, user.organisationId);
   }
 }

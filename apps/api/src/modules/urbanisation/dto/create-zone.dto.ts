@@ -2,9 +2,6 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'cla
 import { TypeZone } from '@prisma/client';
 
 export class CreateZoneDto {
-  @IsUUID()
-  organisationId!: string;
-
   @IsEnum(TypeZone)
   type!: TypeZone;
 

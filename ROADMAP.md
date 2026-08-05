@@ -2,6 +2,8 @@
 
 Ce document liste ce qui reste à faire pour amener ArchiVision d'un backend "référentiel métier" fonctionnel à une plateforme utilisable, en s'appuyant sur l'état réel du code (pas sur la vision long terme du README).
 
+> **Pivot du 2026-08-03 :** le périmètre a été revu avec le porteur de projet — voir `docs/cahier.md` (vision fusionnée). Le multi-tenant, les rôles utilisateurs, les services d'entreprise/organigramme et les objectifs stratégiques **entrent** dans le périmètre réel (ils étaient classés Phase 4/hors-périmètre plus bas dans ce document avant cette date — la Phase 1 ci-dessous, tranchée mono-tenant le matin même, est donc partiellement obsolète, conservée telle quelle pour l'historique). Voir Phase 1bis.
+
 ---
 
 ## État actuel (acquis)
@@ -34,15 +36,27 @@ Ce document liste ce qui reste à faire pour amener ArchiVision d'un backend "r�
 - Dossier `prisma/` racine (schéma legacy antérieur, non référencé par `package.json`) et paire `docker/Dockerfile.api` + `docker/docker-compose.yml` (Node 20, script `build:api` inexistant) supprimés — doublons morts des versions racine actuelles.
 - Fichiers `.js`/`.d.ts` parasites (résidus d'anciens builds ratés) nettoyés dans `apps/api/src` et `libs/*/src`.
 
+## Phase 1bis — Multi-tenant (2026-08-03, ajoutée après le pivot)
+
+Revient sur la décision mono-tenant de la Phase 1 (même jour). Voir `docs/cahier.md` section 7 pour la justification sécurité (isolation par JWT, pas par paramètre client).
+
+- Migration Prisma : `User.organisationId` (FK, requis) + `User.role` (enum `ARCHITECTE`/`DIRIGEANT`/`REPRESENTANT`/`COLLABORATEUR`) + `User.serviceId` (optionnel).
+- Nouvelles tables : `Service` (hiérarchique, auto-référencée comme `ZoneUrbanisation`) et `Objectif` (simple, rattachée à l'organisation).
+- `POST /auth/register` : crée une `Organisation` + son premier `User` en une transaction.
+- Guard d'isolation tenant : résout `organisationId` depuis le JWT, l'injecte dans les requêtes du référentiel — les endpoints existants qui acceptent `organisationId` en query param doivent être audités (actuellement le client le fournit librement, faille dès que plusieurs organisations coexistent).
+- `ServiceViewService` (organigramme généré) — même pattern que `ArchimateViewService`/`UrbanisationViewService`.
+- CRUD Membres (scopé organisation, réservé au rôle Architecte).
+- Endpoint d'export JSON du référentiel.
+
 ## Phase 2 — Construire le frontend
 
-- Rédiger les specs dans `.kiro/specs/archivision-frontend/requirements.md` (actuellement vide) avant de coder.
-- Authentification : page de login, stockage du token, guard de routes.
-- Écrans CRUD : Organisations, Capacités métier, Éléments ArchiMate, Relations, Applications, Zones d'urbanisation.
-- Couche service Angular pour consommer l'API (HttpClient + intercepteur JWT).
-- **Visualisation ArchiMate** : c'est le cœur de la valeur produit — un éditeur/visualiseur graphique des éléments et relations (ex. via une lib de diagrammes : joint.js, GoJS, ou une solution custom SVG/Canvas). À cadrer précisément, c'est la pièce la plus complexe du frontend.
-- **Visualisation urbanisation** : cartographie applicative (POS - Plan d'Occupation des Sols) montrant zones/quartiers/îlots et applications affectées.
-- UI de base : layout, navigation, gestion des erreurs API, retours utilisateur (toasts/messages).
+- ~~Rédiger les specs dans `.kiro/specs/archivision-frontend/requirements.md`~~ Fait (2026-08-03, révisé le même jour après le pivot) — 19 exigences, voir `docs/cahier.md` et `requirements.md`.
+- **État constaté (2026-08-03) :** un premier frontend est apparu en parallèle de ce travail de cadrage (auth, organisations, vue ArchiMate, dashboard, pages statiques). Le composant `ArchimateComponent` est solide et consomme correctement l'API de génération de vue. Le reste nécessite une revue : contenu marketing (accueil, à propos, comment-utiliser) décrivant des fonctionnalités hors périmètre (BPMN, gouvernance, "tenant" au sens SaaS visiteur) à réécrire selon `docs/cahier.md` ; `proxy.conf.json` mal configuré (port 3001 au lieu de 3000, non référencé dans `angular.json`) ; dashboard à reconstruire avec de vraies données (Exigence 15) ; formulaire Organisation avec des champs (`secteur`/`taille`/`pays`/`logoUrl`) déjà ajoutés au schéma mais sans migration.
+- Authentification et inscription (Exigence 1), guard de routes, sidebar (Exigence 2).
+- Écrans CRUD : Organisation courante, Membres, Services/Organigramme, Objectifs, Capacités métier, Éléments ArchiMate, Relations, Applications, Zones d'urbanisation.
+- Couche service Angular pour consommer l'API (HttpClient + intercepteur JWT) — déjà amorcée (`auth.service.ts`, `organisation.service.ts`, `archimate.service.ts`).
+- Tableau de bord avec KPIs réels et graphiques (`ng2-charts`).
+- Design : charte bleu/blanc/noir, logo fourni, responsive.
 
 ## Phase 3 — Qualité et mise en production
 
@@ -53,9 +67,10 @@ Ce document liste ce qui reste à faire pour amener ArchiVision d'un backend "r�
 - Gestion des variables d'environnement (`.env.example` à créer si absent, vérifié).
 - Initialiser un dépôt git si ce n'est pas déjà fait (aucun `.git` détecté dans le dossier).
 
-## Phase 4 — Évolutions (vision long terme du README, à ne traiter qu'une fois le v1 stable)
+## Phase 4 — Évolutions (vision long terme, à ne traiter qu'une fois le v1 stable)
 
-- Multi-tenant réel avec Row-Level Security PostgreSQL.
+- ~~Multi-tenant réel~~ Déplacé en Phase 1bis (2026-08-03) — plus une évolution différée, périmètre réel.
+- Row-Level Security PostgreSQL (l'isolation Phase 1bis se fait au niveau applicatif/guard, pas encore en RLS base de données).
 - `apps/realtime` (Socket.IO + Yjs) pour la collaboration temps réel sur les modèles.
 - `apps/worker` (BullMQ) pour les traitements asynchrones.
 - CQRS / event sourcing (`OutboxEvent`, `EventLog`) si le besoin de projections/audit se confirme.
@@ -68,6 +83,7 @@ Ce document liste ce qui reste à faire pour amener ArchiVision d'un backend "r�
 ## Priorité recommandée
 
 1. Phase 1 (fiabiliser l'existant) — c'est le socle, sans ça le reste repose sur du sable.
-2. Phase 2 (frontend) — sans interface, le produit n'est pas démontrable/utilisable.
-3. Phase 3 (qualité/déploiement) — en parallèle de la phase 2 dès que possible.
-4. Phase 4 — uniquement si le contexte (stage, délais) le permet ; sinon la documenter comme roadmap post-v1.
+2. Phase 1bis (multi-tenant) — condition préalable à tout le reste : le référentiel actuel n'isole pas les données par organisation, et Phase 2/3 en dépendent directement.
+3. Phase 2 (frontend) — sans interface, le produit n'est pas démontrable/utilisable.
+4. Phase 3 (qualité/déploiement) — en parallèle de la phase 2 dès que possible.
+5. Phase 4 — le reste, au fil de l'eau.

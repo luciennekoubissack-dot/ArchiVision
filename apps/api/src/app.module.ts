@@ -7,6 +7,8 @@ import { OrganisationModule } from './organisation/organisation.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ArchimateModule } from './modules/archimate/archimate.module';
 import { UrbanisationModule } from './modules/urbanisation/urbanisation.module';
+import { ServiceModule } from './modules/service/service.module';
+import { ObjectifModule } from './modules/objectif/objectif.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -17,6 +19,8 @@ import { HealthModule } from './modules/health/health.module';
     OrganisationModule,
     ArchimateModule,
     UrbanisationModule,
+    ServiceModule,
+    ObjectifModule,
     HealthModule,
   ],
   providers: [

@@ -6,12 +6,14 @@ import { ArchimateService } from './archimate.service';
 
 describe('ArchimateService', () => {
   let service: ArchimateService;
+  const ORG_ID = 'org-001';
+  const AUTRE_ORG_ID = 'org-002';
 
   const mockCapacite = {
     id: 'cap-001',
     nom: 'Gestion des formations',
     description: null,
-    organisationId: 'org-001',
+    organisationId: ORG_ID,
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
   };
@@ -21,7 +23,7 @@ describe('ArchimateService', () => {
     nom: 'Formateur',
     type: TypeElement.ACTEUR_METIER,
     description: null,
-    organisationId: 'org-001',
+    organisationId: ORG_ID,
     capaciteMetierId: null,
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
@@ -73,32 +75,32 @@ describe('ArchimateService', () => {
   });
 
   describe('Capacités métier', () => {
-    it('crée une capacité', async () => {
+    it('crée une capacité rattachée à l\'organisation de l\'appelant', async () => {
       prismaMock.capaciteMetier.create.mockResolvedValue(mockCapacite);
 
-      const result = await service.createCapacite({
-        organisationId: mockCapacite.organisationId,
-        nom: mockCapacite.nom,
-      });
+      const result = await service.createCapacite(ORG_ID, { nom: mockCapacite.nom });
 
       expect(result).toEqual(mockCapacite);
+      expect(prismaMock.capaciteMetier.create).toHaveBeenCalledWith({
+        data: { nom: mockCapacite.nom, organisationId: ORG_ID },
+      });
     });
 
     it('liste les capacités d\'une organisation', async () => {
       prismaMock.capaciteMetier.findMany.mockResolvedValue([mockCapacite]);
 
-      const result = await service.findAllCapacites('org-001');
+      const result = await service.findAllCapacites(ORG_ID);
 
       expect(result).toEqual([mockCapacite]);
       expect(prismaMock.capaciteMetier.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { organisationId: 'org-001' } }),
+        expect.objectContaining({ where: { organisationId: ORG_ID } }),
       );
     });
 
     it('retourne une capacité par id', async () => {
       prismaMock.capaciteMetier.findUnique.mockResolvedValue(mockCapacite);
 
-      const result = await service.findOneCapacite(mockCapacite.id);
+      const result = await service.findOneCapacite(mockCapacite.id, ORG_ID);
 
       expect(result).toEqual(mockCapacite);
     });
@@ -106,14 +108,22 @@ describe('ArchimateService', () => {
     it('lève NotFoundException si la capacité est introuvable', async () => {
       prismaMock.capaciteMetier.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOneCapacite('inconnue')).rejects.toThrow(NotFoundException);
+      await expect(service.findOneCapacite('inconnue', ORG_ID)).rejects.toThrow(NotFoundException);
+    });
+
+    it('lève NotFoundException si la capacité appartient à une autre organisation', async () => {
+      prismaMock.capaciteMetier.findUnique.mockResolvedValue(mockCapacite);
+
+      await expect(service.findOneCapacite(mockCapacite.id, AUTRE_ORG_ID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('met à jour une capacité existante', async () => {
       prismaMock.capaciteMetier.count.mockResolvedValue(1);
       prismaMock.capaciteMetier.update.mockResolvedValue({ ...mockCapacite, nom: 'Nouveau nom' });
 
-      const result = await service.updateCapacite(mockCapacite.id, { nom: 'Nouveau nom' });
+      const result = await service.updateCapacite(mockCapacite.id, ORG_ID, { nom: 'Nouveau nom' });
 
       expect(result.nom).toBe('Nouveau nom');
     });
@@ -121,7 +131,7 @@ describe('ArchimateService', () => {
     it('lève NotFoundException lors de la mise à jour d\'une capacité inconnue', async () => {
       prismaMock.capaciteMetier.count.mockResolvedValue(0);
 
-      await expect(service.updateCapacite('inconnue', { nom: 'x' })).rejects.toThrow(
+      await expect(service.updateCapacite('inconnue', ORG_ID, { nom: 'x' })).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -130,7 +140,7 @@ describe('ArchimateService', () => {
       prismaMock.capaciteMetier.count.mockResolvedValue(1);
       prismaMock.capaciteMetier.delete.mockResolvedValue(mockCapacite);
 
-      await service.removeCapacite(mockCapacite.id);
+      await service.removeCapacite(mockCapacite.id, ORG_ID);
 
       expect(prismaMock.capaciteMetier.delete).toHaveBeenCalledWith({
         where: { id: mockCapacite.id },
@@ -140,7 +150,7 @@ describe('ArchimateService', () => {
     it('lève NotFoundException lors de la suppression d\'une capacité inconnue', async () => {
       prismaMock.capaciteMetier.count.mockResolvedValue(0);
 
-      await expect(service.removeCapacite('inconnue')).rejects.toThrow(NotFoundException);
+      await expect(service.removeCapacite('inconnue', ORG_ID)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -148,8 +158,7 @@ describe('ArchimateService', () => {
     it('crée un élément sans capacité liée', async () => {
       prismaMock.elementArchimate.create.mockResolvedValue(mockElement);
 
-      const result = await service.createElement({
-        organisationId: mockElement.organisationId,
+      const result = await service.createElement(ORG_ID, {
         nom: mockElement.nom,
         type: mockElement.type,
       });
@@ -157,7 +166,7 @@ describe('ArchimateService', () => {
       expect(result).toEqual(mockElement);
       expect(prismaMock.elementArchimate.create).toHaveBeenCalledWith({
         data: {
-          organisationId: mockElement.organisationId,
+          organisationId: ORG_ID,
           nom: mockElement.nom,
           type: mockElement.type,
           description: undefined,
@@ -165,31 +174,47 @@ describe('ArchimateService', () => {
       });
     });
 
-    it('crée un élément rattaché à une capacité', async () => {
+    it('crée un élément rattaché à une capacité de la même organisation', async () => {
       const withCapacite = { ...mockElement, capaciteMetierId: mockCapacite.id };
+      prismaMock.capaciteMetier.count.mockResolvedValue(1);
       prismaMock.elementArchimate.create.mockResolvedValue(withCapacite);
 
-      await service.createElement({
-        organisationId: mockElement.organisationId,
+      await service.createElement(ORG_ID, {
         nom: mockElement.nom,
         type: mockElement.type,
         capaciteMetierId: mockCapacite.id,
       });
 
+      expect(prismaMock.capaciteMetier.count).toHaveBeenCalledWith({
+        where: { id: mockCapacite.id, organisationId: ORG_ID },
+      });
       expect(prismaMock.elementArchimate.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ capaciteMetierId: mockCapacite.id }),
       });
     });
 
+    it('lève NotFoundException si la capacité rattachée appartient à une autre organisation', async () => {
+      prismaMock.capaciteMetier.count.mockResolvedValue(0);
+
+      await expect(
+        service.createElement(ORG_ID, {
+          nom: mockElement.nom,
+          type: mockElement.type,
+          capaciteMetierId: mockCapacite.id,
+        }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prismaMock.elementArchimate.create).not.toHaveBeenCalled();
+    });
+
     it('liste les éléments filtrés par type', async () => {
       prismaMock.elementArchimate.findMany.mockResolvedValue([mockElement]);
 
-      const result = await service.findAllElements('org-001', TypeElement.ACTEUR_METIER);
+      const result = await service.findAllElements(ORG_ID, TypeElement.ACTEUR_METIER);
 
       expect(result).toEqual([mockElement]);
       expect(prismaMock.elementArchimate.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { organisationId: 'org-001', type: TypeElement.ACTEUR_METIER },
+          where: { organisationId: ORG_ID, type: TypeElement.ACTEUR_METIER },
         }),
       );
     });
@@ -197,7 +222,7 @@ describe('ArchimateService', () => {
     it('retourne un élément par id avec ses relations', async () => {
       prismaMock.elementArchimate.findUnique.mockResolvedValue(mockElement);
 
-      const result = await service.findOneElement(mockElement.id);
+      const result = await service.findOneElement(mockElement.id, ORG_ID);
 
       expect(result).toEqual(mockElement);
     });
@@ -205,7 +230,15 @@ describe('ArchimateService', () => {
     it('lève NotFoundException si l\'élément est introuvable', async () => {
       prismaMock.elementArchimate.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOneElement('inconnu')).rejects.toThrow(NotFoundException);
+      await expect(service.findOneElement('inconnu', ORG_ID)).rejects.toThrow(NotFoundException);
+    });
+
+    it('lève NotFoundException si l\'élément appartient à une autre organisation', async () => {
+      prismaMock.elementArchimate.findUnique.mockResolvedValue(mockElement);
+
+      await expect(service.findOneElement(mockElement.id, AUTRE_ORG_ID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('permet de détacher la capacité en passant capaciteMetierId à null', async () => {
@@ -215,7 +248,7 @@ describe('ArchimateService', () => {
         capaciteMetierId: null,
       });
 
-      await service.updateElement(mockElement.id, { capaciteMetierId: null });
+      await service.updateElement(mockElement.id, ORG_ID, { capaciteMetierId: null });
 
       expect(prismaMock.elementArchimate.update).toHaveBeenCalledWith({
         where: { id: mockElement.id },
@@ -226,7 +259,7 @@ describe('ArchimateService', () => {
     it('lève NotFoundException lors de la mise à jour d\'un élément inconnu', async () => {
       prismaMock.elementArchimate.count.mockResolvedValue(0);
 
-      await expect(service.updateElement('inconnu', { nom: 'x' })).rejects.toThrow(
+      await expect(service.updateElement('inconnu', ORG_ID, { nom: 'x' })).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -235,7 +268,7 @@ describe('ArchimateService', () => {
       prismaMock.elementArchimate.count.mockResolvedValue(1);
       prismaMock.elementArchimate.delete.mockResolvedValue(mockElement);
 
-      await service.removeElement(mockElement.id);
+      await service.removeElement(mockElement.id, ORG_ID);
 
       expect(prismaMock.elementArchimate.delete).toHaveBeenCalledWith({
         where: { id: mockElement.id },
@@ -245,16 +278,16 @@ describe('ArchimateService', () => {
     it('lève NotFoundException lors de la suppression d\'un élément inconnu', async () => {
       prismaMock.elementArchimate.count.mockResolvedValue(0);
 
-      await expect(service.removeElement('inconnu')).rejects.toThrow(NotFoundException);
+      await expect(service.removeElement('inconnu', ORG_ID)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('Relations ArchiMate', () => {
-    it('crée une relation si source et target existent', async () => {
+    it('crée une relation si source et target existent dans la même organisation', async () => {
       prismaMock.elementArchimate.count.mockResolvedValue(1);
       prismaMock.relationArchimate.create.mockResolvedValue(mockRelation);
 
-      const result = await service.createRelation({
+      const result = await service.createRelation(ORG_ID, {
         type: mockRelation.type,
         sourceId: mockRelation.sourceId,
         targetId: mockRelation.targetId,
@@ -267,7 +300,7 @@ describe('ArchimateService', () => {
       prismaMock.elementArchimate.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
 
       await expect(
-        service.createRelation({
+        service.createRelation(ORG_ID, {
           type: mockRelation.type,
           sourceId: 'inconnu',
           targetId: mockRelation.targetId,
@@ -280,7 +313,7 @@ describe('ArchimateService', () => {
       prismaMock.elementArchimate.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
 
       await expect(
-        service.createRelation({
+        service.createRelation(ORG_ID, {
           type: mockRelation.type,
           sourceId: mockRelation.sourceId,
           targetId: 'inconnue',
@@ -289,22 +322,38 @@ describe('ArchimateService', () => {
       expect(prismaMock.relationArchimate.create).not.toHaveBeenCalled();
     });
 
+    it('lève NotFoundException si la source appartient à une autre organisation (isolation tenant)', async () => {
+      // assertElementExists filtre déjà par organisationId dans le count — 0 résultat
+      prismaMock.elementArchimate.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+
+      await expect(
+        service.createRelation(AUTRE_ORG_ID, {
+          type: mockRelation.type,
+          sourceId: mockRelation.sourceId,
+          targetId: mockRelation.targetId,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
     it('liste les relations d\'une organisation', async () => {
       prismaMock.relationArchimate.findMany.mockResolvedValue([mockRelation]);
 
-      const result = await service.findAllRelations('org-001');
+      const result = await service.findAllRelations(ORG_ID);
 
       expect(result).toEqual([mockRelation]);
       expect(prismaMock.relationArchimate.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { source: { organisationId: 'org-001' } } }),
+        expect.objectContaining({ where: { source: { organisationId: ORG_ID } } }),
       );
     });
 
     it('supprime une relation existante', async () => {
-      prismaMock.relationArchimate.findUnique.mockResolvedValue(mockRelation);
+      prismaMock.relationArchimate.findUnique.mockResolvedValue({
+        ...mockRelation,
+        source: { organisationId: ORG_ID },
+      });
       prismaMock.relationArchimate.delete.mockResolvedValue(mockRelation);
 
-      await service.removeRelation(mockRelation.id);
+      await service.removeRelation(mockRelation.id, ORG_ID);
 
       expect(prismaMock.relationArchimate.delete).toHaveBeenCalledWith({
         where: { id: mockRelation.id },
@@ -314,7 +363,18 @@ describe('ArchimateService', () => {
     it('lève NotFoundException lors de la suppression d\'une relation inconnue', async () => {
       prismaMock.relationArchimate.findUnique.mockResolvedValue(null);
 
-      await expect(service.removeRelation('inconnue')).rejects.toThrow(NotFoundException);
+      await expect(service.removeRelation('inconnue', ORG_ID)).rejects.toThrow(NotFoundException);
+    });
+
+    it('lève NotFoundException si la relation appartient à une autre organisation', async () => {
+      prismaMock.relationArchimate.findUnique.mockResolvedValue({
+        ...mockRelation,
+        source: { organisationId: AUTRE_ORG_ID },
+      });
+
+      await expect(service.removeRelation(mockRelation.id, ORG_ID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

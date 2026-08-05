@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { RoleUtilisateur } from '@prisma/client';
 import { JwtStrategy } from './jwt.strategy';
 
 describe('JwtStrategy', () => {
@@ -17,13 +18,18 @@ describe('JwtStrategy', () => {
   });
 
   describe('validate', () => {
-    it('retourne { sub, email } à partir du payload JWT', () => {
+    it('retourne { sub, email, organisationId, role } à partir du payload JWT', () => {
       const strategy = new JwtStrategy(configMock);
-      const payload = { sub: 'user-001', email: 'admin@archivision.local' };
+      const payload = {
+        sub: 'user-001',
+        email: 'admin@archivision.local',
+        organisationId: 'org-001',
+        role: RoleUtilisateur.ARCHITECTE,
+      };
 
       const result = strategy.validate(payload);
 
-      expect(result).toEqual({ sub: 'user-001', email: 'admin@archivision.local' });
+      expect(result).toEqual(payload);
     });
 
     it('ignore les champs superflus du payload', () => {
@@ -31,13 +37,20 @@ describe('JwtStrategy', () => {
       const payload = {
         sub: 'user-001',
         email: 'admin@archivision.local',
+        organisationId: 'org-001',
+        role: RoleUtilisateur.ARCHITECTE,
         iat: 123,
         exp: 456,
-      } as unknown as { sub: string; email: string };
+      } as unknown as { sub: string; email: string; organisationId: string; role: RoleUtilisateur };
 
       const result = strategy.validate(payload);
 
-      expect(result).toEqual({ sub: 'user-001', email: 'admin@archivision.local' });
+      expect(result).toEqual({
+        sub: 'user-001',
+        email: 'admin@archivision.local',
+        organisationId: 'org-001',
+        role: RoleUtilisateur.ARCHITECTE,
+      });
     });
   });
 });

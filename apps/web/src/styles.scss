@@ -1,4 +1,39 @@
-/* styles globaux ArchiVision */
+/* styles globaux ArchiVision — charte bleu / blanc / noir */
+
+:root {
+  --color-primary: #2f6fed;
+  --color-primary-dark: #1d51c4;
+  --color-primary-light: #eaf1ff;
+  --color-black: #10182b;
+  --color-black-soft: #1c2540;
+  --color-white: #ffffff;
+  --color-surface: #eef2fb;
+  --color-border: #e4e9f5;
+  --color-text: #10182b;
+  --color-text-muted: #64708a;
+  --color-danger: #dc2626;
+  --color-danger-light: #fee2e2;
+  --color-success: #16a34a;
+  --color-success-light: #dcfce7;
+  --color-warning: #ea8c00;
+  --color-warning-light: #fff1dc;
+  --color-info: #0ea5c11a;
+  --color-info-strong: #0891b2;
+  --color-info-light: #e0f7fb;
+  --color-violet: #6d5bd0;
+  --color-violet-light: #ece9fb;
+
+  --gradient-primary: linear-gradient(135deg, #2f6fed 0%, #6d5bd0 100%);
+  --gradient-sidebar: linear-gradient(195deg, #151d36 0%, #0a1024 100%);
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --shadow-sm: 0 8px 20px rgba(16, 24, 43, 0.06);
+  --shadow-md: 0 20px 40px rgba(16, 24, 43, 0.1);
+  --shadow-glow-primary: 0 10px 24px rgba(47, 111, 237, 0.35);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -9,6 +44,211 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.5;
-  color: #1a1a2e;
-  background-color: #f8f9fa;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+}
+
+/* ── Boutons ─────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 1.2rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--gradient-primary);
+  color: var(--color-white);
+  box-shadow: var(--shadow-glow-primary);
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(47, 111, 237, 0.42);
+}
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+}
+.btn-outline:hover:not(:disabled) {
+  background: var(--color-primary-light);
+}
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: var(--color-white);
+}
+.btn-danger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(220, 38, 38, 0.3);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* ── Cartes / formulaires ────────────────────────────────────────────────── */
+
+.card {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.field {
+  display: block;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.field input,
+.field select,
+.field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 400;
+  background: var(--color-white);
+}
+.field textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.field-error {
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  font-weight: 400;
+  margin-top: 0.3rem;
+}
+
+/* ── Champs avec icône (auth) ────────────────────────────────────────────── */
+
+.field-icon {
+  position: relative;
+  margin-top: 0.4rem;
+}
+.field-icon svg {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.field-icon input {
+  margin-top: 0;
+  padding-left: 2.6rem;
+}
+
+/* ── Icônes de badge (KPI, sidebar) ──────────────────────────────────────── */
+
+.icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  color: var(--color-white);
+}
+.icon-badge-primary { background: linear-gradient(135deg, #4c8dff, #2f6fed); box-shadow: 0 8px 16px rgba(47, 111, 237, 0.35); }
+.icon-badge-success { background: linear-gradient(135deg, #34d17c, #16a34a); box-shadow: 0 8px 16px rgba(22, 163, 74, 0.32); }
+.icon-badge-warning { background: linear-gradient(135deg, #ffab33, #ea8c00); box-shadow: 0 8px 16px rgba(234, 140, 0, 0.32); }
+.icon-badge-info { background: linear-gradient(135deg, #22c3e6, #0891b2); box-shadow: 0 8px 16px rgba(8, 145, 178, 0.32); }
+.icon-badge-violet { background: linear-gradient(135deg, #8f7ff0, #6d5bd0); box-shadow: 0 8px 16px rgba(109, 91, 208, 0.35); }
+
+/* ── Badges (criticité, rôles) ───────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.badge-danger { background: var(--color-danger-light); color: var(--color-danger); }
+.badge-warning { background: var(--color-warning-light); color: var(--color-warning); }
+.badge-success { background: var(--color-success-light); color: var(--color-success); }
+.badge-neutral { background: var(--color-surface); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+
+/* ── États ───────────────────────────────────────────────────────────────── */
+
+.empty-state {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.page-header h2 {
+  font-size: 1.6rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.35rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  width: fit-content;
+  box-shadow: var(--shadow-sm);
+}
+.tab {
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.tab:hover:not(.active) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.tab.active {
+  color: var(--color-white);
+  background: var(--gradient-primary);
+  box-shadow: var(--shadow-glow-primary);
 }

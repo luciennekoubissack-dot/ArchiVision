@@ -1,23 +1,16 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { ToastHostComponent } from './toast-host.component';
+import { ConfirmDialogHostComponent } from './confirm-dialog-host.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, ToastHostComponent, ConfirmDialogHostComponent],
   template: `
-    <main>
-      <h1>ArchiVision</h1>
-      <p>Plateforme de modélisation d'architecture d'entreprise.</p>
-      <router-outlet />
-    </main>
+    <router-outlet />
+    <app-toast-host />
+    <app-confirm-dialog-host />
   `,
-  styles: [`
-    main {
-      padding: 2rem;
-    }
-  `],
 })
-export class AppComponent {
-  title = 'ArchiVision';
-}
+export class AppComponent {}
