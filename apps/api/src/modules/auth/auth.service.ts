@@ -4,6 +4,7 @@ import { PrismaService } from '@archivision/infrastructure';
 import { RoleUtilisateur } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 @Injectable()
 export class AuthService {
@@ -76,16 +77,28 @@ export class AuthService {
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, nom: true, role: true, createdAt: true },
+      select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
     });
     if (!user) throw new UnauthorizedException('Utilisateur introuvable');
     return user;
+  }
+
+  async updateMe(userId: string, dto: UpdateMeDto) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.nom !== undefined && { nom: dto.nom }),
+        ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
+      },
+      select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
+    });
   }
 
   private buildAuthResponse(user: {
     id: string;
     email: string;
     nom: string;
+    avatarUrl?: string | null;
     organisationId: string;
     role: RoleUtilisateur;
   }) {
@@ -98,7 +111,7 @@ export class AuthService {
 
     return {
       accessToken: token,
-      user: { id: user.id, email: user.email, nom: user.nom, role: user.role },
+      user: { id: user.id, email: user.email, nom: user.nom, avatarUrl: user.avatarUrl ?? null, role: user.role },
     };
   }
 }

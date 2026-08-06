@@ -80,7 +80,10 @@ const ROLE_LABEL: Record<string, string> = {
 
         <div class="sidebar-footer" *ngIf="auth.currentUser() as user">
           <div class="user-card">
-            <span class="avatar">{{ initials(user.nom) }}</span>
+            <span class="avatar">
+              <img *ngIf="user.avatarUrl" [src]="user.avatarUrl" [alt]="user.nom" />
+              <ng-container *ngIf="!user.avatarUrl">{{ initials(user.nom) }}</ng-container>
+            </span>
             <div class="user-info">
               <span class="user-name">{{ user.nom }}</span>
               <span class="user-email">{{ user.email }}</span>
@@ -193,7 +196,9 @@ const ROLE_LABEL: Record<string, string> = {
         font-weight: 800;
         font-size: 0.85rem;
         flex-shrink: 0;
+        overflow: hidden;
       }
+      .avatar img { width: 100%; height: 100%; object-fit: cover; }
       .user-info { display: flex; flex-direction: column; min-width: 0; }
       .user-info .user-name { font-weight: 700; font-size: 0.88rem; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .user-info .user-email { font-size: 0.76rem; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

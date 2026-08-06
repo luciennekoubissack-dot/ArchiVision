@@ -21,6 +21,7 @@ model User {
   email          String          @unique
   passwordHash   String
   nom            String
+  avatarUrl      String?         @map("avatar_url")
   organisationId String
   organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   role           RoleUtilisateur

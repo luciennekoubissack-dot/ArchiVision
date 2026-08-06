@@ -28,6 +28,7 @@ describe('AuthService', () => {
   const prismaMock = {
     user: {
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     $transaction: jest.fn((callback: (tx: typeof txMock) => unknown) => callback(txMock)),
   };
@@ -63,7 +64,7 @@ describe('AuthService', () => {
 
       expect(result).toEqual({
         accessToken: 'signed.jwt.token',
-        user: { id: mockUser.id, email: mockUser.email, nom: mockUser.nom, role: mockUser.role },
+        user: { id: mockUser.id, email: mockUser.email, nom: mockUser.nom, avatarUrl: null, role: mockUser.role },
       });
       expect(jwtMock.sign).toHaveBeenCalledWith({
         sub: mockUser.id,
@@ -143,6 +144,7 @@ describe('AuthService', () => {
         id: createdUser.id,
         email: createdUser.email,
         nom: createdUser.nom,
+        avatarUrl: null,
         role: RoleUtilisateur.ARCHITECTE,
       });
     });
@@ -165,7 +167,7 @@ describe('AuthService', () => {
       expect(result).toEqual(profile);
       expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: mockUser.id },
-        select: { id: true, email: true, nom: true, role: true, createdAt: true },
+        select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
       });
     });
 
@@ -175,6 +177,34 @@ describe('AuthService', () => {
       await expect(service.me('inconnu')).rejects.toThrow(
         new UnauthorizedException('Utilisateur introuvable'),
       );
+    });
+  });
+
+  describe('updateMe', () => {
+    it("met à jour uniquement les champs fournis (nom et/ou avatarUrl)", async () => {
+      const updated = { id: mockUser.id, email: mockUser.email, nom: 'Nouveau nom', avatarUrl: 'https://example.com/a.png', role: mockUser.role, createdAt: mockUser.createdAt };
+      prismaMock.user.update.mockResolvedValue(updated);
+
+      const result = await service.updateMe(mockUser.id, { nom: 'Nouveau nom', avatarUrl: 'https://example.com/a.png' });
+
+      expect(result).toEqual(updated);
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: { nom: 'Nouveau nom', avatarUrl: 'https://example.com/a.png' },
+        select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
+      });
+    });
+
+    it("n'inclut pas les champs absents du DTO dans la mise à jour", async () => {
+      prismaMock.user.update.mockResolvedValue(mockUser);
+
+      await service.updateMe(mockUser.id, {});
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: {},
+        select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
+      });
     });
   });
 });

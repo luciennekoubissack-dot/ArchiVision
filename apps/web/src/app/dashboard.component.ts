@@ -7,6 +7,7 @@ import { ArchimateService, ElementArchimate, TypeElement } from './archimate.ser
 import { Application, Criticite, UrbanisationService } from './urbanisation.service';
 import { MembresService } from './membres.service';
 import { AuthService } from './auth.service';
+import { Organisation, OrganisationService } from './organisation.service';
 
 Chart.register(...registerables);
 
@@ -48,6 +49,33 @@ const KPIS: Kpi[] = [
       <h2>Tableau de bord</h2>
     </div>
 
+    <section class="hero-banner">
+      <div class="hero-user" *ngIf="auth.currentUser() as user">
+        <span class="hero-avatar">
+          <img *ngIf="user.avatarUrl" [src]="user.avatarUrl" [alt]="user.nom" />
+          <ng-container *ngIf="!user.avatarUrl">{{ initials(user.nom) }}</ng-container>
+        </span>
+        <div>
+          <p class="hero-greeting">{{ greeting }}, {{ firstName(user.nom) }} 👋</p>
+          <p class="hero-sub">Bienvenue sur le tableau de bord de votre organisation.</p>
+        </div>
+      </div>
+
+      <div class="hero-org" *ngIf="organisation">
+        <span class="org-logo">
+          <img *ngIf="organisation.logoUrl" [src]="organisation.logoUrl" [alt]="organisation.nom" />
+          <ng-container *ngIf="!organisation.logoUrl">{{ orgInitial }}</ng-container>
+        </span>
+        <div class="org-info">
+          <span class="org-name">{{ organisation.nom }}</span>
+          <span class="org-location" *ngIf="organisation.pays">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            {{ organisation.pays }}
+          </span>
+        </div>
+      </div>
+    </section>
+
     <section class="kpi-row">
       <div class="card kpi card-hover" [class]="'accent-' + kpi.badge" *ngFor="let kpi of kpis">
         <span class="icon-badge" [class]="'icon-badge-' + kpi.badge" [ngSwitch]="kpi.icon">
@@ -88,6 +116,70 @@ const KPIS: Kpi[] = [
   `,
   styles: [
     `
+      .hero-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1.25rem;
+        margin-bottom: 1.5rem;
+        padding: 1.5rem 1.75rem;
+        border-radius: var(--radius-lg);
+        background: var(--gradient-primary);
+        color: white;
+        box-shadow: var(--shadow-glow-primary);
+      }
+      .hero-user { display: flex; align-items: center; gap: 1rem; }
+      .hero-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.18);
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1.15rem;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .hero-avatar img { width: 100%; height: 100%; object-fit: cover; }
+      .hero-greeting { font-size: 1.25rem; font-weight: 800; }
+      .hero-sub { font-size: 0.88rem; opacity: 0.88; margin-top: 0.15rem; }
+
+      .hero-org {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        background: rgba(255, 255, 255, 0.14);
+        border-radius: var(--radius-md);
+        padding: 0.6rem 1rem 0.6rem 0.6rem;
+      }
+      .org-logo {
+        width: 42px;
+        height: 42px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.9);
+        color: var(--color-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1.05rem;
+      }
+      .org-logo img { width: 100%; height: 100%; object-fit: cover; }
+      .org-info { display: flex; flex-direction: column; min-width: 0; }
+      .org-name { font-weight: 700; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+      .org-location { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; opacity: 0.9; margin-top: 0.1rem; }
+
+      @media (max-width: 700px) {
+        .hero-banner { padding: 1.25rem; }
+        .hero-org { width: 100%; }
+      }
+
       .kpi-row {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -129,6 +221,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   kpis = KPIS;
   counts = { capacites: 0, elements: 0, applications: 0, zones: 0, membres: null as number | null };
   loaded = false;
+  organisation?: Organisation;
   private elements: ElementArchimate[] = [];
   private applications: Application[] = [];
   private viewReady = false;
@@ -139,13 +232,42 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     private archimateService: ArchimateService,
     private urbanisationService: UrbanisationService,
     private membresService: MembresService,
-    private auth: AuthService,
+    private organisationService: OrganisationService,
+    public auth: AuthService,
   ) {}
+
+  get orgInitial(): string {
+    return this.organisation?.nom?.[0]?.toUpperCase() ?? '';
+  }
+
+  get greeting(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bonjour';
+    if (hour < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  }
+
+  firstName(nom: string): string {
+    return nom.trim().split(/\s+/)[0] ?? nom;
+  }
+
+  initials(nom: string): string {
+    const parts = nom.trim().split(/\s+/);
+    return parts
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? '')
+      .join('');
+  }
 
   ngOnInit(): void {
     const membres$ = this.auth.hasRole('ARCHITECTE')
       ? this.membresService.list().pipe(catchError(() => of(null)))
       : of(null);
+
+    this.organisationService.getMine().subscribe({
+      next: (organisation) => (this.organisation = organisation),
+      error: () => {},
+    });
 
     forkJoin({
       capacites: this.archimateService.listCapacites(),

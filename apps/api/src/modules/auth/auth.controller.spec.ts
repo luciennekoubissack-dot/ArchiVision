@@ -33,6 +33,7 @@ describe('AuthController (HTTP)', () => {
   const prismaMock = {
     user: {
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     $transaction: jest.fn((callback: (tx: typeof txMock) => unknown) => callback(txMock)),
   };
@@ -132,6 +133,7 @@ describe('AuthController (HTTP)', () => {
         id: mockUser.id,
         email: mockUser.email,
         nom: mockUser.nom,
+        avatarUrl: null,
         role: mockUser.role,
       });
     });
@@ -195,7 +197,39 @@ describe('AuthController (HTTP)', () => {
       });
       expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
         where: { id: mockUser.id },
-        select: { id: true, email: true, nom: true, role: true, createdAt: true },
+        select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
+      });
+    });
+  });
+
+  describe('PATCH /auth/me', () => {
+    it('retourne 401 sans token', async () => {
+      await request(app.getHttpServer()).patch('/auth/me').send({ nom: 'Nouveau nom' }).expect(401);
+    });
+
+    it("met à jour l'avatar et le nom de l'utilisateur courant", async () => {
+      const updated = { ...mockUser, nom: 'Nouveau nom', avatarUrl: 'https://example.com/avatar.png' };
+      delete (updated as { passwordHash?: string }).passwordHash;
+      prismaMock.user.update.mockResolvedValue(updated);
+
+      const token = jwtService.sign({
+        sub: mockUser.id,
+        email: mockUser.email,
+        organisationId: mockUser.organisationId,
+        role: mockUser.role,
+      });
+
+      const response = await request(app.getHttpServer())
+        .patch('/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ nom: 'Nouveau nom', avatarUrl: 'https://example.com/avatar.png' })
+        .expect(200);
+
+      expect(response.body).toMatchObject({ nom: 'Nouveau nom', avatarUrl: 'https://example.com/avatar.png' });
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: mockUser.id },
+        data: { nom: 'Nouveau nom', avatarUrl: 'https://example.com/avatar.png' },
+        select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
       });
     });
   });

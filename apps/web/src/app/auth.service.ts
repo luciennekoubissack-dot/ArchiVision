@@ -8,7 +8,13 @@ export interface CurrentUser {
   id: string;
   email: string;
   nom: string;
+  avatarUrl?: string | null;
   role: RoleUtilisateur;
+}
+
+export interface UpdateMePayload {
+  nom?: string;
+  avatarUrl?: string;
 }
 
 export interface RegisterPayload {
@@ -67,6 +73,15 @@ export class AuthService {
   hasRole(...roles: RoleUtilisateur[]): boolean {
     const user = this.currentUser();
     return user !== null && roles.includes(user.role);
+  }
+
+  updateMe(payload: UpdateMePayload): Observable<CurrentUser> {
+    return this.http.patch<CurrentUser>('/auth/me', payload).pipe(
+      tap((user) => {
+        localStorage.setItem(this.userKey, JSON.stringify(user));
+        this.currentUser.set(user);
+      }),
+    );
   }
 
   private storeSession(response: AuthResponse): void {
