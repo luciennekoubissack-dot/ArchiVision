@@ -58,6 +58,12 @@ describe('UrbanisationService', () => {
       create: jest.fn(),
       delete: jest.fn(),
     },
+    applicationEchange: {
+      findMany: jest.fn(),
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -344,6 +350,49 @@ describe('UrbanisationService', () => {
       await expect(
         service.desaffecter(AUTRE_ORG_ID, mockApplication.id, mockIlot.id),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Échanges applicatifs', () => {
+    const mockAutreApp = { ...mockApplication, id: 'app-002' };
+
+    it('refuse un échange si la cible appartient à une autre organisation', async () => {
+      prismaMock.application.findUnique
+        .mockResolvedValueOnce(mockApplication)
+        .mockResolvedValueOnce({ ...mockAutreApp, organisationId: AUTRE_ORG_ID });
+
+      await expect(
+        service.createEchange(ORG_ID, { sourceId: mockApplication.id, targetId: mockAutreApp.id }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('crée un échange entre deux applications de la même organisation', async () => {
+      prismaMock.application.findUnique
+        .mockResolvedValueOnce(mockApplication)
+        .mockResolvedValueOnce(mockAutreApp);
+      prismaMock.applicationEchange.create.mockResolvedValue({
+        id: 'echange-001',
+        sourceId: mockApplication.id,
+        targetId: mockAutreApp.id,
+        description: null,
+        protocole: null,
+      });
+
+      const result = await service.createEchange(ORG_ID, {
+        sourceId: mockApplication.id,
+        targetId: mockAutreApp.id,
+      });
+
+      expect(result.id).toBe('echange-001');
+    });
+
+    it('lève NotFoundException en supprimant un échange d\'une autre organisation', async () => {
+      prismaMock.applicationEchange.findUnique.mockResolvedValue({
+        id: 'echange-001',
+        source: { ...mockApplication, organisationId: AUTRE_ORG_ID },
+      });
+
+      await expect(service.removeEchange('echange-001', ORG_ID)).rejects.toThrow(NotFoundException);
     });
   });
 });

@@ -7,7 +7,7 @@ export const ROLES_KEY = 'roles';
  * Restreint un endpoint aux rôles listés — à utiliser avec RolesGuard.
  *
  * @example
- * @Roles(RoleUtilisateur.ARCHITECTE)
+ * @Roles(RoleUtilisateur.ADMINISTRATEUR)
  * @UseGuards(RolesGuard)
  * @Delete(':id')
  * remove() { ... }

@@ -61,49 +61,23 @@ import { AuthService } from './auth.service';
   styles: [
     `
       .auth-screen {
-        position: relative;
         min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 2rem;
-        overflow: hidden;
         background: var(--color-black);
       }
-      .auth-screen::before,
-      .auth-screen::after {
-        content: '';
-        position: absolute;
-        border-radius: 50%;
-        filter: blur(70px);
-        opacity: 0.55;
-      }
-      .auth-screen::before {
-        width: 480px;
-        height: 480px;
-        top: -160px;
-        left: -140px;
-        background: radial-gradient(circle, #2f6fed, transparent 70%);
-      }
-      .auth-screen::after {
-        width: 420px;
-        height: 420px;
-        bottom: -160px;
-        right: -120px;
-        background: radial-gradient(circle, #6d5bd0, transparent 70%);
-      }
       .auth-card {
-        position: relative;
-        z-index: 1;
         width: 100%;
         max-width: 400px;
         background: var(--color-white);
         border-radius: var(--radius-lg);
-        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+        box-shadow: var(--shadow-md);
         padding: 2.75rem 2.25rem;
         text-align: center;
       }
-      .logo { width: 56px; height: 56px; border-radius: 14px; margin-bottom: 1rem; box-shadow: var(--shadow-glow-primary); }
+      .logo { width: 56px; height: 56px; border-radius: 12px; margin-bottom: 1rem; }
       h1 { font-size: 1.6rem; font-weight: 800; }
       .subtitle { color: var(--color-text-muted); margin: 0.4rem 0 1.75rem; font-size: 0.92rem; }
       .field { text-align: left; }
@@ -127,16 +101,20 @@ export class LoginComponent {
     this.loading = true;
 
     this.auth.login(this.email, this.password).subscribe({
-      next: () => {
+      next: (response) => {
         this.loading = false;
-        this.router.navigate(['/dashboard']);
+        const isSuperAdmin = response.user.role === 'SUPERADMIN';
+        this.router.navigate([isSuperAdmin ? '/admin' : '/dashboard']);
       },
       error: (err) => {
         this.loading = false;
-        this.error =
-          err?.status === 401
-            ? 'Email ou mot de passe incorrect.'
-            : 'Impossible de se connecter. Réessayez.';
+        if (err?.status === 401) {
+          this.error = 'Email ou mot de passe incorrect.';
+        } else if (err?.status === 403) {
+          this.error = err?.error?.message ?? "Votre compte n'est pas autorisé à se connecter pour le moment.";
+        } else {
+          this.error = 'Impossible de se connecter. Réessayez.';
+        }
       },
     });
   }

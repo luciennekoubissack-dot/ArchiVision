@@ -12,7 +12,7 @@ describe('OrganisationController (HTTP)', () => {
     sub: 'user-001',
     email: 'admin@archivision.local',
     organisationId: 'org-001',
-    role: RoleUtilisateur.ARCHITECTE,
+    role: RoleUtilisateur.ADMINISTRATEUR,
   };
 
   const mockOrganisation = {
@@ -96,7 +96,7 @@ describe('OrganisationController (HTTP)', () => {
   });
 
   describe('PATCH /organisations/me', () => {
-    it("met à jour l'organisation (200) pour un Architecte", async () => {
+    it("met à jour l'organisation (200) pour un Administrateur", async () => {
       const updated = { ...mockOrganisation, description: 'Description mise à jour' };
       prismaMock.organisation.findUnique.mockResolvedValue(mockOrganisation);
       prismaMock.organisation.update.mockResolvedValue(updated);

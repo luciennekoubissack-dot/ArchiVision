@@ -15,7 +15,7 @@ describe('AuthService', () => {
     passwordHash: '',
     nom: 'Admin',
     organisationId: 'org-001',
-    role: RoleUtilisateur.ARCHITECTE,
+    role: RoleUtilisateur.ADMINISTRATEUR,
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
   };
@@ -104,6 +104,15 @@ describe('AuthService', () => {
         expect.stringContaining('$2b$10$invalidhashfortimingprotection'),
       );
     });
+
+    it("réussit même si l'organisation de l'utilisateur est EN_ATTENTE ou REJETEE (plus de blocage à la connexion)", async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+      jwtMock.sign.mockReturnValue('signed.jwt.token');
+
+      const result = await service.login('admin@archivision.local', 'Admin123!');
+
+      expect(result.accessToken).toBe('signed.jwt.token');
+    });
   });
 
   describe('register', () => {
@@ -114,15 +123,25 @@ describe('AuthService', () => {
       nom: 'Fondateur',
     };
 
-    it('crée une organisation et son premier utilisateur (rôle Architecte)', async () => {
+    it("crée une organisation en attente et son premier utilisateur (rôle Administrateur), et connecte immédiatement", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
-      const createdOrg = { id: 'org-002', nom: registerDto.organisationNom, description: null, secteur: null, taille: null, pays: null, logoUrl: null };
+      const createdOrg = {
+        id: 'org-002',
+        nom: registerDto.organisationNom,
+        description: null,
+        secteur: null,
+        taille: null,
+        pays: null,
+        logoUrl: null,
+        statut: 'EN_ATTENTE',
+      };
       const createdUser = {
         id: 'user-002',
         email: registerDto.email,
         nom: registerDto.nom,
+        avatarUrl: null,
         organisationId: createdOrg.id,
-        role: RoleUtilisateur.ARCHITECTE,
+        role: RoleUtilisateur.ADMINISTRATEUR,
       };
       txMock.organisation.create.mockResolvedValue(createdOrg);
       txMock.user.create.mockResolvedValue(createdUser);
@@ -134,18 +153,26 @@ describe('AuthService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             organisationId: createdOrg.id,
-            role: RoleUtilisateur.ARCHITECTE,
+            role: RoleUtilisateur.ADMINISTRATEUR,
           }),
         }),
       );
-      expect(result.accessToken).toBe('signed.jwt.token');
-      expect(result.organisation.id).toBe(createdOrg.id);
-      expect(result.user).toEqual({
-        id: createdUser.id,
+      expect(jwtMock.sign).toHaveBeenCalledWith({
+        sub: createdUser.id,
         email: createdUser.email,
-        nom: createdUser.nom,
-        avatarUrl: null,
-        role: RoleUtilisateur.ARCHITECTE,
+        organisationId: createdUser.organisationId,
+        role: createdUser.role,
+      });
+      expect(result).toEqual({
+        accessToken: 'signed.jwt.token',
+        user: {
+          id: createdUser.id,
+          email: createdUser.email,
+          nom: createdUser.nom,
+          avatarUrl: null,
+          role: createdUser.role,
+        },
+        organisation: { id: createdOrg.id, nom: createdOrg.nom, statut: createdOrg.statut },
       });
     });
 

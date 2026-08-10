@@ -14,6 +14,10 @@ import { ConfirmDialogService } from './confirm-dialog.service';
 type Tab = 'capacites' | 'elements' | 'relations';
 
 const TYPE_ELEMENT_LABEL: Record<TypeElement, string> = {
+  VISION: 'Vision',
+  OBJECTIF_ARCHIMATE: "Objectif d'architecture",
+  PRINCIPE: 'Principe',
+  EXIGENCE: 'Exigence',
   ACTEUR_METIER: 'Acteur métier',
   ROLE_METIER: 'Rôle métier',
   PROCESSUS_METIER: 'Processus métier',

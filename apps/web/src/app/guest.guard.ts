@@ -10,7 +10,8 @@ export class GuestGuard implements CanActivate {
 
   canActivate(): boolean {
     if (this.auth.isAuthenticated()) {
-      this.router.navigate(['/dashboard']);
+      const isSuperAdmin = this.auth.hasRole('SUPERADMIN');
+      this.router.navigate([isSuperAdmin ? '/admin' : '/dashboard']);
       return false;
     }
     return true;

@@ -98,6 +98,74 @@ npm run start:dev
 
 ---
 
+## Procédure de lancement rapide
+
+### Prérequis
+
+- Node.js 22+
+- npm
+- Docker Desktop (pour la base de données PostgreSQL)
+
+### 1. Préparer les variables d’environnement
+
+```bash
+cp .env.example .env
+```
+
+### 2. Installer les dépendances
+
+```bash
+npm install
+cd apps/web
+npm install
+cd ../..
+```
+
+### 3. Démarrer la base de données
+
+```bash
+docker compose up -d postgres
+```
+
+### 4. Initialiser Prisma et la base
+
+```bash
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed
+```
+
+### 5. Lancer l’API
+
+```bash
+npm run start:dev
+```
+
+L’API sera disponible sur http://localhost:3000.
+
+### 6. Lancer le frontend
+
+Dans un second terminal :
+
+```bash
+cd apps/web
+npm start
+```
+
+Le frontend sera disponible sur .
+
+### Alternative avec Docker
+
+Pour démarrer uniquement la stack backend avec PostgreSQL :
+
+```bash
+docker compose up --build
+```
+
+Cette commande lance l’API et la base PostgreSQL, mais pas le frontend Angular.
+
+---
+
 ## Base de données
 
 Le schéma Prisma est défini dans `apps/api/prisma/schema.prisma`. Modèles : `User`, `Organisation`, `CapaciteMetier`, `ElementArchimate`, `RelationArchimate`, `Application`, `ZoneUrbanisation`, `ApplicationZone`.

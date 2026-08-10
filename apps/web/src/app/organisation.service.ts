@@ -10,6 +10,8 @@ export interface Organisation {
   secteur?: string | null;
   taille?: string | null;
   pays?: string | null;
+  vision?: string | null;
+  problemesResoudre?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +23,8 @@ export interface UpdateOrganisationPayload {
   secteur?: string;
   taille?: string;
   pays?: string;
+  vision?: string;
+  problemesResoudre?: string;
 }
 
 export interface ReferentielExport {

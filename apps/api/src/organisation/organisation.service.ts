@@ -10,6 +10,9 @@ const organisationSelect = {
   secteur: true,
   taille: true,
   pays: true,
+  vision: true,
+  problemesResoudre: true,
+  statut: true,
   createdAt: true,
   updatedAt: true,
 } as const;

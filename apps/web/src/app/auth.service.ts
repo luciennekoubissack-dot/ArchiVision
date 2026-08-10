@@ -2,7 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 
-export type RoleUtilisateur = 'ARCHITECTE' | 'DIRIGEANT' | 'REPRESENTANT' | 'COLLABORATEUR';
+export type RoleUtilisateur = 'SUPERADMIN' | 'ADMINISTRATEUR' | 'ARCHITECTE';
 
 export interface CurrentUser {
   id: string;
@@ -17,6 +17,48 @@ export interface UpdateMePayload {
   avatarUrl?: string;
 }
 
+export interface ObjectifItem {
+  nom: string;
+  description?: string;
+}
+
+export interface PartiePrenanteItem {
+  nom: string;
+  role?: string;
+}
+
+export interface BpmnProcessusItem {
+  nom: string;
+  description?: string;
+}
+
+export interface CapaciteItem {
+  nom: string;
+  description?: string;
+}
+
+export interface ActeurItem {
+  nom: string;
+  type: 'ACTEUR_METIER' | 'ROLE_METIER';
+}
+
+export interface DataEntityItem {
+  nom: string;
+  description?: string;
+}
+
+export interface ApplicationItem {
+  nom: string;
+  description?: string;
+  criticite?: 'HAUTE' | 'MOYENNE' | 'BASSE';
+}
+
+export interface TechComponentItem {
+  nom: string;
+  type: 'SERVEUR' | 'RESEAU' | 'CLOUD' | 'BASE_DE_DONNEES' | 'MIDDLEWARE';
+  description?: string;
+}
+
 export interface RegisterPayload {
   organisationNom: string;
   organisationDescription?: string;
@@ -24,9 +66,19 @@ export interface RegisterPayload {
   taille?: string;
   pays?: string;
   logoUrl?: string;
+  vision?: string;
+  problemesResoudre?: string;
   email: string;
   password: string;
   nom: string;
+  objectifs?: ObjectifItem[];
+  partiesPrenantes?: PartiePrenanteItem[];
+  bpmnProcessus?: BpmnProcessusItem[];
+  capacitesMetier?: CapaciteItem[];
+  acteurs?: ActeurItem[];
+  dataEntities?: DataEntityItem[];
+  applications?: ApplicationItem[];
+  techComponents?: TechComponentItem[];
 }
 
 interface AuthResponse {
@@ -34,8 +86,10 @@ interface AuthResponse {
   user: CurrentUser;
 }
 
-export interface RegisterResponse extends AuthResponse {
-  organisation: { id: string; nom: string };
+export interface RegisterResponse {
+  accessToken: string;
+  user: CurrentUser;
+  organisation: { id: string; nom: string; statut: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE' };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -58,6 +112,12 @@ export class AuthService {
     return this.http
       .post<RegisterResponse>('/auth/register', payload)
       .pipe(tap((response) => this.storeSession(response)));
+  }
+
+  uploadLogo(file: File): Observable<{ url: string }> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<{ url: string }>('/uploads/logo', form);
   }
 
   logout(): void {

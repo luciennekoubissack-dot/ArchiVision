@@ -13,7 +13,8 @@ export class RoleGuard implements CanActivate {
     if (!allowedRoles || allowedRoles.length === 0 || this.auth.hasRole(...allowedRoles)) {
       return true;
     }
-    this.router.navigate(['/dashboard']);
+    const isSuperAdmin = this.auth.hasRole('SUPERADMIN');
+    this.router.navigate([isSuperAdmin ? '/admin' : '/dashboard']);
     return false;
   }
 }

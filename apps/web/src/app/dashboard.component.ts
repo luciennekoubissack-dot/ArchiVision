@@ -12,6 +12,10 @@ import { Organisation, OrganisationService } from './organisation.service';
 Chart.register(...registerables);
 
 const TYPE_LABEL: Record<TypeElement, string> = {
+  VISION: 'Visions',
+  OBJECTIF_ARCHIMATE: "Objectifs d'architecture",
+  PRINCIPE: 'Principes',
+  EXIGENCE: 'Exigences',
   ACTEUR_METIER: 'Acteurs',
   ROLE_METIER: 'Rôles',
   PROCESSUS_METIER: 'Processus',
@@ -49,7 +53,7 @@ const KPIS: Kpi[] = [
       <h2>Tableau de bord</h2>
     </div>
 
-    <section class="hero-banner">
+    <section class="card hero-banner">
       <div class="hero-user" *ngIf="auth.currentUser() as user">
         <span class="hero-avatar">
           <img *ngIf="user.avatarUrl" [src]="user.avatarUrl" [alt]="user.nom" />
@@ -77,7 +81,7 @@ const KPIS: Kpi[] = [
     </section>
 
     <section class="kpi-row">
-      <div class="card kpi card-hover" [class]="'accent-' + kpi.badge" *ngFor="let kpi of kpis">
+      <div class="card kpi card-hover" *ngFor="let kpi of kpis">
         <span class="icon-badge" [class]="'icon-badge-' + kpi.badge" [ngSwitch]="kpi.icon">
           <svg *ngSwitchCase="'layers'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
           <svg *ngSwitchCase="'network'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v4M10.3 15.5 7 17.5M13.7 15.5 17 17.5"/></svg>
@@ -123,60 +127,54 @@ const KPIS: Kpi[] = [
         flex-wrap: wrap;
         gap: 1.25rem;
         margin-bottom: 1.5rem;
-        padding: 1.5rem 1.75rem;
-        border-radius: var(--radius-lg);
-        background: var(--gradient-primary);
-        color: white;
-        box-shadow: var(--shadow-glow-primary);
       }
       .hero-user { display: flex; align-items: center; gap: 1rem; }
       .hero-avatar {
-        width: 56px;
-        height: 56px;
+        width: 52px;
+        height: 52px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.18);
-        border: 2px solid rgba(255, 255, 255, 0.4);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 800;
-        font-size: 1.15rem;
-        flex-shrink: 0;
-        overflow: hidden;
-      }
-      .hero-avatar img { width: 100%; height: 100%; object-fit: cover; }
-      .hero-greeting { font-size: 1.25rem; font-weight: 800; }
-      .hero-sub { font-size: 0.88rem; opacity: 0.88; margin-top: 0.15rem; }
-
-      .hero-org {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        background: rgba(255, 255, 255, 0.14);
-        border-radius: var(--radius-md);
-        padding: 0.6rem 1rem 0.6rem 0.6rem;
-      }
-      .org-logo {
-        width: 42px;
-        height: 42px;
-        border-radius: var(--radius-sm);
-        overflow: hidden;
-        flex-shrink: 0;
-        background: rgba(255, 255, 255, 0.9);
+        background: var(--color-primary-light);
         color: var(--color-primary);
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
-        font-size: 1.05rem;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .hero-avatar img { width: 100%; height: 100%; object-fit: cover; }
+      .hero-greeting { font-size: 1.2rem; font-weight: 800; color: var(--color-text); }
+      .hero-sub { font-size: 0.86rem; color: var(--color-text-muted); margin-top: 0.15rem; }
+
+      .hero-org {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        background: var(--color-surface);
+        border-radius: var(--radius-md);
+        padding: 0.6rem 1rem 0.6rem 0.6rem;
+      }
+      .org-logo {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        flex-shrink: 0;
+        background: var(--color-white);
+        color: var(--color-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 1rem;
       }
       .org-logo img { width: 100%; height: 100%; object-fit: cover; }
       .org-info { display: flex; flex-direction: column; min-width: 0; }
-      .org-name { font-weight: 700; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-      .org-location { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; opacity: 0.9; margin-top: 0.1rem; }
+      .org-name { font-weight: 700; font-size: 0.92rem; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+      .org-location { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.1rem; }
 
       @media (max-width: 700px) {
-        .hero-banner { padding: 1.25rem; }
         .hero-org { width: 100%; }
       }
 
@@ -186,19 +184,7 @@ const KPIS: Kpi[] = [
         gap: 1rem;
         margin-bottom: 1.5rem;
       }
-      .kpi { display: flex; align-items: center; gap: 0.9rem; position: relative; overflow: hidden; }
-      .kpi::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 4px;
-        background: var(--gradient-primary);
-      }
-      .kpi.accent-primary::before { background: linear-gradient(90deg, #4c8dff, #2f6fed); }
-      .kpi.accent-violet::before { background: linear-gradient(90deg, #8f7ff0, #6d5bd0); }
-      .kpi.accent-info::before { background: linear-gradient(90deg, #22c3e6, #0891b2); }
-      .kpi.accent-warning::before { background: linear-gradient(90deg, #ffab33, #ea8c00); }
-      .kpi.accent-success::before { background: linear-gradient(90deg, #34d17c, #16a34a); }
+      .kpi { display: flex; align-items: center; gap: 0.9rem; }
       .kpi-text { display: flex; flex-direction: column; }
       .kpi-value { font-size: 1.9rem; font-weight: 800; color: var(--color-text); line-height: 1.1; }
       .kpi-label { color: var(--color-text-muted); font-size: 0.85rem; margin-top: 0.15rem; }
@@ -260,7 +246,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   ngOnInit(): void {
-    const membres$ = this.auth.hasRole('ARCHITECTE')
+    const membres$ = this.auth.hasRole('ADMINISTRATEUR')
       ? this.membresService.list().pipe(catchError(() => of(null)))
       : of(null);
 
@@ -324,7 +310,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         datasets: [
           {
             data: [...counts.values()],
-            backgroundColor: ['#2f6fed', '#6d5bd0', '#0891b2', '#16a34a', '#ea8c00'],
+            backgroundColor: ['#3b5bdb', '#6c5dd3', '#12a0a0', '#1f9d55', '#d98a1f'],
             borderWidth: 0,
           },
         ],
@@ -346,7 +332,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     for (const app of this.applications) {
       counts.set(app.criticite, (counts.get(app.criticite) ?? 0) + 1);
     }
-    const colors: Record<Criticite, string> = { HAUTE: '#dc2626', MOYENNE: '#ea8c00', BASSE: '#16a34a' };
+    const colors: Record<Criticite, string> = { HAUTE: '#dc2626', MOYENNE: '#d98a1f', BASSE: '#1f9d55' };
 
     this.criticiteChart = new Chart(this.criticiteChartRef.nativeElement, {
       type: 'bar',

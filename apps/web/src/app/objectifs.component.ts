@@ -100,7 +100,7 @@ export class ObjectifsComponent implements OnInit {
   ) {}
 
   get canWrite(): boolean {
-    return this.auth.hasRole('ARCHITECTE', 'DIRIGEANT');
+    return this.auth.hasRole('ADMINISTRATEUR', 'ARCHITECTE');
   }
 
   ngOnInit(): void {

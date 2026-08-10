@@ -63,12 +63,12 @@ export class MembresService {
   async remove(organisationId: string, id: string) {
     const membre = await this.assertMemberExists(id, organisationId);
 
-    if (membre.role === RoleUtilisateur.ARCHITECTE) {
-      const nbArchitectes = await this.prisma.user.count({
-        where: { organisationId, role: RoleUtilisateur.ARCHITECTE },
+    if (membre.role === RoleUtilisateur.ADMINISTRATEUR) {
+      const nbAdministrateurs = await this.prisma.user.count({
+        where: { organisationId, role: RoleUtilisateur.ADMINISTRATEUR },
       });
-      if (nbArchitectes <= 1) {
-        throw new ConflictException("Impossible de supprimer le dernier Architecte de l'organisation");
+      if (nbAdministrateurs <= 1) {
+        throw new ConflictException("Impossible de supprimer le dernier Administrateur de l'organisation");
       }
     }
 

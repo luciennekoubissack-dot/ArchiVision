@@ -62,6 +62,7 @@ describe('ArchimateService', () => {
       findUnique: jest.fn(),
       delete: jest.fn(),
     },
+    $transaction: jest.fn((operations: unknown[]) => Promise.all(operations)),
   };
 
   beforeEach(async () => {
@@ -279,6 +280,61 @@ describe('ArchimateService', () => {
       prismaMock.elementArchimate.count.mockResolvedValue(0);
 
       await expect(service.removeElement('inconnu', ORG_ID)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Positions (canevas)', () => {
+    it('met à jour la position d\'un élément existant', async () => {
+      prismaMock.elementArchimate.count.mockResolvedValue(1);
+      prismaMock.elementArchimate.update.mockResolvedValue({ ...mockElement, positionX: 100, positionY: 200 });
+
+      const result = await service.updateElementPosition(mockElement.id, ORG_ID, { positionX: 100, positionY: 200 });
+
+      expect(result.positionX).toBe(100);
+      expect(prismaMock.elementArchimate.update).toHaveBeenCalledWith({
+        where: { id: mockElement.id },
+        data: { positionX: 100, positionY: 200 },
+      });
+    });
+
+    it('lève NotFoundException si l\'élément à déplacer appartient à une autre organisation', async () => {
+      prismaMock.elementArchimate.count.mockResolvedValue(0);
+
+      await expect(
+        service.updateElementPosition(mockElement.id, AUTRE_ORG_ID, { positionX: 0, positionY: 0 }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prismaMock.elementArchimate.update).not.toHaveBeenCalled();
+    });
+
+    it('met à jour les positions de plusieurs éléments en une transaction', async () => {
+      prismaMock.elementArchimate.count.mockResolvedValue(2);
+      prismaMock.elementArchimate.update
+        .mockResolvedValueOnce({ ...mockElement, positionX: 10, positionY: 20 })
+        .mockResolvedValueOnce({ ...mockElementCible, positionX: 30, positionY: 40 });
+
+      const items = [
+        { id: mockElement.id, positionX: 10, positionY: 20 },
+        { id: mockElementCible.id, positionX: 30, positionY: 40 },
+      ];
+      const result = await service.updateElementPositionsBatch(ORG_ID, items);
+
+      expect(result).toHaveLength(2);
+      expect(prismaMock.elementArchimate.count).toHaveBeenCalledWith({
+        where: { id: { in: [mockElement.id, mockElementCible.id] }, organisationId: ORG_ID },
+      });
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+    });
+
+    it('lève NotFoundException si un des éléments du lot n\'appartient pas à l\'organisation, sans écrire', async () => {
+      prismaMock.elementArchimate.count.mockResolvedValue(1);
+
+      await expect(
+        service.updateElementPositionsBatch(ORG_ID, [
+          { id: mockElement.id, positionX: 0, positionY: 0 },
+          { id: 'hors-org', positionX: 0, positionY: 0 },
+        ]),
+      ).rejects.toThrow(NotFoundException);
+      expect(prismaMock.elementArchimate.update).not.toHaveBeenCalled();
     });
   });
 

@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { TypeElement } from '@prisma/client';
 
 export class CreateElementDto {
@@ -18,4 +18,12 @@ export class CreateElementDto {
   @IsUUID()
   @IsOptional()
   capaciteMetierId?: string;
+
+  @IsNumber()
+  @IsOptional()
+  positionX?: number;
+
+  @IsNumber()
+  @IsOptional()
+  positionY?: number;
 }

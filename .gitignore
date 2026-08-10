@@ -24,6 +24,9 @@ Thumbs.db
 # Docker volumes locaux
 docker/data/
 
+# Fichiers uploadés (logos, etc.)
+apps/api/uploads/
+
 # Angular cache
 .angular/
 apps/web/coverage/

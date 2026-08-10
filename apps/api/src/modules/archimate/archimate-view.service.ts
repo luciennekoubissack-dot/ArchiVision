@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TypeElement, TypeRelation } from '@prisma/client';
 import { ArchimateService } from './archimate.service';
+import { computeGridLayout } from './layout.util';
 
 const BOX_WIDTH = 170;
 const BOX_HEIGHT = 56;
@@ -8,7 +9,12 @@ const GAP_X = 50;
 const GAP_Y = 90;
 const MARGIN = 40;
 
-const ROW_ORDER: TypeElement[] = [
+/** Couche Motivation en premier (au-dessus), puis couche Métier. */
+export const ROW_ORDER: TypeElement[] = [
+  TypeElement.VISION,
+  TypeElement.OBJECTIF_ARCHIMATE,
+  TypeElement.PRINCIPE,
+  TypeElement.EXIGENCE,
   TypeElement.ACTEUR_METIER,
   TypeElement.ROLE_METIER,
   TypeElement.PROCESSUS_METIER,
@@ -17,12 +23,29 @@ const ROW_ORDER: TypeElement[] = [
 ];
 
 const TYPE_LABEL: Record<TypeElement, string> = {
+  VISION: 'Vision',
+  OBJECTIF_ARCHIMATE: "Objectif d'architecture",
+  PRINCIPE: 'Principe',
+  EXIGENCE: 'Exigence',
   ACTEUR_METIER: 'Acteur métier',
   ROLE_METIER: 'Rôle métier',
   PROCESSUS_METIER: 'Processus métier',
   SERVICE_METIER: 'Service métier',
   OBJET_METIER: 'Objet métier',
 };
+
+const MOTIVATION_TYPES = new Set<TypeElement>([
+  TypeElement.VISION,
+  TypeElement.OBJECTIF_ARCHIMATE,
+  TypeElement.PRINCIPE,
+  TypeElement.EXIGENCE,
+]);
+
+/** Jaune ArchiMate pour la couche Métier, lavande pour la couche Motivation. */
+const TYPE_COLOR = (type: TypeElement): { fill: string; stroke: string; text: string } =>
+  MOTIVATION_TYPES.has(type)
+    ? { fill: '#E6E6FA', stroke: '#7A6FBE', text: '#4A4177' }
+    : { fill: '#FFFFB3', stroke: '#C6A700', text: '#7A6400' };
 
 const RELATION_LABEL: Record<TypeRelation, string> = {
   ASSIGNATION: 'assignation',
@@ -75,31 +98,13 @@ export class ArchimateViewService {
       };
     }
 
-    const byRow = new Map<TypeElement, ElementLike[]>();
-    for (const type of ROW_ORDER) byRow.set(type, []);
-    for (const element of elements) {
-      byRow.get(element.type)?.push(element);
-    }
-
-    const maxPerRow = Math.max(...ROW_ORDER.map((type) => byRow.get(type)!.length), 1);
-    const width = MARGIN * 2 + maxPerRow * BOX_WIDTH + (maxPerRow - 1) * GAP_X;
-    const activeRows = ROW_ORDER.filter((type) => byRow.get(type)!.length > 0);
-    const height = MARGIN * 2 + activeRows.length * BOX_HEIGHT + (activeRows.length - 1) * GAP_Y;
-
-    const positions = new Map<string, Position>();
-    let rowIndex = 0;
-    for (const type of ROW_ORDER) {
-      const rowElements = byRow.get(type)!;
-      if (rowElements.length === 0) continue;
-      const rowWidth = rowElements.length * BOX_WIDTH + (rowElements.length - 1) * GAP_X;
-      const rowStartX = MARGIN + (width - MARGIN * 2 - rowWidth) / 2;
-      const y = MARGIN + rowIndex * (BOX_HEIGHT + GAP_Y);
-      rowElements.forEach((element, i) => {
-        const x = rowStartX + i * (BOX_WIDTH + GAP_X);
-        positions.set(element.id, { x, y, cx: x + BOX_WIDTH / 2, cy: y + BOX_HEIGHT / 2 });
-      });
-      rowIndex += 1;
-    }
+    const { positions, width, height } = computeGridLayout(elements, ROW_ORDER, {
+      boxWidth: BOX_WIDTH,
+      boxHeight: BOX_HEIGHT,
+      gapX: GAP_X,
+      gapY: GAP_Y,
+      margin: MARGIN,
+    });
 
     const boxesSvg = elements
       .map((element) => this.renderBox(element, positions.get(element.id)!))
@@ -121,9 +126,10 @@ ${boxesSvg}
 
   private renderBox(element: ElementLike, pos: Position): string {
     const { x, y } = pos;
+    const color = TYPE_COLOR(element.type);
     return `<g>
-  <rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="4" fill="#FFFFB3" stroke="#C6A700" stroke-width="1.5" />
-  <text x="${x + 8}" y="${y + 16}" font-size="9" fill="#7A6400">${this.escape(TYPE_LABEL[element.type])}</text>
+  <rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="4" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />
+  <text x="${x + 8}" y="${y + 16}" font-size="9" fill="${color.text}">${this.escape(TYPE_LABEL[element.type])}</text>
   <text x="${x + BOX_WIDTH / 2}" y="${y + BOX_HEIGHT / 2 + 12}" font-size="12" text-anchor="middle" fill="#1a1a1a">${this.escape(this.truncate(element.nom, 28))}</text>
 </g>`;
   }

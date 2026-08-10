@@ -3,6 +3,10 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export type TypeElement =
+  | 'VISION'
+  | 'OBJECTIF_ARCHIMATE'
+  | 'PRINCIPE'
+  | 'EXIGENCE'
   | 'ACTEUR_METIER'
   | 'ROLE_METIER'
   | 'PROCESSUS_METIER'
@@ -27,6 +31,8 @@ export interface ElementArchimate {
   description?: string | null;
   capaciteMetierId?: string | null;
   capacite?: { id: string; nom: string } | null;
+  positionX?: number | null;
+  positionY?: number | null;
   createdAt: string;
   updatedAt: string;
   _count?: { relationsSource: number; relationsTarget: number };
@@ -81,13 +87,22 @@ export class ArchimateService {
     nom: string;
     description?: string;
     capaciteMetierId?: string;
+    positionX?: number;
+    positionY?: number;
   }): Observable<ElementArchimate> {
     return this.http.post<ElementArchimate>('/elements-archimate', payload);
   }
 
   updateElement(
     id: string,
-    payload: { nom?: string; type?: TypeElement; description?: string; capaciteMetierId?: string | null },
+    payload: {
+      nom?: string;
+      type?: TypeElement;
+      description?: string;
+      capaciteMetierId?: string | null;
+      positionX?: number;
+      positionY?: number;
+    },
   ): Observable<ElementArchimate> {
     return this.http.patch<ElementArchimate>(`/elements-archimate/${id}`, payload);
   }
@@ -98,6 +113,23 @@ export class ArchimateService {
 
   generateView(): Observable<ArchimateView> {
     return this.http.get<ArchimateView>('/elements-archimate/generate-vue');
+  }
+
+  updateElementPosition(id: string, positionX: number, positionY: number): Observable<ElementArchimate> {
+    return this.http.patch<ElementArchimate>(`/elements-archimate/${id}/position`, { positionX, positionY });
+  }
+
+  updateElementPositionsBatch(
+    items: { id: string; positionX: number; positionY: number }[],
+  ): Observable<ElementArchimate[]> {
+    return this.http.patch<ElementArchimate[]>('/elements-archimate/positions', { items });
+  }
+
+  generateLayout(): Observable<{ elements: ElementArchimate[]; elementCount: number }> {
+    return this.http.post<{ elements: ElementArchimate[]; elementCount: number }>(
+      '/elements-archimate/generate-layout',
+      {},
+    );
   }
 
   // ── Relations ArchiMate ───────────────────────────────────────────────────

@@ -13,7 +13,7 @@ describe('MembresService', () => {
     passwordHash: 'hash',
     nom: 'Collaborateur',
     organisationId: 'org-001',
-    role: RoleUtilisateur.COLLABORATEUR,
+    role: RoleUtilisateur.ARCHITECTE,
     serviceId: null,
   };
 
@@ -60,13 +60,13 @@ describe('MembresService', () => {
         email: mockMembre.email,
         password: 'MotDePasse123!',
         nom: mockMembre.nom,
-        role: RoleUtilisateur.COLLABORATEUR,
+        role: RoleUtilisateur.ARCHITECTE,
       });
 
       expect(result).toEqual(mockMembre);
       expect(prismaMock.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ organisationId: 'org-001', role: RoleUtilisateur.COLLABORATEUR }),
+          data: expect.objectContaining({ organisationId: 'org-001', role: RoleUtilisateur.ARCHITECTE }),
         }),
       );
     });
@@ -79,7 +79,7 @@ describe('MembresService', () => {
           email: mockMembre.email,
           password: 'MotDePasse123!',
           nom: 'X',
-          role: RoleUtilisateur.COLLABORATEUR,
+          role: RoleUtilisateur.ARCHITECTE,
         }),
       ).rejects.toThrow(ConflictException);
       expect(prismaMock.user.create).not.toHaveBeenCalled();
@@ -91,22 +91,22 @@ describe('MembresService', () => {
       prismaMock.user.findUnique.mockResolvedValue({ ...mockMembre, organisationId: 'org-002' });
 
       await expect(
-        service.update('org-001', mockMembre.id, { role: RoleUtilisateur.ARCHITECTE }),
+        service.update('org-001', mockMembre.id, { role: RoleUtilisateur.ADMINISTRATEUR }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('met à jour le rôle', async () => {
       prismaMock.user.findUnique.mockResolvedValue(mockMembre);
-      prismaMock.user.update.mockResolvedValue({ ...mockMembre, role: RoleUtilisateur.REPRESENTANT });
+      prismaMock.user.update.mockResolvedValue({ ...mockMembre, role: RoleUtilisateur.ADMINISTRATEUR });
 
-      const result = await service.update('org-001', mockMembre.id, { role: RoleUtilisateur.REPRESENTANT });
+      const result = await service.update('org-001', mockMembre.id, { role: RoleUtilisateur.ADMINISTRATEUR });
 
-      expect(result.role).toBe(RoleUtilisateur.REPRESENTANT);
+      expect(result.role).toBe(RoleUtilisateur.ADMINISTRATEUR);
     });
   });
 
   describe('remove', () => {
-    it('supprime un membre non-Architecte', async () => {
+    it('supprime un membre non-Administrateur', async () => {
       prismaMock.user.findUnique.mockResolvedValue(mockMembre);
       prismaMock.user.delete.mockResolvedValue(mockMembre);
 
@@ -115,22 +115,22 @@ describe('MembresService', () => {
       expect(prismaMock.user.delete).toHaveBeenCalledWith({ where: { id: mockMembre.id } });
     });
 
-    it('lève ConflictException si c\'est le dernier Architecte', async () => {
-      const architecte = { ...mockMembre, role: RoleUtilisateur.ARCHITECTE };
-      prismaMock.user.findUnique.mockResolvedValue(architecte);
+    it('lève ConflictException si c\'est le dernier Administrateur', async () => {
+      const administrateur = { ...mockMembre, role: RoleUtilisateur.ADMINISTRATEUR };
+      prismaMock.user.findUnique.mockResolvedValue(administrateur);
       prismaMock.user.count.mockResolvedValue(1);
 
-      await expect(service.remove('org-001', architecte.id)).rejects.toThrow(ConflictException);
+      await expect(service.remove('org-001', administrateur.id)).rejects.toThrow(ConflictException);
       expect(prismaMock.user.delete).not.toHaveBeenCalled();
     });
 
-    it('autorise la suppression d\'un Architecte s\'il en reste un autre', async () => {
-      const architecte = { ...mockMembre, role: RoleUtilisateur.ARCHITECTE };
-      prismaMock.user.findUnique.mockResolvedValue(architecte);
+    it('autorise la suppression d\'un Administrateur s\'il en reste un autre', async () => {
+      const administrateur = { ...mockMembre, role: RoleUtilisateur.ADMINISTRATEUR };
+      prismaMock.user.findUnique.mockResolvedValue(administrateur);
       prismaMock.user.count.mockResolvedValue(2);
-      prismaMock.user.delete.mockResolvedValue(architecte);
+      prismaMock.user.delete.mockResolvedValue(administrateur);
 
-      await service.remove('org-001', architecte.id);
+      await service.remove('org-001', administrateur.id);
 
       expect(prismaMock.user.delete).toHaveBeenCalled();
     });

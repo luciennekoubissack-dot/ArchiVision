@@ -10,6 +10,8 @@ export interface Application {
   nom: string;
   description?: string | null;
   criticite: Criticite;
+  positionX?: number | null;
+  positionY?: number | null;
   createdAt: string;
   updatedAt: string;
   _count?: { zones: number };
@@ -47,13 +49,19 @@ export class UrbanisationService {
     return this.http.get<Application>(`/applications/${id}`);
   }
 
-  createApplication(payload: { nom: string; description?: string; criticite?: Criticite }): Observable<Application> {
+  createApplication(payload: {
+    nom: string;
+    description?: string;
+    criticite?: Criticite;
+    positionX?: number;
+    positionY?: number;
+  }): Observable<Application> {
     return this.http.post<Application>('/applications', payload);
   }
 
   updateApplication(
     id: string,
-    payload: { nom?: string; description?: string; criticite?: Criticite },
+    payload: { nom?: string; description?: string; criticite?: Criticite; positionX?: number; positionY?: number },
   ): Observable<Application> {
     return this.http.patch<Application>(`/applications/${id}`, payload);
   }

@@ -20,7 +20,7 @@ describe('AuthController (HTTP)', () => {
     passwordHash: '',
     nom: 'Admin',
     organisationId: 'org-001',
-    role: RoleUtilisateur.ARCHITECTE,
+    role: RoleUtilisateur.ADMINISTRATEUR,
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
   };
@@ -69,15 +69,15 @@ describe('AuthController (HTTP)', () => {
   });
 
   describe('POST /auth/register', () => {
-    it('est accessible sans authentification et crée une organisation + un Architecte', async () => {
+    it("est accessible sans authentification, crée une organisation en attente + un Administrateur, et connecte immédiatement", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
-      const createdOrg = { id: 'org-002', nom: 'Nouvelle Entreprise', description: null, secteur: null, taille: null, pays: null, logoUrl: null };
+      const createdOrg = { id: 'org-002', nom: 'Nouvelle Entreprise', description: null, secteur: null, taille: null, pays: null, logoUrl: null, statut: 'EN_ATTENTE' };
       const createdUser = {
         id: 'user-002',
         email: 'fondateur@nouvelle-entreprise.local',
         nom: 'Fondateur',
         organisationId: createdOrg.id,
-        role: RoleUtilisateur.ARCHITECTE,
+        role: RoleUtilisateur.ADMINISTRATEUR,
       };
       txMock.organisation.create.mockResolvedValue(createdOrg);
       txMock.user.create.mockResolvedValue(createdUser);
@@ -93,8 +93,14 @@ describe('AuthController (HTTP)', () => {
         .expect(201);
 
       expect(response.body).toHaveProperty('accessToken');
-      expect(response.body.user.role).toBe(RoleUtilisateur.ARCHITECTE);
-      expect(response.body.organisation.id).toBe(createdOrg.id);
+      expect(response.body.user).toEqual({
+        id: createdUser.id,
+        email: createdUser.email,
+        nom: createdUser.nom,
+        avatarUrl: null,
+        role: createdUser.role,
+      });
+      expect(response.body.organisation).toEqual({ id: createdOrg.id, nom: createdOrg.nom, statut: 'EN_ATTENTE' });
     });
 
     it('retourne 409 si l\'email est déjà utilisé', async () => {
@@ -159,6 +165,15 @@ describe('AuthController (HTTP)', () => {
         .post('/auth/login')
         .send({ email: mockUser.email })
         .expect(400);
+    });
+
+    it("retourne 200 même si l'organisation est en attente de validation (plus de blocage à la connexion)", async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: mockUser.email, password: 'Admin123!' })
+        .expect(200);
     });
   });
 

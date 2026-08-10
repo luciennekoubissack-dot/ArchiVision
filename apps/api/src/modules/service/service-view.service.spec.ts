@@ -10,7 +10,7 @@ describe('ServiceViewService', () => {
     service: { findMany: jest.fn() },
   };
 
-  const membre = { id: 'user-001', nom: 'Admin ArchiVision', role: RoleUtilisateur.ARCHITECTE };
+  const membre = { id: 'user-001', nom: 'Admin ArchiVision', role: RoleUtilisateur.ADMINISTRATEUR };
 
   const serviceRacine = {
     id: 'service-001',

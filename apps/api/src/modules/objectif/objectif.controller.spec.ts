@@ -7,15 +7,17 @@ import { ObjectifModule } from './objectif.module';
 
 describe('ObjectifController (HTTP)', () => {
   let app: INestApplication;
-  let currentUser: { sub: string; email: string; organisationId: string; role: RoleUtilisateur };
+  let currentUser: { sub: string; email: string; organisationId: string | null; role: RoleUtilisateur };
 
-  const dirigeant = {
+  const architecte = {
     sub: 'user-001',
-    email: 'dirigeant@k-and-b.local',
+    email: 'architecte@k-and-b.local',
     organisationId: 'org-001',
-    role: RoleUtilisateur.DIRIGEANT,
+    role: RoleUtilisateur.ARCHITECTE,
   };
-  const collaborateur = { ...dirigeant, sub: 'user-002', role: RoleUtilisateur.COLLABORATEUR };
+  // Un superadmin n'est rattaché à aucune organisation — sert ici à démontrer
+  // que le RolesGuard bloque bien les rôles hors ADMINISTRATEUR/ARCHITECTE.
+  const superadmin = { ...architecte, sub: 'user-002', organisationId: null, role: RoleUtilisateur.SUPERADMIN };
 
   const mockObjectif = {
     id: 'objectif-001',
@@ -44,7 +46,7 @@ describe('ObjectifController (HTTP)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    currentUser = dirigeant;
+    currentUser = architecte;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule, ObjectifModule],
@@ -63,16 +65,15 @@ describe('ObjectifController (HTTP)', () => {
     if (app) await app.close();
   });
 
-  it('un Collaborateur peut lister les objectifs (200) — lecture ouverte', async () => {
+  it('un Architecte peut lister les objectifs (200) — lecture ouverte', async () => {
     prismaMock.objectif.findMany.mockResolvedValue([mockObjectif]);
-    currentUser = collaborateur;
 
     const response = await request(app.getHttpServer()).get('/objectifs').expect(200);
 
     expect(response.body).toEqual([mockObjectif]);
   });
 
-  it('un Dirigeant peut créer un objectif (201)', async () => {
+  it('un Architecte peut créer un objectif (201)', async () => {
     prismaMock.objectif.create.mockResolvedValue(mockObjectif);
 
     const response = await request(app.getHttpServer())
@@ -83,14 +84,14 @@ describe('ObjectifController (HTTP)', () => {
     expect(response.body.nom).toBe(mockObjectif.nom);
   });
 
-  it('un Collaborateur reçoit 403 en tentant de créer un objectif', async () => {
-    currentUser = collaborateur;
+  it('un Superadmin reçoit 403 en tentant de créer un objectif', async () => {
+    currentUser = superadmin;
 
     await request(app.getHttpServer()).post('/objectifs').send({ nom: 'X' }).expect(403);
   });
 
-  it('un Collaborateur reçoit 403 en tentant de supprimer un objectif', async () => {
-    currentUser = collaborateur;
+  it('un Superadmin reçoit 403 en tentant de supprimer un objectif', async () => {
+    currentUser = superadmin;
 
     await request(app.getHttpServer()).delete(`/objectifs/${mockObjectif.id}`).expect(403);
   });

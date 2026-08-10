@@ -14,10 +14,11 @@ const MAX_VISIBLE_MEMBRES = 4;
 const STYLE = { fill: '#E3F2FD', stroke: '#1565C0' };
 
 const ROLE_COLOR: Record<RoleUtilisateur, { fill: string; stroke: string }> = {
-  ARCHITECTE: { fill: '#BBDEFB', stroke: '#1565C0' },
-  DIRIGEANT: { fill: '#E1BEE7', stroke: '#6A1B9A' },
-  REPRESENTANT: { fill: '#B2DFDB', stroke: '#00695C' },
-  COLLABORATEUR: { fill: '#F5F5F5', stroke: '#616161' },
+  // SUPERADMIN n'apparaît jamais dans un organigramme (aucune organisation
+  // rattachée) — couleur définie uniquement pour satisfaire l'exhaustivité du Record.
+  SUPERADMIN: { fill: '#ECEFF1', stroke: '#455A64' },
+  ADMINISTRATEUR: { fill: '#BBDEFB', stroke: '#1565C0' },
+  ARCHITECTE: { fill: '#E1BEE7', stroke: '#6A1B9A' },
 };
 
 interface MembreRef {

@@ -5,10 +5,9 @@ import { AuthService, RoleUtilisateur } from './auth.service';
 import { ToastService } from './toast.service';
 
 const ROLE_LABEL: Record<RoleUtilisateur, string> = {
+  SUPERADMIN: 'Superadmin',
+  ADMINISTRATEUR: 'Administrateur',
   ARCHITECTE: 'Architecte',
-  DIRIGEANT: 'Dirigeant',
-  REPRESENTANT: 'Représentant',
-  COLLABORATEUR: 'Collaborateur',
 };
 
 @Component({

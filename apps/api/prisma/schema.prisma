@@ -8,12 +8,30 @@ datasource db {
 
 // ─── Auth (hors référentiel métier — nécessaire pour l'authentification) ──────
 
-/// 4 rôles v1 — voir docs/cahier.md section 3.
+/// Rôles v3 — SUPERADMIN est un rôle plateforme, non rattaché à une organisation.
+/// ADMINISTRATEUR est le créateur/gestionnaire de son organisation. ARCHITECTE
+/// regroupe tous les autres membres (ex-DIRIGEANT/REPRESENTANT/COLLABORATEUR) :
+/// ce sont eux qui construisent le référentiel d'architecture.
 enum RoleUtilisateur {
+  SUPERADMIN
+  ADMINISTRATEUR
   ARCHITECTE
-  DIRIGEANT
-  REPRESENTANT
-  COLLABORATEUR
+}
+
+/// Cycle de vie d'une organisation inscrite — validée par le superadmin
+/// avant que ses membres puissent se connecter (hors superadmin).
+enum StatutOrganisation {
+  EN_ATTENTE
+  VALIDEE
+  REJETEE
+}
+
+/// Statut Gap Analysis d'un élément d'architecture (toutes couches confondues) :
+/// état actuel (AS_IS), état cible (TO_BE), ou inchangé entre les deux.
+enum StatutElement {
+  AS_IS
+  TO_BE
+  LES_DEUX
 }
 
 model User {
@@ -22,8 +40,8 @@ model User {
   passwordHash   String
   nom            String
   avatarUrl      String?         @map("avatar_url")
-  organisationId String
-  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  organisationId String?
+  organisation   Organisation?   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   role           RoleUtilisateur
   serviceId      String?
   service        Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
@@ -38,24 +56,36 @@ model User {
 /// Représente l'entreprise modélisée (ex. K&B Groupe SARL).
 /// Champs : id, nom, description — exactement ce que définit referentiel.md.
 model Organisation {
-  id          String   @id @default(uuid())
-  nom         String
-  description String?
-  logoUrl     String?  @map("logo_url")
-  secteur     String?  @map("sector")
-  taille      String?  @map("size")
-  pays        String?  @map("country")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String             @id @default(uuid())
+  nom               String
+  description       String?
+  logoUrl           String?            @map("logo_url")
+  secteur           String?            @map("sector")
+  taille            String?            @map("size")
+  pays              String?            @map("country")
+  statut            StatutOrganisation @default(EN_ATTENTE)
+  validatedAt       DateTime?          @map("validated_at")
+  /// Vision d'architecture (étape 1 de l'assistant TOGAF ADM — phase préliminaire).
+  vision            String?            @db.Text
+  problemesResoudre String?            @map("problemes_resoudre") @db.Text
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   // Relations inverses (Prisma les exige pour la navigation)
-  capacites    CapaciteMetier[]
-  elements     ElementArchimate[]
-  applications Application[]
-  zones        ZoneUrbanisation[]
-  users        User[]
-  services     Service[]
-  objectifs    Objectif[]
+  capacites          CapaciteMetier[]
+  elements           ElementArchimate[]
+  applications       Application[]
+  zones              ZoneUrbanisation[]
+  users              User[]
+  services           Service[]
+  objectifs          Objectif[]
+  partiesPrenantes   PartiePrenante[]
+  bpmnProcessus      BpmnProcessus[]
+  dataEntities       DataEntity[]
+  techComponents     TechComponent[]
+  sequenceDiagrammes SequenceDiagramme[]
+  projets            Projet[]
+  canevasRelations   CanevasRelation[]
 }
 
 // ─── Service d'entreprise (département, hiérarchique) ─────────────────────────
@@ -113,8 +143,17 @@ model CapaciteMetier {
 
 // ─── ArchiMate — couche Métier uniquement en v1 ───────────────────────────────
 
-/// 5 valeurs exactement — referentiel.md interdit d'en ajouter en v1.
+/// Couche Motivation (Vision, Objectif d'architecture, Principe, Exigence) +
+/// couche Métier. Extension volontaire au-delà des 5 valeurs métier de la v1
+/// (voir docs/referentiel.md) pour permettre au canevas de représenter la
+/// vision/les objectifs d'architecture aux côtés des éléments métier.
 enum TypeElement {
+  // Couche Motivation
+  VISION
+  OBJECTIF_ARCHIMATE
+  PRINCIPE
+  EXIGENCE
+  // Couche Métier
   ACTEUR_METIER
   ROLE_METIER
   PROCESSUS_METIER
@@ -137,6 +176,13 @@ model ElementArchimate {
   nom              String
   type             TypeElement
   description      String?
+  statut           StatutElement   @default(LES_DEUX)
+  /// Position/taille manuelles dans le canevas — null tant que l'utilisateur
+  /// n'a pas déplacé/redimensionné l'élément (l'auto-layout s'applique alors).
+  positionX        Float?          @map("position_x")
+  positionY        Float?          @map("position_y")
+  width            Float?          @map("width")
+  height           Float?          @map("height")
   organisationId   String
   organisation     Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   capaciteMetierId String?
@@ -166,6 +212,38 @@ model RelationArchimate {
   @@index([targetId])
 }
 
+// ─── Canevas — relations inter-couches ─────────────────────────────────────────
+
+/// Couche d'un élément référencé par une CanevasRelation.
+enum ElementKind {
+  ARCHIMATE
+  APPLICATION
+  TECH_COMPONENT
+  DATA_ENTITY
+}
+
+/// Relation entre deux éléments du canevas, potentiellement de couches
+/// différentes (ex. une Application qui réalise un Processus métier).
+/// Volontairement sans clé étrangère Prisma sur sourceId/targetId — la
+/// source et la cible peuvent appartenir à des tables différentes selon
+/// sourceKind/targetKind. L'appartenance à l'organisation est validée en
+/// code (CanevasService.resolveModel) plutôt que par une contrainte DB.
+model CanevasRelation {
+  id             String       @id @default(uuid())
+  type           TypeRelation
+  sourceKind     ElementKind
+  sourceId       String
+  targetKind     ElementKind
+  targetId       String
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organisationId])
+  @@index([sourceKind, sourceId])
+  @@index([targetKind, targetId])
+}
+
 // ─── Urbanisation ─────────────────────────────────────────────────────────────
 
 /// 3 valeurs de criticité.
@@ -178,18 +256,40 @@ enum Criticite {
 /// Application du portefeuille applicatif.
 /// Champs : id, nom, description, criticite, organisationId → Organisation
 model Application {
-  id             String       @id @default(uuid())
+  id             String        @id @default(uuid())
   nom            String
   description    String?
-  criticite      Criticite    @default(MOYENNE)
+  criticite      Criticite     @default(MOYENNE)
+  statut         StatutElement @default(LES_DEUX)
+  positionX      Float?        @map("position_x")
+  positionY      Float?        @map("position_y")
   organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  zones ApplicationZone[]
+  zones          ApplicationZone[]
+  deploiements   TechDeploiement[]
+  echangesSource ApplicationEchange[] @relation("EchangeSource")
+  echangesTarget ApplicationEchange[] @relation("EchangeTarget")
 
   @@index([organisationId])
+}
+
+/// Flux d'échange entre deux applications — diagramme de composants UML
+/// (architecture applicative, étape 5 de l'assistant TOGAF ADM).
+model ApplicationEchange {
+  id          String      @id @default(uuid())
+  sourceId    String
+  source      Application @relation("EchangeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId    String
+  target      Application @relation("EchangeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  description String?
+  protocole   String?
+  createdAt   DateTime    @default(now())
+
+  @@index([sourceId])
+  @@index([targetId])
 }
 
 /// 3 niveaux de la hiérarchie d'urbanisation.
@@ -228,4 +328,247 @@ model ApplicationZone {
   zone          ZoneUrbanisation @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
   @@id([applicationId, zoneId])
+}
+
+// ─── Vision & parties prenantes (étape 1 de l'assistant TOGAF ADM) ────────────
+
+/// Partie prenante externe (client, régulateur, partenaire...) — distincte des
+/// Membres internes déjà représentés par User/Service.
+model PartiePrenante {
+  id             String       @id @default(uuid())
+  nom            String
+  role           String?
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organisationId])
+}
+
+// ─── BPMN — modélisation des processus (étape 2 de l'assistant TOGAF ADM) ─────
+
+/// Types d'éléments BPMN 2.0 pris en charge par l'éditeur (bpmn-js).
+enum TypeBpmn {
+  EVENEMENT_DEBUT
+  EVENEMENT_FIN
+  EVENEMENT_INTERMEDIAIRE
+  TACHE
+  PASSERELLE_EXCLUSIVE
+  PASSERELLE_PARALLELE
+}
+
+/// Un diagramme de processus métier. `bpmnXml` est la source de vérité pour
+/// l'éditeur bpmn-js (positions, points d'ancrage) ; BpmnElement/BpmnFlow sont
+/// dérivés à la sauvegarde pour les besoins transversaux (assistant, gap
+/// analysis, compteurs) — voir docs/plan superadmin+ADM pour la justification.
+model BpmnProcessus {
+  id             String        @id @default(uuid())
+  nom            String
+  description    String?
+  bpmnXml        String?       @map("bpmn_xml") @db.Text
+  organisationId String
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  elements       BpmnElement[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organisationId])
+}
+
+model BpmnElement {
+  id          String        @id @default(uuid())
+  nom         String
+  type        TypeBpmn
+  statut      StatutElement @default(LES_DEUX)
+  positionX   Float?        @map("position_x")
+  positionY   Float?        @map("position_y")
+  processusId String
+  processus   BpmnProcessus @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+
+  flowsSource BpmnFlow[] @relation("BpmnFlowSource")
+  flowsTarget BpmnFlow[] @relation("BpmnFlowTarget")
+
+  @@index([processusId])
+}
+
+/// Flux de séquence entre deux éléments BPMN (ex. tâche → passerelle).
+model BpmnFlow {
+  id       String      @id @default(uuid())
+  label    String?
+  sourceId String
+  source   BpmnElement @relation("BpmnFlowSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId String
+  target   BpmnElement @relation("BpmnFlowTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([targetId])
+}
+
+// ─── Architecture des données (étape 4 de l'assistant TOGAF ADM) ──────────────
+
+/// Cardinalité d'une relation entre deux entités de données (diagramme ER/UML).
+enum TypeCardinalite {
+  UN_A_UN
+  UN_A_PLUSIEURS
+  PLUSIEURS_A_PLUSIEURS
+}
+
+model DataEntity {
+  id             String        @id @default(uuid())
+  nom            String
+  description    String?
+  statut         StatutElement @default(LES_DEUX)
+  positionX      Float?        @map("position_x")
+  positionY      Float?        @map("position_y")
+  organisationId String
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  attributs       DataAttribute[]
+  relationsSource DataRelation[]  @relation("DataRelSource")
+  relationsTarget DataRelation[]  @relation("DataRelTarget")
+
+  @@index([organisationId])
+}
+
+/// Attribut d'une entité de données. `type` en texte libre (ex. "string",
+/// "int", "date") — la variété des systèmes de typage rencontrés en entretien
+/// ne justifie pas un enum fermé.
+model DataAttribute {
+  id       String     @id @default(uuid())
+  nom      String
+  type     String
+  entityId String
+  entity   DataEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@index([entityId])
+}
+
+model DataRelation {
+  id          String          @id @default(uuid())
+  cardinalite TypeCardinalite
+  label       String?
+  sourceId    String
+  source      DataEntity      @relation("DataRelSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId    String
+  target      DataEntity      @relation("DataRelTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([targetId])
+}
+
+// ─── Architecture technologique (étape 6 de l'assistant TOGAF ADM) ────────────
+
+enum TypeTechComponent {
+  SERVEUR
+  RESEAU
+  CLOUD
+  BASE_DE_DONNEES
+  MIDDLEWARE
+}
+
+model TechComponent {
+  id             String            @id @default(uuid())
+  nom            String
+  type           TypeTechComponent
+  description    String?
+  statut         StatutElement     @default(LES_DEUX)
+  positionX      Float?            @map("position_x")
+  positionY      Float?            @map("position_y")
+  organisationId String
+  organisation   Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  deploiements TechDeploiement[]
+
+  @@index([organisationId])
+}
+
+/// Diagramme de déploiement — quelle application tourne sur quel composant technique.
+model TechDeploiement {
+  applicationId   String
+  application     Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  techComponentId String
+  techComponent   TechComponent @relation(fields: [techComponentId], references: [id], onDelete: Cascade)
+
+  @@id([applicationId, techComponentId])
+}
+
+// ─── Diagrammes de séquence UML (architecture applicative) ────────────────────
+
+/// Modélisé par ordre (participants, messages) plutôt que par position XY —
+/// un diagramme de séquence n'est pas un problème de glisser-déposer. Rendu en
+/// lecture seule, SVG généré côté serveur comme les autres vues.
+model SequenceDiagramme {
+  id             String       @id @default(uuid())
+  nom            String
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  participants SequenceParticipant[]
+
+  @@index([organisationId])
+}
+
+model SequenceParticipant {
+  id          String            @id @default(uuid())
+  nom         String
+  ordre       Int
+  diagrammeId String
+  diagramme   SequenceDiagramme @relation(fields: [diagrammeId], references: [id], onDelete: Cascade)
+
+  messagesEnvoyes SequenceMessage[] @relation("MessageFrom")
+  messagesRecus   SequenceMessage[] @relation("MessageTo")
+
+  @@index([diagrammeId])
+}
+
+model SequenceMessage {
+  id     String              @id @default(uuid())
+  label  String
+  ordre  Int
+  fromId String
+  from   SequenceParticipant @relation("MessageFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId   String
+  to     SequenceParticipant @relation("MessageTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([fromId])
+  @@index([toId])
+}
+
+// ─── Roadmap de transformation (étape 8 de l'assistant TOGAF ADM) ─────────────
+
+enum PrioriteProjet {
+  HAUTE
+  MOYENNE
+  BASSE
+}
+
+enum StatutProjet {
+  PLANIFIE
+  EN_COURS
+  TERMINE
+}
+
+model Projet {
+  id             String         @id @default(uuid())
+  nom            String
+  description    String?
+  priorite       PrioriteProjet @default(MOYENNE)
+  coutEstime     String?        @map("cout_estime")
+  dateDebut      DateTime?      @map("date_debut")
+  dateFin        DateTime?      @map("date_fin")
+  statut         StatutProjet   @default(PLANIFIE)
+  organisationId String
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organisationId])
 }

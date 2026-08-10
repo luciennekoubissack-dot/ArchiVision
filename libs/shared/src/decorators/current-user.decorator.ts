@@ -5,7 +5,8 @@ import { RoleUtilisateur } from '@prisma/client';
 export interface AuthUser {
   sub: string;
   email: string;
-  organisationId: string;
+  /** `null` uniquement pour le rôle SUPERADMIN, qui n'est rattaché à aucune organisation. */
+  organisationId: string | null;
   role: RoleUtilisateur;
 }
 

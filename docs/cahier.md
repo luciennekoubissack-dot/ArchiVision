@@ -1,207 +1,265 @@
-# ArchiVision — Vision produit fusionnée
+# Cahier de charge technique — ArchiVision
 
-> **Statut :** version fusionnée (2026-08-03) du document de vision initial
-> (ambitieux, ci-dessous historiquement appelé "EAMP complet") et du Cahier
-> des Charges Technique officiel du stage. Les arbitrages ont été validés
-> avec le porteur du projet. Ce document est la **référence produit actuelle**
-> — `docs/stack.md`, `docs/referentiel.md` et `docs/conventions.md` restent
-> les références **techniques** figées, à mettre à jour en cohérence avec
-> les décisions ci-dessous plutôt que d'être contredites par elles.
->
-> Ce qui a changé par rapport à la version précédente de ce document : le
-> multi-tenant, les rôles utilisateurs, les services d'entreprise et les
-> objectifs stratégiques sont **entrés** dans le périmètre réel. Le BPMN,
-> l'éditeur graphique interactif, NgRx, la collaboration temps réel (Yjs)
-> et la collaboration inter-entreprises restent **hors périmètre**.
+## 1. Objectif du document
 
----
+Ce document formalise le cahier de charge technique de la version v1 d'ArchiVision, à partir de la vision produit fusionnée, de la documentation technique et du référentiel métier validés pour le projet. Il sert de base de référence pour la conception, le développement, les tests et la validation de la solution.
 
-## 1. Vision du produit
+## 2. Objectif du produit
 
-ArchiVision est une plateforme **multi-organisations** de modélisation
-d'architecture d'entreprise. Chaque organisation cliente y documente sa
-propre architecture (stratégie, métier, applicatif) selon les principes
-TOGAF/ArchiMate, dans un référentiel structuré et isolé des autres
-organisations.
+ArchiVision est une plateforme multi-organisations de modélisation d’architecture d’entreprise. Elle permet à une organisation de documenter son architecture métier, applicative et organisationnelle dans un référentiel unique, puis de générer automatiquement des vues synthétiques (organigramme, vue ArchiMate, Plan d’Occupation des Sols) à partir de données structurées.
 
-**Principe fondateur, non négociable :** le référentiel est la source
-unique de vérité. Les vues (diagramme ArchiMate, organigramme, Plan
-d'Occupation des Sols) ne sont **jamais dessinées à la main** — elles sont
-**générées automatiquement** à partir des données saisies via des
-formulaires structurés. L'objectif du produit n'est pas de fournir un
-outil de dessin, mais de permettre à une organisation de **comprendre**
-son architecture et à ses membres de **collaborer en interne** dessus
-(dirigeant, architecte, représentant, collaborateur).
+Le produit ne doit pas être un outil de dessin libre. Son cœur est la qualité du référentiel et la génération automatique de vues cohérentes.
 
-L'application couvre le suivi **As-Is** (état actuel documenté dans le
-référentiel) — le **To-Be** (cible) et l'analyse d'écarts formalisée sont
-une piste d'enrichissement documentée en section 8, pas un engagement v1.
+## 3. Périmètre fonctionnel v1
 
----
+### 3.1 Inclusions
 
-## 2. Parcours utilisateur
+Le périmètre v1 couvre :
 
-### Inscription et création d'organisation
+- l’inscription et la création d’une organisation ;
+- l’authentification des utilisateurs avec JWT ;
+- la gestion des membres et des rôles par organisation ;
+- la gestion des services organisationnels et de leur hiérarchie ;
+- la gestion des objectifs stratégiques ;
+- la gestion des capacités métier ;
+- la gestion des éléments ArchiMate et de leurs relations ;
+- la gestion du portefeuille applicatif ;
+- la gestion de l’urbanisation (zones, quartiers, îlots, affectations) ;
+- la génération de vues SVG à partir du référentiel ;
+- l’export du référentiel au format JSON ;
+- un tableau de bord avec indicateurs clés.
 
-1. Un visiteur s'inscrit : email, mot de passe, nom.
-2. Dans la foulée, il crée son organisation : nom, description, secteur,
-   taille, pays, logo — c'est le premier objet du référentiel.
-3. Il devient automatiquement le premier utilisateur de cette
-   organisation, avec un rôle qui lui donne les pleins pouvoirs (Architecte
-   ou Dirigeant — voir section 3).
-4. Il peut ensuite créer des comptes pour ses collègues (représentants,
-   collaborateurs, autres architectes) rattachés à la même organisation.
+### 3.2 Exclusions explicites
 
-Il n'y a pas de notion de "Super Administrateur multi-tenant SaaS" en v1 :
-chaque organisation gère ses propres membres, aucun rôle transverse
-n'administre plusieurs organisations à la fois.
+Le périmètre v1 exclut :
 
-### Utilisation courante
+- l’éditeur graphique interactif ;
+- le BPMN ;
+- la collaboration temps réel ;
+- la gouvernance avancée et workflow de validation ;
+- le multi-tenant technique au sens de partage de données entre organisations sans isolation applicative ;
+- l’intégration SSO/oidc ;
+- les exports PDF/Word avancés ;
+- les architectures distribuées et les composants worker/realtime.
 
-1. Structurer l'organisation : services/départements (hiérarchie), membres
-   rattachés à chaque service.
-2. Documenter la stratégie : objectifs de l'organisation.
-3. Documenter le métier : capacités métier, éléments ArchiMate (acteurs,
-   rôles, processus, services métier, objets métier), relations entre eux.
-4. Documenter le patrimoine applicatif : applications/produits, criticité.
-5. Documenter l'urbanisation : zones, quartiers, îlots, affectation des
-   applications aux îlots.
-6. Consulter les vues générées : organigramme, vue ArchiMate, POS —
-   jamais éditées à la main, toujours régénérées depuis le référentiel à
-   jour.
-7. Exporter (JSON du référentiel, SVG/PNG des vues) pour partage ou
-   archivage.
+## 4. Exigences fonctionnelles
 
----
+### FR1 — Authentification et comptes utilisateurs
 
-## 3. Profils utilisateurs (rôles v1)
+L’application doit permettre :
 
-| Rôle | Description | Droits |
+- l’inscription d’un utilisateur avec email, mot de passe et nom ;
+- la création automatique d’une organisation au moment de l’inscription ;
+- la connexion avec JWT ;
+- l’accès au profil utilisateur connecté ;
+- la mise à jour du profil utilisateur.
+
+### FR2 — Gestion des organisations
+
+L’application doit permettre :
+
+- la consultation des informations d’une organisation ;
+- la mise à jour des métadonnées de l’organisation ;
+- la gestion des membres attachés à cette organisation.
+
+### FR3 — Gestion des rôles et services
+
+L’application doit permettre :
+
+- la gestion des rôles suivants : Architecte, Dirigeant, Représentant, Collaborateur ;
+- l’affectation d’un utilisateur à un service organisationnel ;
+- la gestion d’une hiérarchie de services (Direction > Département > Service).
+
+### FR4 — Stratégie et objectifs
+
+L’application doit permettre :
+
+- la création, consultation, modification et suppression d’objectifs ;
+- le rattachement des objectifs à l’organisation courante.
+
+### FR5 — Architecture métier
+
+L’application doit permettre :
+
+- la gestion des capacités métier ;
+- la gestion des éléments ArchiMate selon 5 types autorisés : ACTEUR_METIER, ROLE_METIER, PROCESSUS_METIER, SERVICE_METIER, OBJET_METIER ;
+- la gestion des relations ArchiMate selon 4 types autorisés : ASSIGNATION, COMPOSITION, REALISATION, ASSOCIATION ;
+- la génération d’une vue ArchiMate au format SVG à partir du référentiel.
+
+### FR6 — Portefeuille applicatif
+
+L’application doit permettre :
+
+- la création, consultation, modification et suppression d’applications ;
+- la définition de la criticité d’une application : HAUTE, MOYENNE, BASSE ;
+- la gestion de la relation entre applications et zones d’urbanisation.
+
+### FR7 — Urbanisation
+
+L’application doit permettre :
+
+- la création de zones, quartiers et îlots ;
+- la gestion d’une hiérarchie Zone > Quartier > Îlot ;
+- l’affectation d’une application à un îlot ;
+- la génération du Plan d’Occupation des Sols au format SVG.
+
+### FR8 — Vues générées et exports
+
+L’application doit permettre :
+
+- l’affichage de vues générées à partir des données du référentiel ;
+- l’export des vues sous forme SVG/PNG ;
+- l’export du référentiel au format JSON.
+
+### FR9 — Tableau de bord
+
+Le tableau de bord doit afficher :
+
+- le nombre d’éléments du référentiel ;
+- le nombre d’applications ;
+- le nombre de zones ;
+- le nombre de membres ;
+- une activité récente ou un état synthétique des données.
+
+## 5. Exigences techniques
+
+### 5.1 Architecture générale
+
+L’application doit être développée selon une architecture monorepo avec :
+
+- un frontend Angular pour l’interface utilisateur ;
+- un backend NestJS pour la logique métier et l’API REST ;
+- une base PostgreSQL avec Prisma comme ORM ;
+- des modules métier découplés par domaine.
+
+### 5.2 Sécurité
+
+Les exigences de sécurité sont les suivantes :
+
+- toutes les routes sensibles doivent être protégées par JWT ;
+- l’identifiant d’organisation de l’utilisateur doit être porté par le JWT et non par un paramètre client modifiable ;
+- les données d’une organisation ne doivent jamais être accessibles à une autre organisation ;
+- les entrées doivent être validées côté backend avec des DTO et des règles de validation ;
+- les erreurs doivent être normalisées et ne pas exposer de détails internes ;
+- les en-têtes HTTP doivent être sécurisés via Helmet.
+
+### 5.3 Performance et robustesse
+
+- le temps de réponse attendu pour les écrans CRUD simples doit rester acceptable sur un environnement de démonstration ;
+- la génération des vues SVG doit être déterministe et indépendante d’un rendu graphique tiers ;
+- les opérations doivent être résistantes aux erreurs métier et retourner des messages explicites.
+
+### 5.4 Maintenabilité
+
+- le code doit respecter la séparation des responsabilités par domaine ;
+- les modules doivent être testables unitairement et via des tests d’intégration ;
+- la documentation technique doit rester synchronisée avec l’implémentation.
+
+## 6. Stack technique retenue
+
+| Domaine | Choix retenu | Notes |
 |---|---|---|
-| **Architecte** | Pilote la démarche, modélise le référentiel | Lecture/écriture complète sur le référentiel de son organisation, gestion des membres |
-| **Dirigeant** | Consulte la vision d'ensemble, valide les orientations | Lecture complète, écriture sur Stratégie/Objectifs, consultation des vues et tableaux de bord |
-| **Représentant** | Porte-parole d'un service, contribue aux données de son périmètre | Lecture/écriture limitée à son service et aux objets qu'il a créés |
-| **Collaborateur** | Contribue ponctuellement, consulte | Lecture sur son organisation, écriture limitée (ex. mise à jour de fiches qui le concernent) |
+| Frontend | Angular 17+ | Interface responsive et composants métier structurés |
+| Backend | NestJS | API REST, modules par domaine |
+| Langage | TypeScript | Strict mode recommandé |
+| Base de données | PostgreSQL 15 | Source de vérité relationnelle |
+| ORM | Prisma | Schéma versionné et migrations |
+| Auth | JWT | Basé sur un utilisateur connecté et son organisation |
+| Graphiques | Chart.js | Pour les indicateurs du tableau de bord |
+| Conteneurisation | Docker + Docker Compose | Déploiement local et démonstration |
+| Tests | Jest + Supertest | Tests unitaires et API |
 
-Hors périmètre v1, documentés comme piste (section 8) : matrice de
-permissions fine par module, workflow de validation/approbation,
-collaboration inter-organisations.
+## 7. Modèle de données principal
 
----
+Le référentiel doit être la source unique de vérité. Les vues doivent être générées à partir de ce référentiel et non stockées séparément.
 
-## 4. Modèle de données
+### Entités principales
 
-### 4.1 Cœur (Organisation & Utilisateurs)
+- Organisation
+- User
+- Service
+- Objectif
+- CapaciteMetier
+- ElementArchimate
+- RelationArchimate
+- Application
+- ZoneUrbanisation
+- ApplicationZone
 
-| Table | Champs clés | Relations |
-|---|---|---|
-| `Organisation` | id, nom, description, secteur, taille, pays, logoUrl | 1-N vers tout le référentiel |
-| `User` | id, organisationId, email, passwordHash, nom, role (ARCHITECTE / DIRIGEANT / REPRESENTANT / COLLABORATEUR), serviceId (optionnel) | N-1 vers Organisation, N-1 vers Service |
-| `Service` | id, organisationId, nom, description, parentId (auto-référencé) | hiérarchie Direction > Département > Service, membres = `User[]` |
+### Règles de conception data
 
-### 4.2 Stratégie (allégé par rapport à la vision initiale)
+- chaque entité doit être rattachée à une organisation ;
+- les relations doivent être explicitement modélisées en base ;
+- il ne faut pas dupliquer une information dans plusieurs tables ;
+- les vues doivent être dérivées des objets métier et non saisies manuellement.
 
-| Table | Champs clés |
-|---|---|
-| `Objectif` | id, organisationId, nom, description |
+## 8. Spécification API
 
-Volontairement **pas** de tables séparées `drivers`/`goals`/`principles`/
-`stakeholders` — un `Objectif` simple suffit au périmètre v1. L'arbre
-complet motivation → stratégie reste une piste d'enrichissement (section 8).
+### 8.1 Conventions
 
-### 4.3 Architecture métier (déjà en place, inchangé)
+- les ressources doivent utiliser des noms au pluriel ;
+- les routes doivent respecter les verbes HTTP standards ;
+- les réponses JSON doivent exposer les identifiants de référence et non des doublons d’objets ;
+- les actions non CRUD doivent rester exceptionnelles et être nommées explicitement.
 
-`CapaciteMetier`, `ElementArchimate` (5 types dont `SERVICE_METIER` — les
-"services métier" au sens ArchiMate, à ne pas confondre avec l'entité
-`Service` de la section 4.1 qui représente un département/service
-**organisationnel**), `RelationArchimate` (4 types). Voir `docs/referentiel.md`.
+### 8.2 Principaux modules API
 
-### 4.4 Urbanisation (déjà en place, inchangé)
+- Auth : `/auth/login`, `/auth/register`, `/auth/me`
+- Organisations : `/organisations`
+- Membres : `/organisations/:id/membres`
+- Services : `/services`
+- Objectifs : `/objectifs`
+- Capacités métier : `/capacites-metier`
+- Éléments ArchiMate : `/elements-archimate`
+- Relations ArchiMate : `/relations-archimate`
+- Applications : `/applications`
+- Zones d’urbanisation : `/zones-urbanisation`
+- Vues générées : `/elements-archimate/generate-vue`, `/zones-urbanisation/generate-vue`
 
-`Application`, `ZoneUrbanisation` (hiérarchie Zone > Quartier > Îlot),
-`ApplicationZone`. Voir `docs/referentiel.md`.
+## 9. Exigences UX/UI
 
----
+L’interface doit respecter les règles suivantes :
 
-## 5. Modules fonctionnels (sidebar)
+- une navigation claire via une sidebar ;
+- un design sobre basé sur une charte bleu/blanc/noir ;
+- une expérience responsive sur desktop et tablette ;
+- des écrans de gestion structurés avec formulaires dédiés ;
+- un affichage des vues générées en lecture seule, sans édition manuelle.
 
-1. **Tableau de bord** — KPIs réels de l'organisation courante (nombre
-   d'éléments, d'applications, de zones, de membres ; activité récente),
-   avec des graphiques (voir section 6).
-2. **Organisation** — informations générales, membres et rôles, services
-   (CRUD hiérarchique), organigramme (vue générée).
-3. **Stratégie** — objectifs de l'organisation.
-4. **Architecture métier** — capacités, éléments ArchiMate, relations.
-5. **Portefeuille applicatif** — applications/produits (CRUD).
-6. **Urbanisation** — zones, POS, affectations.
-7. **Vues générées** — vue ArchiMate, organigramme, POS, avec export
-   SVG/PNG.
-8. **Paramètres** — profil utilisateur, sécurité.
+## 10. Critères de validation
 
-Explicitement **hors** de cette liste : module BPMN, éditeur de canevas
-graphique, module Gouvernance/workflow de validation, module Gap
-Analysis/Roadmap, module Rapports PDF/Word avancés, module Collaboration
-temps réel.
+La solution sera considérée comme livrée lorsque :
 
----
+- l’application démarre correctement en environnement local ;
+- l’authentification et la création d’organisation fonctionnent ;
+- les modules principaux du référentiel sont CRUD et testés ;
+- les vues générées s’affichent correctement ;
+- l’isolation par organisation est respectée ;
+- les tests unitaires et d’intégration passent ;
+- la documentation technique et le README sont à jour.
 
-## 6. Stack technique (confirmée, sans changement de cap)
+## 11. Livrables attendus
 
-Reprend intégralement `docs/stack.md` — aucune des libs de la version
-initiale (NgRx, JointJS+/AntV X6/Konva, bpmn-js, Yjs, AG Grid, ngx-gantt,
-workspace Nx) n'entre dans le périmètre v1. Seul ajout : une librairie de
-graphiques pour le tableau de bord.
+- application backend fonctionnelle ;
+- interface frontend minimale mais exploitable ;
+- base de données versionnée ;
+- seed de données initiales ;
+- tests automatisés ;
+- documentation technique et procédure de lancement.
 
-| Besoin | Choix | Justification |
-|---|---|---|
-| Graphiques (dashboard) | **Chart.js**, utilisé directement (sans wrapper `ng2-charts`) | Léger, mature, suffisant pour des KPIs (barres/donut/courbes). `ng2-charts` a été écarté après vérification : toutes ses versions récentes imposent `@angular/cdk` en peer dependency, une dépendance supplémentaire non justifiée pour un seul graphique — Chart.js s'utilise directement dans un composant standalone (`ViewChild` sur un `<canvas>` + `new Chart(...)`) sans ce détour. Alternative à ngx-charts (D3, plus lourd) ou ApexCharts, sans justification suffisante pour leur poids |
-| Génération de vues | SVG construit côté backend (déjà implémenté) | Inchangé — voir `ArchimateViewService`, `UrbanisationViewService`, et le futur `ServiceViewService` (organigramme) |
-| Export | JSON du référentiel (nouveau) + SVG/PNG des vues (déjà prévu) | Pas de format d'interopérabilité lourd (ArchiMate Exchange Format, BPMN XML) sans éditeur complet en face |
+## 12. Délais et priorités
 
----
+Priorité 1 : fiabiliser le socle backend et l’isolation par organisation.
 
-## 7. Sécurité multi-tenant — point d'attention critique
+Priorité 2 : livrer les modules métier essentiels et les vues générées.
 
-Le passage au multi-tenant change la donne sur un point précis : la plupart
-des endpoints actuels (`GET /elements-archimate?organisationId=...`, etc.)
-font confiance à un paramètre fourni par le client. C'est sans risque en
-mono-tenant (une seule organisation existe), mais devient une **fuite de
-données inter-organisations** dès que plusieurs organisations coexistent
-dans la même base — n'importe quel utilisateur authentifié pourrait lire
-les données d'une autre organisation en changeant ce paramètre.
+Priorité 3 : finaliser le frontend, le tableau de bord et les éléments de qualité.
 
-**Exigence non négociable de l'implémentation :** l'`organisationId` de
-l'utilisateur doit être porté par le JWT (résolu à la connexion), jamais
-par un paramètre de requête modifiable côté client. Un guard doit l'imposer
-sur chaque route qui touche au référentiel.
+## 13. Hors périmètre de cette version
 
----
-
-## 8. Pistes d'enrichissement (hors engagement v1, ordre indicatif)
-
-- **Fil d'activité** : journal des créations/modifications (qui, quoi,
-  quand) — apporte de la collaboration interne sans le poids du temps réel.
-- **Recherche globale** dans le référentiel (éléments, applications, zones,
-  services).
-- **Comparateur As-Is/To-Be léger** : dupliquer un référentiel en
-  "brouillon cible" et comparer deux instantanés côte à côte — version
-  simplifiée du Gap Analysis de la vision initiale.
-- **Tableau de bord différencié par rôle** : vue synthétique pour le
-  Dirigeant, vue détaillée pour l'Architecte, vue "mes tâches" pour le
-  Collaborateur.
-- **Workflow de validation léger** : un Représentant propose une
-  modification, un Architecte l'approuve — sans aller jusqu'au comité
-  d'architecture de la vision initiale.
-- **Notifications in-app** basiques (ex. "un membre a modifié votre
-  service").
-
----
-
-## 9. Design
-
-- Charte graphique : **bleu, blanc, noir**.
-- Logo fourni (`apps/web/src/assets/logo.png`).
-- Responsive obligatoire.
-- Inspiration de maquettes fournies : sidebar sombre + cards pour le
-  tableau de bord, écran de connexion en deux volets (image de marque à
-  gauche, formulaire à droite).
+- éditeur BPMN ;
+- collaboration temps réel ;
+- workflows complexes ;
+- analyses de gap avancées ;
+- exports Word/PDF métier avancés ;
+- déploiement cloud complexe ou orchestration Kubernetes.

@@ -66,6 +66,18 @@ describe('ArchimateViewService', () => {
     expect(result.svg).toContain('Aucun élément ArchiMate');
   });
 
+  it('affiche un élément de la couche Motivation (ex. Vision) avec une couleur distincte de la couche Métier', async () => {
+    const vision = { id: 'elem-003', nom: 'Devenir leader régional', type: TypeElement.VISION };
+    archimateServiceMock.findAllElements.mockResolvedValue([vision, acteur]);
+    archimateServiceMock.findAllRelations.mockResolvedValue([]);
+
+    const result = await service.generate('org-001');
+
+    expect(result.svg).toContain('Devenir leader régional');
+    expect(result.svg).toContain('#E6E6FA');
+    expect(result.svg).toContain('#FFFFB3');
+  });
+
   it('ignore une relation dont un élément référencé serait absent de la liste (défensif)', async () => {
     archimateServiceMock.findAllElements.mockResolvedValue([acteur]);
     archimateServiceMock.findAllRelations.mockResolvedValue([relation]);

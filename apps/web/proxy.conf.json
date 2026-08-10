@@ -49,7 +49,52 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/applications-echanges": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/bpmn-processus": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/data-entities": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/tech-components": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/canevas-relations": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/projets": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/parties-prenantes": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/admin": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
   "/health": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/uploads": {
     "target": "http://localhost:3000",
     "secure": false,
     "changeOrigin": true

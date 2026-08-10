@@ -10,13 +10,25 @@ import { DashboardComponent } from './dashboard.component';
 import { OrganisationComponent } from './organisation.component';
 import { ObjectifsComponent } from './objectifs.component';
 import { ArchitectureMetierComponent } from './architecture-metier.component';
+import { CanevasComponent } from './canevas.component';
 import { ApplicationsComponent } from './applications.component';
 import { UrbanisationComponent } from './urbanisation.component';
 import { VuesComponent } from './vues.component';
 import { ParametresComponent } from './parametres.component';
+import { BpmnComponent } from './bpmn.component';
+import { DonneesComponent } from './donnees.component';
+import { TechnologieComponent } from './technologie.component';
+import { RoadmapComponent } from './roadmap.component';
+import { WizardComponent } from './wizard.component';
+import { AdminDashboardComponent } from './admin-dashboard.component';
+import { AdminOrganisationsComponent } from './admin-organisations.component';
+import { AdminUtilisateursComponent } from './admin-utilisateurs.component';
 import { NotFoundComponent } from './not-found.component';
 import { AuthGuard } from './auth.guard';
 import { GuestGuard } from './guest.guard';
+import { RoleGuard } from './role.guard';
+
+const TENANT_ROLES = ['ADMINISTRATEUR', 'ARCHITECTE'];
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', component: HomeComponent },
@@ -30,14 +42,31 @@ export const routes: Routes = [
     component: AppShellComponent,
     canActivate: [AuthGuard],
     children: [
-      { path: 'dashboard', component: DashboardComponent },
-      { path: 'organisation', component: OrganisationComponent },
-      { path: 'strategie', component: ObjectifsComponent },
-      { path: 'architecture-metier', component: ArchitectureMetierComponent },
-      { path: 'portefeuille-applicatif', component: ApplicationsComponent },
-      { path: 'urbanisation', component: UrbanisationComponent },
-      { path: 'vues', component: VuesComponent },
-      { path: 'parametres', component: ParametresComponent },
+      { path: 'dashboard', component: DashboardComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'assistant', component: WizardComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'organisation', component: OrganisationComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'strategie', component: ObjectifsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'architecture-metier', component: ArchitectureMetierComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'canevas', component: CanevasComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'portefeuille-applicatif', component: ApplicationsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'urbanisation', component: UrbanisationComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'vues', component: VuesComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'processus', component: BpmnComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'donnees', component: DonneesComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'technologique', component: TechnologieComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'roadmap', component: RoadmapComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'parametres', component: ParametresComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+    ],
+  },
+  {
+    path: 'admin',
+    component: AppShellComponent,
+    canActivate: [AuthGuard],
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: 'dashboard', component: AdminDashboardComponent, canActivate: [RoleGuard], data: { roles: ['SUPERADMIN'] } },
+      { path: 'organisations', component: AdminOrganisationsComponent, canActivate: [RoleGuard], data: { roles: ['SUPERADMIN'] } },
+      { path: 'utilisateurs', component: AdminUtilisateursComponent, canActivate: [RoleGuard], data: { roles: ['SUPERADMIN'] } },
     ],
   },
   { path: '**', component: NotFoundComponent },

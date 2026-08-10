@@ -9,20 +9,20 @@ describe('MembresController (HTTP)', () => {
   let app: INestApplication;
   let currentUser: { sub: string; email: string; organisationId: string; role: RoleUtilisateur };
 
-  const architecte = {
+  const administrateur = {
     sub: 'user-001',
-    email: 'architecte@k-and-b.local',
+    email: 'administrateur@k-and-b.local',
     organisationId: 'org-001',
-    role: RoleUtilisateur.ARCHITECTE,
+    role: RoleUtilisateur.ADMINISTRATEUR,
   };
 
-  const collaborateur = { ...architecte, sub: 'user-002', role: RoleUtilisateur.COLLABORATEUR };
+  const architecte = { ...administrateur, sub: 'user-002', role: RoleUtilisateur.ARCHITECTE };
 
   const mockMembre = {
     id: 'user-003',
     email: 'nouveau@k-and-b.local',
     nom: 'Nouveau Membre',
-    role: RoleUtilisateur.REPRESENTANT,
+    role: RoleUtilisateur.ARCHITECTE,
     serviceId: null,
   };
 
@@ -46,7 +46,7 @@ describe('MembresController (HTTP)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    currentUser = architecte;
+    currentUser = administrateur;
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule, OrganisationModule],
@@ -65,7 +65,7 @@ describe('MembresController (HTTP)', () => {
     if (app) await app.close();
   });
 
-  it('un Architecte peut lister les membres (200)', async () => {
+  it('un Administrateur peut lister les membres (200)', async () => {
     prismaMock.user.findMany.mockResolvedValue([mockMembre]);
 
     const response = await request(app.getHttpServer()).get('/membres').expect(200);
@@ -73,13 +73,13 @@ describe('MembresController (HTTP)', () => {
     expect(response.body).toEqual([mockMembre]);
   });
 
-  it('un Collaborateur reçoit 403 sur /membres (RolesGuard)', async () => {
-    currentUser = collaborateur;
+  it('un Architecte reçoit 403 sur /membres (RolesGuard)', async () => {
+    currentUser = architecte;
 
     await request(app.getHttpServer()).get('/membres').expect(403);
   });
 
-  it('un Architecte peut créer un membre (201)', async () => {
+  it('un Administrateur peut créer un membre (201)', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue(mockMembre);
 
@@ -89,7 +89,7 @@ describe('MembresController (HTTP)', () => {
         email: mockMembre.email,
         password: 'MotDePasse123!',
         nom: mockMembre.nom,
-        role: RoleUtilisateur.REPRESENTANT,
+        role: RoleUtilisateur.ARCHITECTE,
       })
       .expect(201);
 
@@ -107,17 +107,17 @@ describe('MembresController (HTTP)', () => {
     prismaMock.user.findUnique.mockResolvedValue({
       ...mockMembre,
       organisationId: 'org-001',
-      role: RoleUtilisateur.REPRESENTANT,
+      role: RoleUtilisateur.ARCHITECTE,
     });
     prismaMock.user.delete.mockResolvedValue(mockMembre);
 
     await request(app.getHttpServer()).delete(`/membres/${mockMembre.id}`).expect(204);
   });
 
-  it('retourne 409 en tentant de supprimer le dernier Architecte', async () => {
-    prismaMock.user.findUnique.mockResolvedValue({ ...architecte, id: architecte.sub, role: RoleUtilisateur.ARCHITECTE });
+  it('retourne 409 en tentant de supprimer le dernier Administrateur', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ ...administrateur, id: administrateur.sub, role: RoleUtilisateur.ADMINISTRATEUR });
     prismaMock.user.count.mockResolvedValue(1);
 
-    await request(app.getHttpServer()).delete(`/membres/${architecte.sub}`).expect(409);
+    await request(app.getHttpServer()).delete(`/membres/${administrateur.sub}`).expect(409);
   });
 });

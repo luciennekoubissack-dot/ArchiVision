@@ -6,6 +6,7 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 import { CreateZoneDto } from './dto/create-zone.dto';
 import { UpdateZoneDto } from './dto/update-zone.dto';
 import { AffecterApplicationDto } from './dto/affecter-application.dto';
+import { CreateEchangeDto } from './dto/create-echange.dto';
 
 @Injectable()
 export class UrbanisationService {
@@ -179,6 +180,42 @@ export class UrbanisationService {
     return this.prisma.applicationZone.delete({
       where: { applicationId_zoneId: { applicationId, zoneId } },
     });
+  }
+
+  // ─── Échanges applicatifs (diagramme de composants UML) ──────────────────
+
+  findAllEchanges(organisationId: string) {
+    return this.prisma.applicationEchange.findMany({
+      where: { source: { organisationId } },
+      include: { source: true, target: true },
+    });
+  }
+
+  async createEchange(organisationId: string, dto: CreateEchangeDto) {
+    const [source, target] = await Promise.all([
+      this.prisma.application.findUnique({ where: { id: dto.sourceId } }),
+      this.prisma.application.findUnique({ where: { id: dto.targetId } }),
+    ]);
+    if (
+      !source ||
+      source.organisationId !== organisationId ||
+      !target ||
+      target.organisationId !== organisationId
+    ) {
+      throw new BadRequestException('Source et cible doivent appartenir à votre organisation');
+    }
+    return this.prisma.applicationEchange.create({ data: dto });
+  }
+
+  async removeEchange(echangeId: string, organisationId: string) {
+    const echange = await this.prisma.applicationEchange.findUnique({
+      where: { id: echangeId },
+      include: { source: true },
+    });
+    if (!echange || echange.source.organisationId !== organisationId) {
+      throw new NotFoundException(`Échange ${echangeId} introuvable`);
+    }
+    return this.prisma.applicationEchange.delete({ where: { id: echangeId } });
   }
 
   // ─── Utilitaires ──────────────────────────────────────────────────────────

@@ -31,4 +31,14 @@ export class UpdateOrganisationDto {
   @IsOptional()
   @MaxLength(100)
   pays?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
+  vision?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
+  problemesResoudre?: string;
 }

@@ -24,7 +24,7 @@ describe('JwtStrategy', () => {
         sub: 'user-001',
         email: 'admin@archivision.local',
         organisationId: 'org-001',
-        role: RoleUtilisateur.ARCHITECTE,
+        role: RoleUtilisateur.ADMINISTRATEUR,
       };
 
       const result = strategy.validate(payload);
@@ -38,7 +38,7 @@ describe('JwtStrategy', () => {
         sub: 'user-001',
         email: 'admin@archivision.local',
         organisationId: 'org-001',
-        role: RoleUtilisateur.ARCHITECTE,
+        role: RoleUtilisateur.ADMINISTRATEUR,
         iat: 123,
         exp: 456,
       } as unknown as { sub: string; email: string; organisationId: string; role: RoleUtilisateur };
@@ -49,8 +49,22 @@ describe('JwtStrategy', () => {
         sub: 'user-001',
         email: 'admin@archivision.local',
         organisationId: 'org-001',
-        role: RoleUtilisateur.ARCHITECTE,
+        role: RoleUtilisateur.ADMINISTRATEUR,
       });
+    });
+
+    it('accepte un organisationId nul (SUPERADMIN)', () => {
+      const strategy = new JwtStrategy(configMock);
+      const payload = {
+        sub: 'user-superadmin',
+        email: 'superadmin@archivision.local',
+        organisationId: null,
+        role: RoleUtilisateur.SUPERADMIN,
+      };
+
+      const result = strategy.validate(payload);
+
+      expect(result).toEqual(payload);
     });
   });
 });

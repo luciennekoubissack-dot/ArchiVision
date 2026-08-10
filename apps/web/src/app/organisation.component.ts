@@ -5,13 +5,16 @@ import { AuthService, RoleUtilisateur } from './auth.service';
 import { OrganisationService, Organisation } from './organisation.service';
 import { MembresService, Membre, CreateMembrePayload } from './membres.service';
 import { ServiceEntrepriseService, ServiceEntreprise } from './service-entreprise.service';
+import { PartiesPrenantesService, PartiePrenante } from './parties-prenantes.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
 import { downloadJson, downloadPng, downloadSvg } from './download.util';
 
 type Tab = 'infos' | 'membres' | 'services' | 'organigramme';
 
-const ROLES: RoleUtilisateur[] = ['ARCHITECTE', 'DIRIGEANT', 'REPRESENTANT', 'COLLABORATEUR'];
+// SUPERADMIN volontairement exclu : un rôle plateforme ne peut pas être
+// attribué à un membre d'une organisation.
+const ROLES: Exclude<RoleUtilisateur, 'SUPERADMIN'>[] = ['ADMINISTRATEUR', 'ARCHITECTE'];
 
 @Component({
   selector: 'app-organisation',
@@ -63,12 +66,39 @@ const ROLES: RoleUtilisateur[] = ['ARCHITECTE', 'DIRIGEANT', 'REPRESENTANT', 'CO
         </label>
       </div>
 
+      <hr />
+      <h3>Vision d'architecture</h3>
+      <p class="muted">Étape 1 de la démarche TOGAF ADM — sert de point de départ à l'assistant de génération.</p>
+      <label class="field">
+        Vision
+        <textarea placeholder="Quelle est la vision de l'entreprise ?" [value]="organisation.vision || ''" (input)="organisation.vision = $any($event.target).value" [disabled]="!canEditInfos"></textarea>
+      </label>
+      <label class="field">
+        Problèmes à résoudre
+        <textarea placeholder="Quels problèmes veut-on résoudre ?" [value]="organisation.problemesResoudre || ''" (input)="organisation.problemesResoudre = $any($event.target).value" [disabled]="!canEditInfos"></textarea>
+      </label>
+
       <button class="btn btn-primary" *ngIf="canEditInfos" (click)="saveInfos()" [disabled]="savingInfos">
         {{ savingInfos ? 'Enregistrement…' : 'Enregistrer' }}
       </button>
       <p class="hint" *ngIf="!canEditInfos">
-        Seuls les rôles Architecte et Dirigeant peuvent modifier ces informations.
+        Seuls les rôles Administrateur et Dirigeant peuvent modifier ces informations.
       </p>
+
+      <hr />
+      <h3>Parties prenantes</h3>
+      <form class="inline-form" *ngIf="canEditInfos" (submit)="addPartiePrenante($event)">
+        <input type="text" placeholder="Nom" [value]="newPartie.nom" (input)="newPartie.nom = $any($event.target).value" required />
+        <input type="text" placeholder="Rôle (ex. client, régulateur)" [value]="newPartie.role || ''" (input)="newPartie.role = $any($event.target).value" />
+        <button type="submit" class="btn btn-outline">Ajouter</button>
+      </form>
+      <div class="empty-state" *ngIf="partiesPrenantes.length === 0">Aucune partie prenante renseignée.</div>
+      <ul class="list" *ngIf="partiesPrenantes.length > 0">
+        <li class="list-item" *ngFor="let p of partiesPrenantes">
+          <div><strong>{{ p.nom }}</strong><span class="badge badge-neutral" *ngIf="p.role">{{ p.role }}</span></div>
+          <button class="btn btn-ghost" *ngIf="canEditInfos" (click)="removePartiePrenante(p)">Retirer</button>
+        </li>
+      </ul>
     </section>
 
     <!-- ── Membres ───────────────────────────────────────────────────────── -->
@@ -209,6 +239,13 @@ const ROLES: RoleUtilisateur[] = ['ARCHITECTE', 'DIRIGEANT', 'REPRESENTANT', 'CO
       .node-nom { font-weight: 700; }
       .actions { display: flex; gap: 0.5rem; }
       .svg-container { overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; }
+      hr { border: none; border-top: 1px solid var(--color-border); margin: 1.5rem 0; }
+      .muted { color: var(--color-text-muted); font-size: 0.88rem; margin-bottom: 1rem; }
+      .inline-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+      .inline-form input { padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+      .list { list-style: none; display: grid; gap: 0.5rem; }
+      .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 10px; }
+      .list-item .badge { margin-left: 0.5rem; }
     `,
   ],
 })
@@ -221,7 +258,7 @@ export class OrganisationComponent implements OnInit {
 
   membres: Membre[] = [];
   creatingMembre = false;
-  newMembre: CreateMembrePayload = { nom: '', email: '', password: '', role: 'COLLABORATEUR' };
+  newMembre: CreateMembrePayload = { nom: '', email: '', password: '', role: 'ARCHITECTE' };
 
   services: ServiceEntreprise[] = [];
   flatServices: { id: string; nom: string; indent: string }[] = [];
@@ -231,32 +268,41 @@ export class OrganisationComponent implements OnInit {
   organigrammeSvg = '';
   organigrammeTrustedSvg: SafeHtml | null = null;
 
+  partiesPrenantes: PartiePrenante[] = [];
+  newPartie: { nom: string; role?: string } = { nom: '' };
+
   constructor(
     public auth: AuthService,
     private organisationService: OrganisationService,
     private membresService: MembresService,
     private serviceEntrepriseService: ServiceEntrepriseService,
+    private partiesPrenantesService: PartiesPrenantesService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
     private sanitizer: DomSanitizer,
   ) {}
 
   get canEditInfos(): boolean {
-    return this.auth.hasRole('ARCHITECTE', 'DIRIGEANT');
+    return this.auth.hasRole('ADMINISTRATEUR', 'ARCHITECTE');
   }
 
   get canManageMembres(): boolean {
-    return this.auth.hasRole('ARCHITECTE');
+    return this.auth.hasRole('ADMINISTRATEUR');
   }
 
   ngOnInit(): void {
     this.loadInfos();
     this.loadServices();
+    this.loadPartiesPrenantes();
     if (this.canManageMembres) this.loadMembres();
   }
 
   roleLabel(role: RoleUtilisateur): string {
-    return { ARCHITECTE: 'Architecte', DIRIGEANT: 'Dirigeant', REPRESENTANT: 'Représentant', COLLABORATEUR: 'Collaborateur' }[role];
+    const labels: Record<string, string> = {
+      ADMINISTRATEUR: 'Administrateur',
+      ARCHITECTE: 'Architecte',
+    };
+    return labels[role] ?? role;
   }
 
   // ── Infos ────────────────────────────────────────────────────────────────
@@ -271,8 +317,17 @@ export class OrganisationComponent implements OnInit {
   saveInfos(): void {
     if (!this.organisation) return;
     this.savingInfos = true;
-    const { nom, description, secteur, taille, pays, logoUrl } = this.organisation;
-    this.organisationService.updateMine({ nom, description: description ?? undefined, secteur: secteur ?? undefined, taille: taille ?? undefined, pays: pays ?? undefined, logoUrl: logoUrl ?? undefined }).subscribe({
+    const { nom, description, secteur, taille, pays, logoUrl, vision, problemesResoudre } = this.organisation;
+    this.organisationService.updateMine({
+      nom,
+      description: description ?? undefined,
+      secteur: secteur ?? undefined,
+      taille: taille ?? undefined,
+      pays: pays ?? undefined,
+      logoUrl: logoUrl ?? undefined,
+      vision: vision ?? undefined,
+      problemesResoudre: problemesResoudre ?? undefined,
+    }).subscribe({
       next: (org) => {
         this.organisation = org;
         this.savingInfos = false;
@@ -310,7 +365,7 @@ export class OrganisationComponent implements OnInit {
     this.membresService.create(this.newMembre).subscribe({
       next: (membre) => {
         this.membres = [...this.membres, membre];
-        this.newMembre = { nom: '', email: '', password: '', role: 'COLLABORATEUR' };
+        this.newMembre = { nom: '', email: '', password: '', role: 'ARCHITECTE' };
         this.creatingMembre = false;
         this.toast.success('Membre créé.');
       },
@@ -438,5 +493,37 @@ export class OrganisationComponent implements OnInit {
     const filename = `organigramme.${format}`;
     if (format === 'svg') downloadSvg(this.organigrammeSvg, filename);
     else downloadPng(this.organigrammeSvg, filename);
+  }
+
+  // ── Parties prenantes ────────────────────────────────────────────────────
+
+  loadPartiesPrenantes(): void {
+    this.partiesPrenantesService.list().subscribe({
+      next: (parties) => (this.partiesPrenantes = parties),
+      error: () => this.toast.error('Impossible de charger les parties prenantes.'),
+    });
+  }
+
+  addPartiePrenante(event: Event): void {
+    event.preventDefault();
+    if (!this.newPartie.nom.trim()) return;
+    this.partiesPrenantesService.create(this.newPartie).subscribe({
+      next: () => {
+        this.newPartie = { nom: '' };
+        this.loadPartiesPrenantes();
+        this.toast.success('Partie prenante ajoutée.');
+      },
+      error: () => this.toast.error("Impossible d'ajouter cette partie prenante."),
+    });
+  }
+
+  removePartiePrenante(p: PartiePrenante): void {
+    this.partiesPrenantesService.delete(p.id).subscribe({
+      next: () => {
+        this.loadPartiesPrenantes();
+        this.toast.success('Partie prenante retirée.');
+      },
+      error: () => this.toast.error('Impossible de retirer cette partie prenante.'),
+    });
   }
 }

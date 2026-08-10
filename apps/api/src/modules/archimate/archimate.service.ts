@@ -6,6 +6,8 @@ import { UpdateCapaciteDto } from './dto/update-capacite.dto';
 import { CreateElementDto } from './dto/create-element.dto';
 import { UpdateElementDto } from './dto/update-element.dto';
 import { CreateRelationDto } from './dto/create-relation.dto';
+import { UpdatePositionDto } from './dto/update-position.dto';
+import { PositionItemDto } from './dto/update-positions-batch.dto';
 
 @Injectable()
 export class ArchimateService {
@@ -60,6 +62,8 @@ export class ArchimateService {
         nom: dto.nom,
         type: dto.type,
         description: dto.description,
+        positionX: dto.positionX,
+        positionY: dto.positionY,
         ...(dto.capaciteMetierId && { capaciteMetierId: dto.capaciteMetierId }),
       },
     });
@@ -111,6 +115,8 @@ export class ArchimateService {
         ...(dto.nom !== undefined && { nom: dto.nom }),
         ...(dto.type !== undefined && { type: dto.type }),
         ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.positionX !== undefined && { positionX: dto.positionX }),
+        ...(dto.positionY !== undefined && { positionY: dto.positionY }),
         // null permet de détacher la capacité, undefined l'ignore
         ...('capaciteMetierId' in dto && { capaciteMetierId: dto.capaciteMetierId }),
       },
@@ -121,6 +127,30 @@ export class ArchimateService {
     await this.assertElementExists(id, organisationId);
     // onDelete: Cascade sur les relations via le schéma Prisma
     return this.prisma.elementArchimate.delete({ where: { id } });
+  }
+
+  async updateElementPosition(id: string, organisationId: string, dto: UpdatePositionDto) {
+    await this.assertElementExists(id, organisationId);
+    return this.prisma.elementArchimate.update({
+      where: { id },
+      data: { positionX: dto.positionX, positionY: dto.positionY },
+    });
+  }
+
+  async updateElementPositionsBatch(organisationId: string, items: PositionItemDto[]) {
+    const ids = items.map((item) => item.id);
+    const count = await this.prisma.elementArchimate.count({ where: { id: { in: ids }, organisationId } });
+    if (count !== ids.length) {
+      throw new NotFoundException('Un ou plusieurs éléments introuvables');
+    }
+    return this.prisma.$transaction(
+      items.map((item) =>
+        this.prisma.elementArchimate.update({
+          where: { id: item.id },
+          data: { positionX: item.positionX, positionY: item.positionY },
+        }),
+      ),
+    );
   }
 
   // ─── RelationArchimate ────────────────────────────────────────────────────

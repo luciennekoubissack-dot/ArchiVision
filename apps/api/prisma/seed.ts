@@ -25,8 +25,27 @@ const ILOT_ID = '10000000-0000-4000-8000-000000000051';
 const SERVICE_DG_ID = '10000000-0000-4000-8000-000000000060';
 const OBJECTIF_ID = '10000000-0000-4000-8000-000000000070';
 
+const SUPERADMIN_EMAIL = 'superadmin@archivision.local';
+const SUPERADMIN_PASSWORD = 'SuperAdmin123!';
+
 async function main() {
+  // Superadmin plateforme — aucune organisation rattachée.
+  const superAdminPasswordHash = await bcrypt.hash(SUPERADMIN_PASSWORD, 10);
+  const superAdmin = await prisma.user.upsert({
+    where: { email: SUPERADMIN_EMAIL },
+    update: {},
+    create: {
+      email: SUPERADMIN_EMAIL,
+      passwordHash: superAdminPasswordHash,
+      nom: 'Superadmin ArchiVision',
+      role: 'SUPERADMIN',
+      organisationId: null,
+    },
+  });
+
   // Organisation de démonstration (K&B Groupe SARL — cas d'usage référentiel.md)
+  // statut VALIDEE explicite : cette organisation ne doit jamais être bloquée
+  // par le workflow d'approbation, contrairement à une vraie inscription.
   const org = await prisma.organisation.upsert({
     where: { id: ORG_ID },
     update: {},
@@ -38,6 +57,8 @@ async function main() {
       secteur: 'Conseil & services',
       taille: '150 collaborateurs',
       pays: 'France',
+      statut: 'VALIDEE',
+      validatedAt: new Date(),
     },
   });
 
@@ -53,7 +74,7 @@ async function main() {
     },
   });
 
-  // Utilisateur admin — premier Architecte de l'organisation
+  // Utilisateur admin — premier Administrateur de l'organisation
   const passwordHash = await bcrypt.hash('Admin123!', 10);
   const user = await prisma.user.upsert({
     where: { email: 'admin@archivision.local' },
@@ -63,7 +84,7 @@ async function main() {
       passwordHash,
       nom: 'Admin ArchiVision',
       organisationId: org.id,
-      role: 'ARCHITECTE',
+      role: 'ADMINISTRATEUR',
       serviceId: serviceDG.id,
     },
   });
@@ -180,10 +201,11 @@ async function main() {
     create: { applicationId: app.id, zoneId: ilot.id },
   });
 
-  console.log(`✓ User    : ${user.email} (${user.role})`);
-  console.log(`✓ Org     : ${org.nom}`);
-  console.log(`✓ Service : ${serviceDG.nom}`);
-  console.log(`✓ Seed complet — référentiel multi-tenant prêt`);
+  console.log(`✓ Superadmin : ${superAdmin.email} / ${SUPERADMIN_PASSWORD}`);
+  console.log(`✓ User       : ${user.email} (${user.role})`);
+  console.log(`✓ Org        : ${org.nom} (${org.statut})`);
+  console.log(`✓ Service    : ${serviceDG.nom}`);
+  console.log(`✓ Seed complet — référentiel multi-tenant + workflow superadmin prêt`);
 }
 
 main()
