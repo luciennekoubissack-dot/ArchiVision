@@ -19,6 +19,7 @@ import { CreateZoneDto } from './dto/create-zone.dto';
 import { UpdateZoneDto } from './dto/update-zone.dto';
 import { AffecterApplicationDto } from './dto/affecter-application.dto';
 import { CreateEchangeDto } from './dto/create-echange.dto';
+import { CreateApplicationServiceDto } from './dto/create-application-service.dto';
 import { AuthUser, CurrentUser, requireOrganisationId } from '@archivision/shared';
 
 @Controller()
@@ -130,5 +131,24 @@ export class UrbanisationController {
   @HttpCode(HttpStatus.NO_CONTENT)
   removeEchange(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.removeEchange(id, requireOrganisationId(user));
+  }
+
+  // ── Services applicatifs ────────────────────────────────────────────────────
+  // Convention : /applications/:id/services
+
+  @Post('applications/:id/services')
+  @HttpCode(HttpStatus.CREATED)
+  addService(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: CreateApplicationServiceDto,
+  ) {
+    return this.service.addService(id, requireOrganisationId(user), dto);
+  }
+
+  @Delete('applications/services/:serviceId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeService(@CurrentUser() user: AuthUser, @Param('serviceId') serviceId: string) {
+    return this.service.removeService(serviceId, requireOrganisationId(user));
   }
 }

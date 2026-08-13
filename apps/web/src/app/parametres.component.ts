@@ -15,7 +15,6 @@ const ROLE_LABEL: Record<RoleUtilisateur, string> = {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Paramètres</h2></div>
     <section class="card" *ngIf="auth.currentUser() as user">
       <h3>Mon profil</h3>
 

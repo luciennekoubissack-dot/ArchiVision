@@ -1,41 +1,29 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Application, TypeZone, UrbanisationService, ZoneUrbanisation } from './urbanisation.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
+
+const ICONS: Record<string, string> = {
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+};
 
 @Component({
   selector: 'app-urbanisation',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Urbanisation</h2></div>
-
-    <form class="card form-card" (submit)="createZone($event)">
-      <h3>Nouvelle zone</h3>
-      <div class="grid-2">
-        <label class="field">Nom<input type="text" [value]="newZone.nom" (input)="newZone.nom = $any($event.target).value" required /></label>
-        <label class="field">
-          Type
-          <select [value]="newZone.type" (change)="onTypeChange($any($event.target).value)">
-            <option value="ZONE">Zone</option>
-            <option value="QUARTIER">Quartier</option>
-            <option value="ILOT">Îlot</option>
-          </select>
-        </label>
-      </div>
-      <label class="field" *ngIf="newZone.type !== 'ZONE'">
-        Parent ({{ newZone.type === 'QUARTIER' ? 'une Zone' : 'un Quartier' }})
-        <select [value]="newZone.parentId || ''" (change)="newZone.parentId = $any($event.target).value || undefined">
-          <option value="" disabled>Choisir un parent</option>
-          <option *ngFor="let p of validParents" [value]="p.id">{{ p.nom }}</option>
-        </select>
-      </label>
-      <button type="submit" class="btn btn-primary" [disabled]="creatingZone">Créer</button>
-    </form>
+    <div class="page-header">
+      <h3>Hiérarchie Zone &gt; Quartier &gt; Îlot</h3>
+      <button type="button" class="btn btn-primary" (click)="openCreateZone()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+        Ajouter une zone
+      </button>
+    </div>
 
     <section class="card">
-      <h3>Hiérarchie Zone &gt; Quartier &gt; Îlot</h3>
       <div class="empty-state" *ngIf="zones.length === 0">Aucune zone définie.</div>
       <ul class="tree" *ngIf="zones.length > 0">
         <ng-container *ngFor="let root of zones">
@@ -79,6 +67,40 @@ import { ConfirmDialogService } from './confirm-dialog.service';
       </div>
       <button type="submit" class="btn btn-primary" [disabled]="affecting">Affecter</button>
     </form>
+
+    <!-- ── Popover : ajouter une zone ────────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="createZonePopover" (click)="closeCreateZone()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createZone($event)">
+        <div class="popover-head">
+          <h3>Ajouter une zone</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCreateZone()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <div class="grid-2">
+          <label class="field">Nom<input type="text" [value]="newZone.nom" (input)="newZone.nom = $any($event.target).value" required /></label>
+          <label class="field">
+            Type
+            <select [value]="newZone.type" (change)="onTypeChange($any($event.target).value)">
+              <option value="ZONE">Zone</option>
+              <option value="QUARTIER">Quartier</option>
+              <option value="ILOT">Îlot</option>
+            </select>
+          </label>
+        </div>
+        <label class="field" *ngIf="newZone.type !== 'ZONE'">
+          Parent ({{ newZone.type === 'QUARTIER' ? 'une Zone' : 'un Quartier' }})
+          <select [value]="newZone.parentId || ''" (change)="newZone.parentId = $any($event.target).value || undefined">
+            <option value="" disabled>Choisir un parent</option>
+            <option *ngFor="let p of validParents" [value]="p.id">{{ p.nom }}</option>
+          </select>
+        </label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreateZone()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creatingZone">{{ creatingZone ? 'Création…' : 'Créer' }}</button>
+        </div>
+      </form>
+    </div>
   `,
   styles: [
     `
@@ -99,6 +121,7 @@ export class UrbanisationComponent implements OnInit {
 
   newZone: { nom: string; type: TypeZone; parentId?: string } = { nom: '', type: 'ZONE' };
   creatingZone = false;
+  createZonePopover = false;
 
   affectation: { applicationId: string; zoneId: string } = { applicationId: '', zoneId: '' };
   affecting = false;
@@ -107,7 +130,21 @@ export class UrbanisationComponent implements OnInit {
     private urbanisationService: UrbanisationService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
+    private sanitizer: DomSanitizer,
   ) {}
+
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
+  }
+
+  openCreateZone(): void {
+    this.newZone = { nom: '', type: 'ZONE' };
+    this.createZonePopover = true;
+  }
+
+  closeCreateZone(): void {
+    this.createZonePopover = false;
+  }
 
   ngOnInit(): void {
     this.loadZones();
@@ -167,8 +204,8 @@ export class UrbanisationComponent implements OnInit {
     this.creatingZone = true;
     this.urbanisationService.createZone(this.newZone).subscribe({
       next: () => {
-        this.newZone = { nom: '', type: 'ZONE' };
         this.creatingZone = false;
+        this.closeCreateZone();
         this.loadZones();
         this.toast.success('Zone créée.');
       },

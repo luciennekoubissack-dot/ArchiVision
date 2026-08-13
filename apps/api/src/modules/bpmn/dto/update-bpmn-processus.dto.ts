@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { TypeProcessus } from '@prisma/client';
 
 export class UpdateBpmnProcessusDto {
   @IsString()
@@ -11,6 +12,10 @@ export class UpdateBpmnProcessusDto {
   @IsOptional()
   @MaxLength(2000)
   description?: string;
+
+  @IsEnum(TypeProcessus)
+  @IsOptional()
+  type?: TypeProcessus;
 
   @IsString()
   @IsOptional()

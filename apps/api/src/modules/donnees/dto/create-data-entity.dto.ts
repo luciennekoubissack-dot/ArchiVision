@@ -11,6 +11,11 @@ export class CreateDataEntityDto {
   @MaxLength(2000)
   description?: string;
 
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  proprietaire?: string;
+
   @IsNumber()
   @IsOptional()
   positionX?: number;

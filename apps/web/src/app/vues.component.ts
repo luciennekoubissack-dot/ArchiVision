@@ -27,8 +27,6 @@ function emptyState(): VueState {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Vues générées</h2></div>
-
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'archimate'" (click)="select('archimate')">Vue ArchiMate</button>
       <button class="tab" [class.active]="tab === 'organigramme'" (click)="select('organigramme')">Organigramme</button>

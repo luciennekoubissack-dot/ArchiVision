@@ -11,4 +11,9 @@ export class UpdateObjectifDto {
   @IsOptional()
   @MaxLength(2000)
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  sousObjectif?: string;
 }

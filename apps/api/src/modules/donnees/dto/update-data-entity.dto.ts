@@ -13,6 +13,11 @@ export class UpdateDataEntityDto {
   @MaxLength(2000)
   description?: string;
 
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  proprietaire?: string;
+
   @IsEnum(StatutElement)
   @IsOptional()
   statut?: StatutElement;

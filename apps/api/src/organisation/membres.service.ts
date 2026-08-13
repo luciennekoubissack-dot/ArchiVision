@@ -11,6 +11,8 @@ const membreSelect = {
   nom: true,
   role: true,
   serviceId: true,
+  poste: true,
+  contact: true,
   createdAt: true,
 } as const;
 
@@ -42,6 +44,8 @@ export class MembresService {
         role: dto.role,
         organisationId,
         ...(dto.serviceId && { serviceId: dto.serviceId }),
+        ...(dto.poste !== undefined && { poste: dto.poste }),
+        ...(dto.contact !== undefined && { contact: dto.contact }),
       },
       select: membreSelect,
     });
@@ -55,6 +59,8 @@ export class MembresService {
       data: {
         ...(dto.role !== undefined && { role: dto.role }),
         ...('serviceId' in dto && { serviceId: dto.serviceId }),
+        ...(dto.poste !== undefined && { poste: dto.poste }),
+        ...(dto.contact !== undefined && { contact: dto.contact }),
       },
       select: membreSelect,
     });

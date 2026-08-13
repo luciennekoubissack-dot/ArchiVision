@@ -82,15 +82,13 @@ interface PaletteItem {
   styles: [
     `
       .palette {
-        width: 220px;
+        width: 260px;
         flex-shrink: 0;
         background: var(--color-white);
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-sm);
         padding: 1.25rem;
         align-self: flex-start;
-        max-height: 80vh;
-        overflow-y: auto;
       }
       h3 {
         margin: 0 0 0.25rem;

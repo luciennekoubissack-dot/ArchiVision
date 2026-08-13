@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class CreateObjectifDto {
+export class CreateApplicationServiceDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
@@ -8,11 +8,6 @@ export class CreateObjectifDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(2000)
+  @MaxLength(500)
   description?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(200)
-  sousObjectif?: string;
 }

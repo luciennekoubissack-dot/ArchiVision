@@ -9,8 +9,6 @@ import { ToastService } from './toast.service';
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="page-header"><h2>Tableau de bord plateforme</h2></div>
-
     <section class="kpi-row" *ngIf="stats as s">
       <div class="card kpi card-hover">
         <span class="icon-badge icon-badge-primary">

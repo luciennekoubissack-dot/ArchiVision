@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
   ActeurItem,
   ApplicationItem,
@@ -79,7 +80,14 @@ const CRITICITES: { value: NonNullable<ApplicationItem['criticite']>; label: str
   imports: [CommonModule, RouterLink, InfoTipComponent],
   template: `
     <section class="auth-screen">
-      <div class="auth-card wizard">
+      <div class="auth-image">
+        <div class="auth-image-overlay">
+          <span class="auth-image-eyebrow">ArchiVision</span>
+          <p class="auth-image-quote">Modélisez votre architecture d'entreprise étape par étape, du référentiel au canevas interactif.</p>
+        </div>
+      </div>
+
+      <div class="auth-form-col">
         <div class="wizard-top">
           <img src="assets/logo.png" alt="ArchiVision" class="logo-sm" />
           <span class="switch">Déjà un compte ? <a routerLink="/login">Se connecter</a></span>
@@ -360,35 +368,60 @@ const CRITICITES: { value: NonNullable<ApplicationItem['criticite']>; label: str
   styles: [
     `
       .auth-screen {
-        min-height: 100vh;
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 40% 60%;
+        overflow: hidden;
+      }
+      .auth-image {
+        position: relative;
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.55), rgba(31, 59, 179, 0.55)), url('/assets/im.jpg') center/cover no-repeat;
         display: flex;
-        align-items: center;
+        align-items: flex-end;
+      }
+      .auth-image-overlay { padding: 2.5rem; color: var(--color-white); }
+      .auth-image-eyebrow {
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        background: rgba(255, 255, 255, 0.16);
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        margin-bottom: 0.9rem;
+      }
+      .auth-image-quote { font-size: 1.25rem; font-weight: 700; line-height: 1.5; max-width: 340px; }
+
+      .auth-form-col {
+        height: 100vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
         justify-content: center;
-        padding: 2rem;
-        background: linear-gradient(135deg, rgba(15, 23, 42, 0.72), rgba(29, 78, 216, 0.42)),
-          url('/assets/fond.jpg') center/cover no-repeat;
+        padding: 0.85rem 3rem;
       }
-      .auth-card {
-        width: 100%;
-        background: var(--color-white);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-md);
-        padding: 2.5rem 2.25rem;
-      }
-      .wizard { max-width: 720px; max-height: 94vh; overflow-y: auto; }
       .logo { width: 56px; height: 56px; border-radius: 12px; margin-bottom: 1rem; }
-      .wizard-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
-      .logo-sm { width: 36px; height: 36px; border-radius: 9px; }
-      h1 { font-size: 1.5rem; font-weight: 800; }
-      h3 { font-size: 1rem; margin-bottom: 0.75rem; display: flex; align-items: center; }
-      .subtitle { color: var(--color-text-muted); margin: 0.4rem 0 1.5rem; font-size: 0.92rem; }
-      .muted { color: var(--color-text-muted); font-size: 0.88rem; }
-      .field { text-align: left; display: flex; align-items: center; flex-wrap: wrap; }
+      .wizard-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
+      .logo-sm { width: 32px; height: 32px; border-radius: 8px; }
+      h1 { font-size: 1.3rem; font-weight: 800; }
+      h3 { font-size: 0.94rem; margin-bottom: 0.5rem; display: flex; align-items: center; }
+      .subtitle { color: var(--color-text-muted); margin: 0.25rem 0 0.85rem; font-size: 0.86rem; }
+      .muted { color: var(--color-text-muted); font-size: 0.86rem; }
+      .field { text-align: left; display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 0.55rem; }
       .field input, .field textarea { flex-basis: 100%; }
+      .field input, .field select, .field textarea { padding: 0.5rem 0.7rem; margin-top: 0.25rem; }
+      .field textarea { min-height: 50px; }
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
-      hr { border: none; border-top: 1px solid var(--color-border); margin: 1.5rem 0; }
-      .switch { font-size: 0.88rem; color: var(--color-text-muted); }
+      hr { border: none; border-top: 1px solid var(--color-border); margin: 0.75rem 0; }
+      .switch { font-size: 0.86rem; color: var(--color-text-muted); }
       .switch a { color: var(--color-primary); font-weight: 700; text-decoration: none; }
+
+      @media (max-width: 900px) {
+        .auth-screen { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+        .auth-image { min-height: 200px; }
+        .auth-form-col { height: auto; }
+      }
 
       .entreprise-head { display: flex; align-items: flex-start; gap: 1.5rem; }
       .entreprise-fields { flex: 1; }
@@ -427,16 +460,16 @@ const CRITICITES: { value: NonNullable<ApplicationItem['criticite']>; label: str
       .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.5rem 1rem; margin-bottom: 1rem; }
       .checkbox-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
 
-      .recap { display: grid; gap: 0.6rem; }
-      .recap-row { display: flex; justify-content: space-between; padding: 0.6rem 0.9rem; background: var(--color-surface); border-radius: 10px; font-size: 0.9rem; }
+      .recap { display: grid; gap: 0.35rem; }
+      .recap-row { display: flex; justify-content: space-between; padding: 0.4rem 0.8rem; background: var(--color-surface); border-radius: 10px; font-size: 0.85rem; }
 
       .stepper {
         display: flex;
         align-items: stretch;
         gap: 0;
         overflow-x: auto;
-        margin-bottom: 1.5rem;
-        padding: 0.75rem 0.25rem;
+        margin-bottom: 0.75rem;
+        padding: 0.35rem 0.25rem;
         border-bottom: 1px solid var(--color-border);
       }
       .step {
@@ -482,15 +515,15 @@ const CRITICITES: { value: NonNullable<ApplicationItem['criticite']>; label: str
       .step.active .step-titre { color: var(--color-text); }
       .step.done .step-circle { border-color: var(--color-success); color: var(--color-success); background: var(--color-success-light); }
 
-      .step-body { min-height: 220px; }
+      .step-body { min-height: 0; }
 
       .step-nav {
         display: flex;
         align-items: center;
         justify-content: flex-end;
         gap: 0.6rem;
-        margin-top: 1.5rem;
-        padding-top: 1.25rem;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
         border-top: 1px solid var(--color-border);
       }
       .step-nav .btn-outline { margin-right: auto; }
@@ -561,10 +594,11 @@ export class RegisterComponent {
   constructor(
     private auth: AuthService,
     private router: Router,
+    private sanitizer: DomSanitizer,
   ) {}
 
-  icon(name: string): string {
-    return ICONS[name] ?? '';
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
   }
 
   techLabel(value: string): string {

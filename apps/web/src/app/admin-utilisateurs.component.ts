@@ -13,9 +13,8 @@ const ROLE_LABEL: Record<string, string> = {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Utilisateurs ({{ utilisateurs.length }})</h2></div>
-
     <section class="card">
+      <h3>Utilisateurs ({{ utilisateurs.length }})</h3>
       <div class="empty-state" *ngIf="utilisateurs.length === 0">Aucun utilisateur pour l'instant.</div>
       <table class="table" *ngIf="utilisateurs.length > 0">
         <thead>

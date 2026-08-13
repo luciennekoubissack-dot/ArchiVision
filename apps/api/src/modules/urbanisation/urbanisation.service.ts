@@ -7,6 +7,7 @@ import { CreateZoneDto } from './dto/create-zone.dto';
 import { UpdateZoneDto } from './dto/update-zone.dto';
 import { AffecterApplicationDto } from './dto/affecter-application.dto';
 import { CreateEchangeDto } from './dto/create-echange.dto';
+import { CreateApplicationServiceDto } from './dto/create-application-service.dto';
 
 @Injectable()
 export class UrbanisationService {
@@ -23,7 +24,8 @@ export class UrbanisationService {
       where: { organisationId },
       orderBy: { nom: 'asc' },
       include: {
-        _count: { select: { zones: true } },
+        services: true,
+        _count: { select: { zones: true, services: true } },
       },
     });
   }
@@ -37,6 +39,7 @@ export class UrbanisationService {
             zone: { select: { id: true, nom: true, type: true } },
           },
         },
+        services: true,
       },
     });
     if (!app || app.organisationId !== organisationId) {
@@ -216,6 +219,24 @@ export class UrbanisationService {
       throw new NotFoundException(`Échange ${echangeId} introuvable`);
     }
     return this.prisma.applicationEchange.delete({ where: { id: echangeId } });
+  }
+
+  // ─── Services applicatifs ──────────────────────────────────────────────────
+
+  async addService(applicationId: string, organisationId: string, dto: CreateApplicationServiceDto) {
+    await this.assertApplicationExists(applicationId, organisationId);
+    return this.prisma.applicationService.create({ data: { ...dto, applicationId } });
+  }
+
+  async removeService(serviceId: string, organisationId: string) {
+    const service = await this.prisma.applicationService.findUnique({
+      where: { id: serviceId },
+      include: { application: true },
+    });
+    if (!service || service.application.organisationId !== organisationId) {
+      throw new NotFoundException(`Service ${serviceId} introuvable`);
+    }
+    return this.prisma.applicationService.delete({ where: { id: serviceId } });
   }
 
   // ─── Utilitaires ──────────────────────────────────────────────────────────

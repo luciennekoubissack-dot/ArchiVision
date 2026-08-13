@@ -27,25 +27,24 @@ const TENANT_NAV_GROUPS: NavGroup[] = [
   {
     label: "Architecture d'entreprise",
     items: [
-      { label: 'Organisation', path: '/organisation', icon: 'building' },
-      { label: 'Stratégie', path: '/strategie', icon: 'target' },
+      { label: "Stratégie de l'organisation", path: '/organisation', icon: 'building' },
+      { label: 'Procédure', path: '/processus', icon: 'flow' },
       { label: 'Architecture métier', path: '/architecture-metier', icon: 'layers' },
-      { label: 'Canevas', path: '/canevas', icon: 'canvas' },
-      { label: 'Portefeuille applicatif', path: '/portefeuille-applicatif', icon: 'grid' },
+      { label: 'Architecture des données', path: '/donnees', icon: 'database' },
+      { label: 'Architecture applicative', path: '/portefeuille-applicatif', icon: 'grid' },
+      { label: 'Architecture technologique', path: '/technologique', icon: 'server' },
+      { label: 'Analyse des écarts', path: '/analyse-ecarts', icon: 'compare' },
+      { label: 'Feuille de route', path: '/roadmap', icon: 'flag' },
       { label: 'Urbanisation', path: '/urbanisation', icon: 'map' },
-      { label: 'Vues générées', path: '/vues', icon: 'eye' },
     ],
   },
   {
-    label: 'Modélisation avancée',
+    label: 'Modélisation',
     items: [
-      { label: 'Processus (BPMN)', path: '/processus', icon: 'flow' },
-      { label: 'Données', path: '/donnees', icon: 'database' },
-      { label: 'Technologique', path: '/technologique', icon: 'server' },
-      { label: 'Roadmap', path: '/roadmap', icon: 'flag' },
+      { label: 'Canevas', path: '/canevas', icon: 'canvas' },
+      { label: 'Vues générées', path: '/vues', icon: 'eye' },
     ],
   },
-  { label: 'Compte', items: [{ label: 'Paramètres', path: '/parametres', icon: 'settings' }] },
 ];
 
 const SUPERADMIN_NAV_GROUPS: NavGroup[] = [
@@ -81,6 +80,7 @@ const ICON_PATHS: Record<string, string> = {
   search: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
   users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   canvas: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 9v12"/>',
+  compare: '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 15V9a3 3 0 0 1 3-3h6"/><path d="M18 9v6a3 3 0 0 1-3 3H9"/>',
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -182,16 +182,16 @@ const ROLE_LABEL: Record<string, string> = {
     `
       .shell { display: flex; min-height: 100vh; }
       .sidebar {
-        width: 268px;
+        width: 230px;
         background: var(--color-black);
         color: #aab0c4;
         padding: 1.25rem;
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
-        transition: width 0.2s ease;
+        transition: width 0.25s ease;
       }
-      .collapsed .sidebar { width: 84px; }
+      .collapsed .sidebar { width: 72px; }
       .collapsed .brand-text,
       .collapsed .nav-group-label,
       .collapsed .nav a span:not(.sr-only),
@@ -246,9 +246,13 @@ const ROLE_LABEL: Record<string, string> = {
       .nav a svg { flex-shrink: 0; opacity: 0.85; }
       .nav a:hover { background: rgba(255, 255, 255, 0.07); color: white; }
       .nav a.active {
-        background: var(--color-white);
-        color: var(--color-black);
+        background: var(--color-primary-light);
+        color: var(--color-primary);
+        border-radius: 0 20px 20px 0;
+        margin-left: -1.25rem;
+        padding-left: 1.95rem;
       }
+      .collapsed .nav a.active { margin-left: 0; padding-left: 0.7rem; border-radius: 10px; }
       .nav a.active svg { opacity: 1; }
 
       .collapse-toggle {
@@ -318,9 +322,11 @@ const ROLE_LABEL: Record<string, string> = {
         display: flex;
         align-items: center;
         gap: 1.25rem;
-        padding: 0.9rem 1.75rem;
+        height: 78px;
+        padding: 0 1.75rem;
         background: var(--color-white);
-        border-bottom: 1px solid var(--color-border);
+        border-bottom: 2px solid var(--color-border);
+        flex-shrink: 0;
       }
       .breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; flex-shrink: 0; }
       .crumb-muted { color: var(--color-text-muted); }

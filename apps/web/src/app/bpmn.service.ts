@@ -11,11 +11,13 @@ export type TypeBpmn =
   | 'PASSERELLE_PARALLELE';
 
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
+export type TypeProcessus = 'METIER' | 'SUPPORT' | 'PILOTAGE';
 
 export interface BpmnProcessus {
   id: string;
   nom: string;
   description?: string | null;
+  type: TypeProcessus;
   bpmnXml?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -57,16 +59,27 @@ export class BpmnService {
     return this.http.get<BpmnProcessusDetail>(`/bpmn-processus/${id}`);
   }
 
-  create(payload: { nom: string; description?: string }): Observable<BpmnProcessus> {
+  create(payload: { nom: string; description?: string; type?: TypeProcessus }): Observable<BpmnProcessus> {
     return this.http.post<BpmnProcessus>('/bpmn-processus', payload);
+  }
+
+  update(id: string, payload: { nom?: string; description?: string; type?: TypeProcessus }): Observable<BpmnProcessus> {
+    return this.http.patch<BpmnProcessus>(`/bpmn-processus/${id}`, payload);
   }
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`/bpmn-processus/${id}`);
   }
 
-  addElement(processusId: string, payload: { nom: string; type: TypeBpmn }): Observable<BpmnElement> {
+  addElement(processusId: string, payload: { nom: string; type: TypeBpmn; statut?: StatutElement }): Observable<BpmnElement> {
     return this.http.post<BpmnElement>(`/bpmn-processus/${processusId}/elements`, payload);
+  }
+
+  updateElement(
+    elementId: string,
+    payload: { nom?: string; type?: TypeBpmn; statut?: StatutElement; positionX?: number; positionY?: number },
+  ): Observable<BpmnElement> {
+    return this.http.patch<BpmnElement>(`/bpmn-processus/elements/${elementId}`, payload);
   }
 
   deleteElement(elementId: string): Observable<void> {

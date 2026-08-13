@@ -1,113 +1,126 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { BpmnElement, BpmnProcessus, BpmnProcessusDetail, BpmnService, TypeBpmn } from './bpmn.service';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { BpmnProcessus, BpmnService, TypeProcessus } from './bpmn.service';
+import { BpmnCanevasComponent } from './bpmn-canevas.component';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
 
-const TYPE_LABEL: Record<TypeBpmn, string> = {
-  EVENEMENT_DEBUT: 'Événement de début',
-  EVENEMENT_FIN: 'Événement de fin',
-  EVENEMENT_INTERMEDIAIRE: 'Événement intermédiaire',
-  TACHE: 'Tâche',
-  PASSERELLE_EXCLUSIVE: 'Passerelle exclusive',
-  PASSERELLE_PARALLELE: 'Passerelle parallèle',
+/// Ordre d'affichage façon « maison des processus » : pilotage (toit) en
+/// premier, métier (corps, crée la valeur) au centre, support (fondations).
+const TYPE_PROCESSUS_ORDER: TypeProcessus[] = ['PILOTAGE', 'METIER', 'SUPPORT'];
+const TYPE_PROCESSUS_LABEL: Record<TypeProcessus, string> = {
+  PILOTAGE: 'Processus de pilotage',
+  METIER: 'Processus métier',
+  SUPPORT: 'Processus support',
 };
-const TYPES: TypeBpmn[] = Object.keys(TYPE_LABEL) as TypeBpmn[];
+const TYPE_PROCESSUS_HINT: Record<TypeProcessus, string> = {
+  PILOTAGE: "Définissent la stratégie et pilotent les autres processus (ex. gouvernance, qualité, contrôle de gestion).",
+  METIER: "Créent directement de la valeur pour le client (ex. vente, production, livraison).",
+  SUPPORT: "Nécessaires au fonctionnement interne, sans valeur directe pour le client (ex. RH, IT, comptabilité).",
+};
+const TYPES_PROCESSUS: TypeProcessus[] = Object.keys(TYPE_PROCESSUS_LABEL) as TypeProcessus[];
+
+const ICONS: Record<string, string> = {
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  trash:
+    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+};
 
 @Component({
   selector: 'app-bpmn',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, BpmnCanevasComponent],
   template: `
-    <div class="page-header"><h2>Processus métier (BPMN)</h2></div>
+    <p class="muted intro">
+      Comment fonctionne l'entreprise ? Classez chaque processus selon son rôle : un processus <strong>métier</strong>
+      crée directement de la valeur pour le client, un processus <strong>support</strong> fait fonctionner
+      l'entreprise en interne, un processus de <strong>pilotage</strong> définit la stratégie et pilote les autres.
+    </p>
 
-    <form class="card form-card" (submit)="createProcessus($event)">
-      <h3>Nouveau processus</h3>
-      <div class="grid-2">
-        <label class="field">Nom<input type="text" [value]="newProcessus.nom" (input)="newProcessus.nom = $any($event.target).value" required /></label>
-        <label class="field">Description<input type="text" [value]="newProcessus.description || ''" (input)="newProcessus.description = $any($event.target).value" /></label>
-      </div>
-      <button type="submit" class="btn btn-primary" [disabled]="creatingProcessus">Créer</button>
-    </form>
+    <div class="page-header">
+      <h3>Processus ({{ processus.length }})</h3>
+      <button type="button" class="btn btn-primary" (click)="openCreate()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+        Ajouter un processus
+      </button>
+    </div>
 
     <div class="layout">
-      <section class="card processus-list">
-        <h3>Processus ({{ processus.length }})</h3>
-        <div class="empty-state" *ngIf="processus.length === 0">Aucun processus défini.</div>
-        <ul class="list" *ngIf="processus.length > 0">
-          <li
-            class="list-item"
-            *ngFor="let p of processus"
-            [class.selected]="selected?.id === p.id"
-            (click)="select(p)"
-          >
-            <div>
-              <strong>{{ p.nom }}</strong>
-              <p class="muted" *ngIf="p.description">{{ p.description }}</p>
-              <span class="badge badge-neutral">{{ p._count?.elements || 0 }} élément(s)</span>
-            </div>
-            <button class="btn btn-danger" (click)="removeProcessus(p, $event)">Supprimer</button>
-          </li>
-        </ul>
-      </section>
+      <div class="processus-list">
+        <div class="card empty-state" *ngIf="processus.length === 0">Aucun processus défini.</div>
+        <ng-container *ngFor="let t of typesProcessus">
+          <section class="card processus-groupe" *ngIf="processusParType(t).length > 0">
+            <h4>{{ typeProcessusLabel(t) }}</h4>
+            <p class="muted hint">{{ typeProcessusHint(t) }}</p>
+            <ul class="list">
+              <li
+                class="list-item"
+                *ngFor="let p of processusParType(t)"
+                [class.selected]="selected?.id === p.id"
+                (click)="select(p)"
+              >
+                <div class="processus-info">
+                  <strong>{{ p.nom }}</strong>
+                  <p class="muted" *ngIf="p.description">{{ p.description }}</p>
+                  <span class="badge badge-neutral">{{ p._count?.elements || 0 }} élément(s)</span>
+                </div>
+                <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeProcessus(p, $event)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                </button>
+              </li>
+            </ul>
+          </section>
+        </ng-container>
+      </div>
 
       <section class="card processus-detail" *ngIf="selected">
         <h3>{{ selected.nom }}</h3>
-
-        <form class="inline-form" (submit)="addElement($event)">
-          <input type="text" placeholder="Nom de l'étape" [value]="newElement.nom" (input)="newElement.nom = $any($event.target).value" required />
-          <select [value]="newElement.type" (change)="newElement.type = $any($event.target).value">
-            <option *ngFor="let t of types" [value]="t">{{ typeLabel(t) }}</option>
-          </select>
-          <button type="submit" class="btn btn-outline" [disabled]="addingElement">Ajouter l'étape</button>
-        </form>
-
-        <ul class="list" *ngIf="selected.elements.length > 0">
-          <li class="list-item" *ngFor="let el of selected.elements">
-            <div>
-              <strong>{{ el.nom }}</strong>
-              <span class="badge badge-neutral">{{ typeLabel(el.type) }}</span>
-            </div>
-            <button class="btn btn-danger" (click)="removeElement(el)">Supprimer</button>
-          </li>
-        </ul>
-        <div class="empty-state" *ngIf="selected.elements.length === 0">Aucune étape pour l'instant.</div>
-
-        <h4 *ngIf="selected.elements.length > 1">Flux de séquence</h4>
-        <form class="inline-form" *ngIf="selected.elements.length > 1" (submit)="addFlow($event)">
-          <select [value]="newFlow.sourceId" (change)="newFlow.sourceId = $any($event.target).value">
-            <option value="" disabled>Depuis…</option>
-            <option *ngFor="let el of selected.elements" [value]="el.id">{{ el.nom }}</option>
-          </select>
-          <select [value]="newFlow.targetId" (change)="newFlow.targetId = $any($event.target).value">
-            <option value="" disabled>Vers…</option>
-            <option *ngFor="let el of selected.elements" [value]="el.id">{{ el.nom }}</option>
-          </select>
-          <button type="submit" class="btn btn-outline" [disabled]="addingFlow">Relier</button>
-        </form>
-
-        <ul class="list" *ngIf="allFlows.length > 0">
-          <li class="list-item" *ngFor="let flow of allFlows">
-            <div>{{ elementName(flow.sourceId) }} → {{ elementName(flow.targetId) }}</div>
-            <button class="btn btn-danger" (click)="removeFlow(flow.id)">Supprimer</button>
-          </li>
-        </ul>
+        <app-bpmn-canevas [processusId]="selected.id" (changed)="loadProcessus()" />
       </section>
+    </div>
+
+    <!-- ── Popover : ajouter un processus ────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="createPopover" (click)="closeCreate()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createProcessus($event)">
+        <div class="popover-head">
+          <h3>Ajouter un processus</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCreate()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <label class="field">Nom<input type="text" [value]="newProcessus.nom" (input)="newProcessus.nom = $any($event.target).value" required /></label>
+        <label class="field">Description<input type="text" [value]="newProcessus.description || ''" (input)="newProcessus.description = $any($event.target).value" /></label>
+        <label class="field">
+          Catégorie
+          <select [value]="newProcessus.type" (change)="newProcessus.type = $any($event.target).value">
+            <option *ngFor="let t of typesProcessus" [value]="t">{{ typeProcessusLabel(t) }}</option>
+          </select>
+        </label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreate()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creatingProcessus">{{ creatingProcessus ? 'Création…' : 'Créer' }}</button>
+        </div>
+      </form>
     </div>
   `,
   styles: [
     `
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
-      .form-card { margin-bottom: 1.5rem; }
-      .layout { display: grid; grid-template-columns: 340px 1fr; gap: 1.25rem; align-items: start; }
+      .intro { max-width: 760px; margin: -0.5rem 0 1.25rem; }
+      .processus-groupe h4 { margin-bottom: 0.15rem; }
+      .processus-groupe .hint { margin-top: 0; font-size: 0.85rem; }
+      .layout { display: flex; flex-direction: column; gap: 1.25rem; }
+      .processus-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; align-items: start; }
       .list { list-style: none; display: grid; gap: 0.6rem; margin-top: 1rem; }
-      .list-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 0.85rem; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; }
+      .list-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.85rem; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; }
+      .processus-info { flex: 1; min-width: 0; }
+      .processus-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .processus-info p.muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .processus-list .list-item.selected { border-color: var(--color-primary); background: var(--color-primary-light); }
       .processus-detail .list-item { cursor: default; }
       .muted { color: var(--color-text-muted); margin-top: 0.25rem; font-size: 0.88rem; }
-      .inline-form { display: flex; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
-      .inline-form input, .inline-form select { padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
-      h4 { margin-top: 1.5rem; }
 
       @media (max-width: 900px) {
         .layout { grid-template-columns: 1fr; }
@@ -116,40 +129,48 @@ const TYPES: TypeBpmn[] = Object.keys(TYPE_LABEL) as TypeBpmn[];
   ],
 })
 export class BpmnComponent implements OnInit {
-  types = TYPES;
+  typesProcessus = TYPE_PROCESSUS_ORDER;
   processus: BpmnProcessus[] = [];
-  selected: BpmnProcessusDetail | null = null;
+  selected: BpmnProcessus | null = null;
 
-  newProcessus: { nom: string; description?: string } = { nom: '' };
+  newProcessus: { nom: string; description?: string; type: TypeProcessus } = { nom: '', type: 'METIER' };
   creatingProcessus = false;
-
-  newElement: { nom: string; type: TypeBpmn } = { nom: '', type: 'TACHE' };
-  addingElement = false;
-
-  newFlow: { sourceId: string; targetId: string } = { sourceId: '', targetId: '' };
-  addingFlow = false;
+  createPopover = false;
 
   constructor(
     private bpmnService: BpmnService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
     this.loadProcessus();
   }
 
-  typeLabel(type: TypeBpmn): string {
-    return TYPE_LABEL[type];
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
   }
 
-  get allFlows() {
-    if (!this.selected) return [];
-    return this.selected.elements.flatMap((el) => el.flowsSource ?? []);
+  openCreate(): void {
+    this.newProcessus = { nom: '', type: 'METIER' };
+    this.createPopover = true;
   }
 
-  elementName(id: string): string {
-    return this.selected?.elements.find((el) => el.id === id)?.nom ?? '?';
+  closeCreate(): void {
+    this.createPopover = false;
+  }
+
+  typeProcessusLabel(type: TypeProcessus): string {
+    return TYPE_PROCESSUS_LABEL[type];
+  }
+
+  typeProcessusHint(type: TypeProcessus): string {
+    return TYPE_PROCESSUS_HINT[type];
+  }
+
+  processusParType(type: TypeProcessus): BpmnProcessus[] {
+    return this.processus.filter((p) => p.type === type);
   }
 
   loadProcessus(): void {
@@ -164,8 +185,8 @@ export class BpmnComponent implements OnInit {
     this.creatingProcessus = true;
     this.bpmnService.create(this.newProcessus).subscribe({
       next: () => {
-        this.newProcessus = { nom: '' };
         this.creatingProcessus = false;
+        this.closeCreate();
         this.loadProcessus();
         this.toast.success('Processus créé.');
       },
@@ -191,74 +212,6 @@ export class BpmnComponent implements OnInit {
   }
 
   select(p: BpmnProcessus): void {
-    this.bpmnService.get(p.id).subscribe({
-      next: (detail) => (this.selected = detail),
-      error: () => this.toast.error('Impossible de charger ce processus.'),
-    });
-  }
-
-  addElement(event: Event): void {
-    event.preventDefault();
-    if (!this.selected) return;
-    this.addingElement = true;
-    this.bpmnService.addElement(this.selected.id, this.newElement).subscribe({
-      next: () => {
-        this.newElement = { nom: '', type: 'TACHE' };
-        this.addingElement = false;
-        this.select(this.selected!);
-        this.loadProcessus();
-        this.toast.success('Étape ajoutée.');
-      },
-      error: () => {
-        this.addingElement = false;
-        this.toast.error("Impossible d'ajouter cette étape.");
-      },
-    });
-  }
-
-  async removeElement(el: BpmnElement): Promise<void> {
-    const confirmed = await this.confirmDialog.confirm(`Supprimer l'étape « ${el.nom} » ?`);
-    if (!confirmed || !this.selected) return;
-    this.bpmnService.deleteElement(el.id).subscribe({
-      next: () => {
-        this.select(this.selected!);
-        this.loadProcessus();
-        this.toast.success('Étape supprimée.');
-      },
-      error: () => this.toast.error("Impossible de supprimer cette étape."),
-    });
-  }
-
-  addFlow(event: Event): void {
-    event.preventDefault();
-    if (!this.selected || !this.newFlow.sourceId || !this.newFlow.targetId) return;
-    if (this.newFlow.sourceId === this.newFlow.targetId) {
-      this.toast.error('La source et la cible doivent être différentes.');
-      return;
-    }
-    this.addingFlow = true;
-    this.bpmnService.addFlow(this.selected.id, this.newFlow).subscribe({
-      next: () => {
-        this.newFlow = { sourceId: '', targetId: '' };
-        this.addingFlow = false;
-        this.select(this.selected!);
-        this.toast.success('Flux créé.');
-      },
-      error: () => {
-        this.addingFlow = false;
-        this.toast.error('Impossible de créer ce flux.');
-      },
-    });
-  }
-
-  removeFlow(flowId: string): void {
-    if (!this.selected) return;
-    this.bpmnService.deleteFlow(flowId).subscribe({
-      next: () => {
-        this.select(this.selected!);
-        this.toast.success('Flux supprimé.');
-      },
-      error: () => this.toast.error('Impossible de supprimer ce flux.'),
-    });
+    this.selected = p;
   }
 }

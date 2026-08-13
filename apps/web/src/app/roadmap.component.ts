@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { PrioriteProjet, Projet, RoadmapService, StatutProjet } from './roadmap.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
@@ -11,32 +12,25 @@ const PRIORITES: PrioriteProjet[] = ['HAUTE', 'MOYENNE', 'BASSE'];
 const STATUT_LABEL: Record<StatutProjet, string> = { PLANIFIE: 'Planifié', EN_COURS: 'En cours', TERMINE: 'Terminé' };
 const STATUTS: StatutProjet[] = ['PLANIFIE', 'EN_COURS', 'TERMINE'];
 
+const ICONS: Record<string, string> = {
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+};
+
 @Component({
   selector: 'app-roadmap',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Roadmap de transformation</h2></div>
+    <p class="muted step-question">Quels projets faut-il lancer pour combler l'écart entre l'existant et la cible, avec quelles priorités, quels coûts et quels délais ?</p>
 
-    <form class="card form-card" (submit)="createProjet($event)">
-      <h3>Nouveau projet</h3>
-      <label class="field">Nom<input type="text" [value]="newProjet.nom" (input)="newProjet.nom = $any($event.target).value" required /></label>
-      <label class="field">Description<textarea [value]="newProjet.description || ''" (input)="newProjet.description = $any($event.target).value"></textarea></label>
-      <div class="grid-3">
-        <label class="field">
-          Priorité
-          <select [value]="newProjet.priorite || 'MOYENNE'" (change)="newProjet.priorite = $any($event.target).value">
-            <option *ngFor="let p of priorites" [value]="p">{{ prioriteLabel(p) }}</option>
-          </select>
-        </label>
-        <label class="field">Coût estimé<input type="text" placeholder="ex. 50 000 €" [value]="newProjet.coutEstime || ''" (input)="newProjet.coutEstime = $any($event.target).value" /></label>
-      </div>
-      <div class="grid-3">
-        <label class="field">Date de début<input type="date" [value]="newProjet.dateDebut || ''" (input)="newProjet.dateDebut = $any($event.target).value" /></label>
-        <label class="field">Date de fin<input type="date" [value]="newProjet.dateFin || ''" (input)="newProjet.dateFin = $any($event.target).value" /></label>
-      </div>
-      <button type="submit" class="btn btn-primary" [disabled]="creating">Créer</button>
-    </form>
+    <div class="page-header">
+      <h3>Projets ({{ projets.length }})</h3>
+      <button type="button" class="btn btn-primary" (click)="openCreate()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+        Ajouter un projet
+      </button>
+    </div>
 
     <section class="card" *ngIf="projetsAvecDates.length > 0">
       <h3>Frise chronologique</h3>
@@ -56,7 +50,6 @@ const STATUTS: StatutProjet[] = ['PLANIFIE', 'EN_COURS', 'TERMINE'];
     </section>
 
     <section class="card">
-      <h3>Projets ({{ projets.length }})</h3>
       <div class="empty-state" *ngIf="projets.length === 0">Aucun projet planifié.</div>
       <ul class="list" *ngIf="projets.length > 0">
         <li class="list-item" *ngFor="let p of projets">
@@ -78,11 +71,41 @@ const STATUTS: StatutProjet[] = ['PLANIFIE', 'EN_COURS', 'TERMINE'];
         </li>
       </ul>
     </section>
+
+    <!-- ── Popover : ajouter un projet ───────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="createPopover" (click)="closeCreate()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createProjet($event)">
+        <div class="popover-head">
+          <h3>Ajouter un projet</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCreate()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <label class="field">Nom<input type="text" [value]="newProjet.nom" (input)="newProjet.nom = $any($event.target).value" required /></label>
+        <label class="field">Description<textarea [value]="newProjet.description || ''" (input)="newProjet.description = $any($event.target).value"></textarea></label>
+        <div class="grid-3">
+          <label class="field">
+            Priorité
+            <select [value]="newProjet.priorite || 'MOYENNE'" (change)="newProjet.priorite = $any($event.target).value">
+              <option *ngFor="let p of priorites" [value]="p">{{ prioriteLabel(p) }}</option>
+            </select>
+          </label>
+          <label class="field">Coût estimé<input type="text" placeholder="ex. 50 000 €" [value]="newProjet.coutEstime || ''" (input)="newProjet.coutEstime = $any($event.target).value" /></label>
+        </div>
+        <div class="grid-3">
+          <label class="field">Date de début<input type="date" [value]="newProjet.dateDebut || ''" (input)="newProjet.dateDebut = $any($event.target).value" /></label>
+          <label class="field">Date de fin<input type="date" [value]="newProjet.dateFin || ''" (input)="newProjet.dateFin = $any($event.target).value" /></label>
+        </div>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreate()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creating">{{ creating ? 'Création…' : 'Créer' }}</button>
+        </div>
+      </form>
+    </div>
   `,
   styles: [
     `
       .grid-3 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
-      .form-card { margin-bottom: 1.5rem; }
       .card { margin-bottom: 1.25rem; }
       .muted { color: var(--color-text-muted); margin-top: 0.25rem; font-size: 0.9rem; }
       .list { list-style: none; display: grid; gap: 0.75rem; }
@@ -115,15 +138,30 @@ export class RoadmapComponent implements OnInit {
     dateFin?: string;
   } = { nom: '', priorite: 'MOYENNE' };
   creating = false;
+  createPopover = false;
 
   constructor(
     private roadmapService: RoadmapService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
     this.load();
+  }
+
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
+  }
+
+  openCreate(): void {
+    this.newProjet = { nom: '', priorite: 'MOYENNE' };
+    this.createPopover = true;
+  }
+
+  closeCreate(): void {
+    this.createPopover = false;
   }
 
   prioriteLabel(p: PrioriteProjet): string {
@@ -164,8 +202,8 @@ export class RoadmapComponent implements OnInit {
     this.creating = true;
     this.roadmapService.create(this.newProjet).subscribe({
       next: () => {
-        this.newProjet = { nom: '', priorite: 'MOYENNE' };
         this.creating = false;
+        this.closeCreate();
         this.load();
         this.toast.success('Projet créé.');
       },

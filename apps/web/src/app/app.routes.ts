@@ -8,7 +8,6 @@ import { RegisterComponent } from './register.component';
 import { AppShellComponent } from './app-shell.component';
 import { DashboardComponent } from './dashboard.component';
 import { OrganisationComponent } from './organisation.component';
-import { ObjectifsComponent } from './objectifs.component';
 import { ArchitectureMetierComponent } from './architecture-metier.component';
 import { CanevasComponent } from './canevas.component';
 import { ApplicationsComponent } from './applications.component';
@@ -16,6 +15,7 @@ import { UrbanisationComponent } from './urbanisation.component';
 import { VuesComponent } from './vues.component';
 import { ParametresComponent } from './parametres.component';
 import { BpmnComponent } from './bpmn.component';
+import { EcartsComponent } from './ecarts.component';
 import { DonneesComponent } from './donnees.component';
 import { TechnologieComponent } from './technologie.component';
 import { RoadmapComponent } from './roadmap.component';
@@ -45,7 +45,7 @@ export const routes: Routes = [
       { path: 'dashboard', component: DashboardComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'assistant', component: WizardComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'organisation', component: OrganisationComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
-      { path: 'strategie', component: ObjectifsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'strategie', redirectTo: 'organisation', pathMatch: 'full' },
       { path: 'architecture-metier', component: ArchitectureMetierComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'canevas', component: CanevasComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'portefeuille-applicatif', component: ApplicationsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
@@ -55,6 +55,7 @@ export const routes: Routes = [
       { path: 'donnees', component: DonneesComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'technologique', component: TechnologieComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'roadmap', component: RoadmapComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'analyse-ecarts', component: EcartsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'parametres', component: ParametresComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
     ],
   },

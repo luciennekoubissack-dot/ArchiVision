@@ -73,8 +73,13 @@ interface PendingRelation {
   standalone: true,
   imports: [CommonModule, CanevasPaletteComponent],
   template: `
-    <div class="page-header">
-      <h2>Canevas d'architecture</h2>
+    <p class="hint">
+      Pour relier deux éléments : survolez un élément — 4 petits points apparaissent sur ses bords — puis glissez
+      depuis l'un de ces points jusqu'à l'élément cible. Pour supprimer un élément, survolez-le et cliquez sur le
+      « × » rouge en haut à droite.
+    </p>
+
+    <div class="page-header page-header-end">
       <div class="actions">
         <button class="btn btn-outline" (click)="exportPng()" [disabled]="loading || elements.length === 0">
           Exporter en PNG
@@ -83,17 +88,12 @@ interface PendingRelation {
           class="btn btn-primary"
           (click)="generate()"
           [disabled]="loading"
-          title="La génération automatique ne repositionne que les éléments ArchiMate (Motivation/Métier) — les couches Applicatif, Technologique et Données ne sont pas concernées."
+          title="Positionne automatiquement tous les éléments du canevas (Motivation, Métier, Applicatif, Technologique, Données)."
         >
           {{ generating ? 'Génération…' : 'Générer' }}
         </button>
       </div>
     </div>
-
-    <p class="hint">
-      Pour relier deux éléments : survolez un élément — 4 petits points apparaissent sur ses bords — puis glissez
-      depuis l'un de ces points jusqu'à l'élément cible.
-    </p>
 
     <div class="canevas-layout">
       <app-canevas-palette />
@@ -304,17 +304,42 @@ export class CanevasComponent implements AfterViewInit, OnDestroy {
     archimateRelations: RelationArchimate[];
     canevasRelations: CanevasRelation[];
   }): void {
-    const archimateHasNone =
-      result.archimateElements.length > 0 && result.archimateElements.every((e) => e.positionX == null);
-    if (archimateHasNone) {
+    const allElements = [
+      ...result.archimateElements,
+      ...result.applications,
+      ...result.techComponents,
+      ...result.dataEntities,
+    ];
+    const canvasIsFresh = allElements.length > 0 && allElements.every((e) => e.positionX == null);
+
+    if (canvasIsFresh) {
+      // Canevas jamais ouvert pour cette organisation : on positionne tout de
+      // suite les éléments issus de l'inscription/de l'assistant, sur toutes
+      // les couches, pour arriver sur un plan de travail déjà exploitable.
+      this.buildFromSources(result);
       this.archimateService.generateLayout().subscribe({
         next: (layout) => {
-          this.buildFromSources({ ...result, archimateElements: layout.elements });
-          this.loading = false;
-          this.render();
+          const updatedById = new Map(layout.elements.map((e) => [e.id, e]));
+          this.elements = this.elements.map((el) => {
+            if (el.kind !== 'ARCHIMATE') return el;
+            const updated = updatedById.get(el.id);
+            return updated ? { ...el, positionX: updated.positionX ?? null, positionY: updated.positionY ?? null } : el;
+          });
+          const archimateBottomY = layout.elements.length
+            ? Math.max(...layout.elements.map((e) => (e.positionY ?? 0) + BOX_HEIGHT)) + GAP_Y
+            : 40;
+          this.generateOtherLayers(archimateBottomY).subscribe({
+            next: () => {
+              this.loading = false;
+              this.render();
+            },
+            error: () => {
+              this.loading = false;
+              this.render();
+            },
+          });
         },
         error: () => {
-          this.buildFromSources(result);
           this.loading = false;
           this.render();
         },
@@ -532,15 +557,49 @@ export class CanevasComponent implements AfterViewInit, OnDestroy {
       return circle;
     });
 
+    const deleteBtn = new Konva.Group({ x: BOX_WIDTH, y: 0, opacity: 0 });
+    deleteBtn.add(new Konva.Circle({ radius: 8, fill: '#dc2626', stroke: '#ffffff', strokeWidth: 1 }));
+    deleteBtn.add(
+      new Konva.Text({
+        text: '×',
+        fontSize: 13,
+        fontStyle: 'bold',
+        fill: '#ffffff',
+        width: 16,
+        height: 16,
+        offsetX: 8,
+        offsetY: 8.5,
+        align: 'center',
+        verticalAlign: 'middle',
+        listening: false,
+      }),
+    );
+    deleteBtn.on('mousedown', (e) => {
+      e.cancelBubble = true;
+    });
+    deleteBtn.on('click', (e) => {
+      e.cancelBubble = true;
+      this.deleteElement(element);
+    });
+    deleteBtn.on('mouseenter', () => {
+      document.body.style.cursor = 'pointer';
+    });
+    deleteBtn.on('mouseleave', () => {
+      document.body.style.cursor = 'grab';
+    });
+    group.add(deleteBtn);
+
     group.on('mouseenter', () => {
       document.body.style.cursor = 'grab';
       anchors.forEach((a) => a.opacity(0.8));
+      deleteBtn.opacity(1);
       this.layer.batchDraw();
     });
     group.on('mouseleave', () => {
       document.body.style.cursor = 'default';
       if (this.linking) return;
       anchors.forEach((a) => a.opacity(0));
+      deleteBtn.opacity(0);
       this.layer.batchDraw();
     });
 
@@ -558,7 +617,13 @@ export class CanevasComponent implements AfterViewInit, OnDestroy {
   }
 
   private savePosition(kind: ElementKind, id: string, x: number, y: number): void {
-    const req$ = (
+    this.positionUpdateRequest(kind, id, x, y).subscribe({
+      error: () => this.toast.error("Impossible d'enregistrer la position."),
+    });
+  }
+
+  private positionUpdateRequest(kind: ElementKind, id: string, x: number, y: number): Observable<unknown> {
+    return (
       kind === 'ARCHIMATE'
         ? this.archimateService.updateElementPosition(id, x, y)
         : kind === 'APPLICATION'
@@ -567,7 +632,6 @@ export class CanevasComponent implements AfterViewInit, OnDestroy {
             ? this.technologieService.update(id, { positionX: x, positionY: y })
             : this.donneesService.update(id, { positionX: x, positionY: y })
     ) as Observable<unknown>;
-    req$.subscribe({ error: () => this.toast.error("Impossible d'enregistrer la position.") });
   }
 
   private buildArrow(relation: CanevasRelationView): Konva.Arrow | null {
@@ -707,23 +771,26 @@ export class CanevasComponent implements AfterViewInit, OnDestroy {
     forkJoin({
       archimateRelations: this.archimateService.listRelations(),
       canevasRelations: this.canevasService.listRelations(),
-    }).subscribe((result) => {
-      const archimateRels: CanevasRelationView[] = result.archimateRelations.map((r) => ({
-        id: r.id,
-        type: r.type,
-        sourceKey: this.key('ARCHIMATE', r.source.id),
-        targetKey: this.key('ARCHIMATE', r.target.id),
-        origin: 'ARCHIMATE',
-      }));
-      const canevasRels: CanevasRelationView[] = result.canevasRelations.map((r) => ({
-        id: r.id,
-        type: r.type,
-        sourceKey: this.key(r.sourceKind, r.sourceId),
-        targetKey: this.key(r.targetKind, r.targetId),
-        origin: 'CANEVAS',
-      }));
-      this.relations = [...archimateRels, ...canevasRels];
-      this.redrawArrows();
+    }).subscribe({
+      next: (result) => {
+        const archimateRels: CanevasRelationView[] = result.archimateRelations.map((r) => ({
+          id: r.id,
+          type: r.type,
+          sourceKey: this.key('ARCHIMATE', r.source.id),
+          targetKey: this.key('ARCHIMATE', r.target.id),
+          origin: 'ARCHIMATE',
+        }));
+        const canevasRels: CanevasRelationView[] = result.canevasRelations.map((r) => ({
+          id: r.id,
+          type: r.type,
+          sourceKey: this.key(r.sourceKind, r.sourceId),
+          targetKey: this.key(r.targetKind, r.targetId),
+          origin: 'CANEVAS',
+        }));
+        this.relations = [...archimateRels, ...canevasRels];
+        this.redrawArrows();
+      },
+      error: () => this.toast.error("La relation est enregistrée mais l'affichage n'a pas pu être rafraîchi — rechargez la page."),
     });
   }
 
@@ -823,14 +890,95 @@ export class CanevasComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  // ── Génération automatique (ArchiMate uniquement) ────────────────────────
+  // ── Suppression ──────────────────────────────────────────────────────────
+
+  async deleteElement(element: CanevasElement): Promise<void> {
+    const ok = await this.confirmDialog.confirm(
+      `Supprimer « ${element.nom} » ? Les relations qui lui sont rattachées seront aussi supprimées.`,
+    );
+    if (!ok) return;
+
+    const req$ = (
+      element.kind === 'ARCHIMATE'
+        ? this.archimateService.deleteElement(element.id)
+        : element.kind === 'APPLICATION'
+          ? this.urbanisationService.deleteApplication(element.id)
+          : element.kind === 'TECH_COMPONENT'
+            ? this.technologieService.delete(element.id)
+            : this.donneesService.delete(element.id)
+    ) as Observable<unknown>;
+
+    req$.subscribe({
+      next: () => {
+        // RelationArchimate est nettoyée en cascade côté base pour les
+        // éléments ArchiMate ; CanevasRelation n'a pas de contrainte de clé
+        // étrangère (relations inter-couches), donc on la nettoie ici.
+        const orphanCanevasRelations = this.relations.filter(
+          (r) => r.origin === 'CANEVAS' && (r.sourceKey === element.key || r.targetKey === element.key),
+        );
+        if (orphanCanevasRelations.length) {
+          forkJoin(orphanCanevasRelations.map((r) => this.canevasService.deleteRelation(r.id))).subscribe({
+            error: () => {},
+          });
+        }
+
+        this.elements = this.elements.filter((e) => e.key !== element.key);
+        this.relations = this.relations.filter((r) => r.sourceKey !== element.key && r.targetKey !== element.key);
+        this.nodesById.delete(element.key);
+        this.positionsById.delete(element.key);
+        this.render();
+        this.toast.success('Élément supprimé.');
+      },
+      error: () => this.toast.error("Impossible de supprimer l'élément."),
+    });
+  }
+
+  // ── Génération automatique (toutes couches) ──────────────────────────────
+
+  /** Aligne une liste d'éléments d'une même couche sur une ligne horizontale,
+   * en partant de la marge gauche, à l'ordonnée `y` donnée. */
+  private layoutRow(items: CanevasElement[], y: number): Map<string, { x: number; y: number }> {
+    const result = new Map<string, { x: number; y: number }>();
+    items.forEach((item, i) => {
+      result.set(item.key, { x: 40 + i * (BOX_WIDTH + GAP_X), y });
+    });
+    return result;
+  }
+
+  /** Calcule et persiste un layout en grille pour Applicatif/Technologique/
+   * Données, sous la zone occupée par la couche ArchiMate. */
+  private generateOtherLayers(archimateBottomY: number): Observable<unknown> {
+    const apps = this.elements.filter((e) => e.kind === 'APPLICATION');
+    const techs = this.elements.filter((e) => e.kind === 'TECH_COMPONENT');
+    const datas = this.elements.filter((e) => e.kind === 'DATA_ENTITY');
+
+    let y = archimateBottomY;
+    const appPositions = this.layoutRow(apps, y);
+    if (apps.length) y += BOX_HEIGHT + GAP_Y;
+    const techPositions = this.layoutRow(techs, y);
+    if (techs.length) y += BOX_HEIGHT + GAP_Y;
+    const dataPositions = this.layoutRow(datas, y);
+
+    const allPositions = new Map([...appPositions, ...techPositions, ...dataPositions]);
+    for (const element of [...apps, ...techs, ...datas]) {
+      const pos = allPositions.get(element.key);
+      if (pos) {
+        element.positionX = pos.x;
+        element.positionY = pos.y;
+      }
+    }
+
+    const requests = [...apps, ...techs, ...datas].map((e) =>
+      this.positionUpdateRequest(e.kind, e.id, e.positionX!, e.positionY!),
+    );
+    return requests.length ? forkJoin(requests) : forkJoin([]);
+  }
 
   async generate(): Promise<void> {
-    const archimateEls = this.elements.filter((e) => e.kind === 'ARCHIMATE');
-    const dejaPositionne = archimateEls.some((e) => e.positionX != null);
+    const dejaPositionne = this.elements.some((e) => e.positionX != null);
     if (dejaPositionne) {
       const ok = await this.confirmDialog.confirm(
-        "Cette action va réorganiser automatiquement les éléments ArchiMate (Motivation/Métier) et écraser leurs positions actuelles. Les autres couches (Applicatif, Technologique, Données) ne sont pas concernées. Continuer ?",
+        'Cette action va réorganiser automatiquement tous les éléments (Motivation, Métier, Applicatif, Technologique, Données) et écraser leurs positions actuelles. Continuer ?',
       );
       if (!ok) return;
     }
@@ -838,15 +986,28 @@ export class CanevasComponent implements AfterViewInit, OnDestroy {
     this.generating = true;
     this.archimateService.generateLayout().subscribe({
       next: (result) => {
-        this.generating = false;
         const updatedById = new Map(result.elements.map((e) => [e.id, e]));
         this.elements = this.elements.map((el) => {
           if (el.kind !== 'ARCHIMATE') return el;
           const updated = updatedById.get(el.id);
           return updated ? { ...el, positionX: updated.positionX ?? null, positionY: updated.positionY ?? null } : el;
         });
-        this.render();
-        this.toast.success('Plan ArchiMate régénéré.');
+        const archimateBottomY = result.elements.length
+          ? Math.max(...result.elements.map((e) => (e.positionY ?? 0) + BOX_HEIGHT)) + GAP_Y
+          : 40;
+
+        this.generateOtherLayers(archimateBottomY).subscribe({
+          next: () => {
+            this.generating = false;
+            this.render();
+            this.toast.success("Plan de l'architecture régénéré.");
+          },
+          error: () => {
+            this.generating = false;
+            this.render();
+            this.toast.error("Les éléments ArchiMate ont été replacés, mais l'enregistrement des autres couches a échoué.");
+          },
+        });
       },
       error: () => {
         this.generating = false;

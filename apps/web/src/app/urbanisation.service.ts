@@ -14,8 +14,27 @@ export interface Application {
   positionY?: number | null;
   createdAt: string;
   updatedAt: string;
-  _count?: { zones: number };
+  _count?: { zones: number; services: number };
   zones?: { zone: { id: string; nom: string; type: TypeZone } }[];
+  services?: ApplicationServiceItem[];
+}
+
+export interface ApplicationServiceItem {
+  id: string;
+  nom: string;
+  description?: string | null;
+  applicationId: string;
+}
+
+export interface ApplicationEchange {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  description?: string | null;
+  protocole?: string | null;
+  createdAt: string;
+  source: Application;
+  target: Application;
 }
 
 export interface ZoneUrbanisation {
@@ -102,5 +121,34 @@ export class UrbanisationService {
 
   generateView(): Observable<UrbanisationView> {
     return this.http.get<UrbanisationView>('/zones-urbanisation/generate-vue');
+  }
+
+  // ── Services applicatifs ────────────────────────────────────────────────────
+
+  addService(applicationId: string, payload: { nom: string; description?: string }): Observable<ApplicationServiceItem> {
+    return this.http.post<ApplicationServiceItem>(`/applications/${applicationId}/services`, payload);
+  }
+
+  removeService(serviceId: string): Observable<void> {
+    return this.http.delete<void>(`/applications/services/${serviceId}`);
+  }
+
+  // ── Échanges applicatifs (diagramme de composants UML) ─────────────────────
+
+  listEchanges(): Observable<ApplicationEchange[]> {
+    return this.http.get<ApplicationEchange[]>('/applications-echanges');
+  }
+
+  createEchange(payload: {
+    sourceId: string;
+    targetId: string;
+    description?: string;
+    protocole?: string;
+  }): Observable<ApplicationEchange> {
+    return this.http.post<ApplicationEchange>('/applications-echanges', payload);
+  }
+
+  deleteEchange(id: string): Observable<void> {
+    return this.http.delete<void>(`/applications-echanges/${id}`);
   }
 }

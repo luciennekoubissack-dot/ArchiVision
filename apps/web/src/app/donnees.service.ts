@@ -16,6 +16,7 @@ export interface DataEntity {
   id: string;
   nom: string;
   description?: string | null;
+  proprietaire?: string | null;
   statut: StatutElement;
   positionX?: number | null;
   positionY?: number | null;
@@ -41,13 +42,15 @@ export class DonneesService {
     return this.http.get<DataEntity[]>('/data-entities');
   }
 
-  create(payload: { nom: string; description?: string; positionX?: number; positionY?: number }): Observable<DataEntity> {
+  create(
+    payload: { nom: string; description?: string; proprietaire?: string; positionX?: number; positionY?: number },
+  ): Observable<DataEntity> {
     return this.http.post<DataEntity>('/data-entities', payload);
   }
 
   update(
     id: string,
-    payload: { nom?: string; description?: string; positionX?: number; positionY?: number },
+    payload: { nom?: string; description?: string; proprietaire?: string; positionX?: number; positionY?: number },
   ): Observable<DataEntity> {
     return this.http.patch<DataEntity>(`/data-entities/${id}`, payload);
   }

@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, registerables } from 'chart.js';
 import { forkJoin, of } from 'rxjs';
@@ -49,10 +49,6 @@ const KPIS: Kpi[] = [
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header">
-      <h2>Tableau de bord</h2>
-    </div>
-
     <section class="card hero-banner">
       <div class="hero-user" *ngIf="auth.currentUser() as user">
         <span class="hero-avatar">
@@ -60,7 +56,7 @@ const KPIS: Kpi[] = [
           <ng-container *ngIf="!user.avatarUrl">{{ initials(user.nom) }}</ng-container>
         </span>
         <div>
-          <p class="hero-greeting">{{ greeting }}, {{ firstName(user.nom) }} 👋</p>
+          <p class="hero-greeting">{{ greeting }}, {{ firstName(user.nom) }}</p>
           <p class="hero-sub">Bienvenue sur le tableau de bord de votre organisation.</p>
         </div>
       </div>
@@ -200,7 +196,7 @@ const KPIS: Kpi[] = [
     `,
   ],
 })
-export class DashboardComponent implements OnInit, AfterViewInit {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('elementsChart') elementsChartRef?: ElementRef<HTMLCanvasElement>;
   @ViewChild('criticiteChart') criticiteChartRef?: ElementRef<HTMLCanvasElement>;
 
@@ -282,6 +278,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.renderCharts();
+  }
+
+  ngOnDestroy(): void {
+    this.elementsChart?.destroy();
+    this.criticiteChart?.destroy();
   }
 
   private renderCharts(): void {

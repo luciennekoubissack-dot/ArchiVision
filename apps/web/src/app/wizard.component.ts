@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OrganisationService, Organisation } from './organisation.service';
 import { PartiesPrenantesService, PartiePrenante } from './parties-prenantes.service';
 import { ToastService } from './toast.service';
@@ -22,7 +23,7 @@ interface WizardStep {
 
 const STEPS: WizardStep[] = [
   { key: 'vision', numero: 1, titre: 'Vision stratégique', sousTitre: 'Vision, problématiques à résoudre et parties prenantes', icon: 'target' },
-  { key: 'bpmn', numero: 2, titre: 'Processus (BPMN)', sousTitre: 'Modélisation des processus métier', icon: 'flow' },
+  { key: 'bpmn', numero: 2, titre: 'Procédures', sousTitre: 'Processus métier, support et de pilotage', icon: 'flow' },
   { key: 'metier', numero: 3, titre: 'Architecture métier', sousTitre: 'Capacités, acteurs et éléments ArchiMate', icon: 'layers' },
   { key: 'donnees', numero: 4, titre: 'Architecture des données', sousTitre: 'Entités, attributs et relations', icon: 'database' },
   { key: 'applicatif', numero: 5, titre: 'Architecture applicative', sousTitre: 'Portefeuille d’applications', icon: 'grid' },
@@ -30,6 +31,15 @@ const STEPS: WizardStep[] = [
   { key: 'roadmap', numero: 7, titre: 'Roadmap de transformation', sousTitre: 'Projets, priorités et échéances', icon: 'flag' },
   { key: 'synthese', numero: 8, titre: 'Synthèse', sousTitre: 'Architecture générée automatiquement', icon: 'eye' },
 ];
+
+/// Question(s) guide pour chaque étape de la démarche TOGAF ADM, pour aider
+/// l'utilisateur à savoir quoi renseigner sans connaître la méthode par cœur.
+/// Uniquement pour les étapes sans page dédiée (les étapes 2 à 7 embarquent
+/// un composant qui affiche déjà sa propre question — voir bpmn/architecture-
+/// metier/donnees/applications/technologie/roadmap.component.ts).
+const STEP_QUESTIONS: Record<string, string> = {
+  vision: 'Quels sont les objectifs de l’entreprise ? Quels problèmes veut-on résoudre ? Quelle est sa vision ?',
+};
 
 const ICONS: Record<string, string> = {
   target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
@@ -57,12 +67,6 @@ const ICONS: Record<string, string> = {
     RoadmapComponent,
   ],
   template: `
-    <div class="page-header">
-      <div>
-        <h2>Assistant de génération d'architecture</h2>
-        <p class="muted">Suivez les 8 étapes de la démarche TOGAF ADM pour construire progressivement l'architecture d'entreprise. Chaque étape est indépendante : vous pouvez y revenir à tout moment.</p>
-      </div>
-    </div>
 
     <div class="stepper card">
       <button
@@ -92,6 +96,10 @@ const ICONS: Record<string, string> = {
           <h3>Étape {{ current.numero }} — {{ current.titre }}</h3>
           <p class="muted">{{ current.sousTitre }}</p>
         </div>
+      </div>
+
+      <div class="step-question" *ngIf="stepQuestion(current.key) as q">
+        <strong>À se demander :</strong> {{ q }}
       </div>
 
       <!-- ── Étape 1 : Vision ─────────────────────────────────────────────── -->
@@ -136,9 +144,19 @@ const ICONS: Record<string, string> = {
       <div *ngIf="current.key === 'synthese'" class="synthese">
         <p class="muted">
           Les informations saisies dans les étapes précédentes alimentent automatiquement l'architecture
-          d'entreprise. Consultez les vues générées pour visualiser le résultat.
+          d'entreprise. Cliquez sur « Générer » ci-dessous pour ouvrir le canevas interactif avec tous
+          les éléments positionnés automatiquement — vous pourrez ensuite les déplacer et les relier librement.
         </p>
         <div class="synthese-grid">
+          <a class="synthese-card" routerLink="/canevas">
+            <span class="icon-badge icon-badge-warning">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('layers')"></svg>
+            </span>
+            <div>
+              <strong>Canevas d'architecture</strong>
+              <p class="muted">Plan de travail interactif, modifiable</p>
+            </div>
+          </a>
           <a class="synthese-card" routerLink="/vues">
             <span class="icon-badge icon-badge-primary">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('layers')"></svg>
@@ -181,7 +199,8 @@ const ICONS: Record<string, string> = {
       <div class="step-nav">
         <button class="btn btn-outline" [disabled]="current.numero === 1" (click)="previous()">← Étape précédente</button>
         <span class="step-progress">Étape {{ current.numero }} / {{ steps.length }}</span>
-        <button class="btn btn-primary" [disabled]="current.numero === steps.length" (click)="next()">Étape suivante →</button>
+        <button *ngIf="current.numero < steps.length" class="btn btn-primary" (click)="next()">Étape suivante →</button>
+        <button *ngIf="current.numero === steps.length" class="btn btn-primary" (click)="goToCanevas()">Générer →</button>
       </div>
     </section>
   `,
@@ -302,7 +321,13 @@ export class WizardComponent implements OnInit {
     private organisationService: OrganisationService,
     private partiesPrenantesService: PartiesPrenantesService,
     private toast: ToastService,
+    private router: Router,
+    private sanitizer: DomSanitizer,
   ) {}
+
+  goToCanevas(): void {
+    this.router.navigate(['/canevas']);
+  }
 
   get canEdit(): boolean {
     return this.auth.hasRole('ADMINISTRATEUR', 'ARCHITECTE');
@@ -319,12 +344,16 @@ export class WizardComponent implements OnInit {
     });
   }
 
-  icon(name: string): string {
-    return ICONS[name] ?? '';
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
   }
 
   goTo(step: WizardStep): void {
     this.current = step;
+  }
+
+  stepQuestion(key: string): string | null {
+    return STEP_QUESTIONS[key] ?? null;
   }
 
   next(): void {

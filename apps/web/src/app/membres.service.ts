@@ -9,6 +9,8 @@ export interface Membre {
   nom: string;
   role: RoleUtilisateur;
   serviceId?: string | null;
+  poste?: string | null;
+  contact?: string | null;
   createdAt: string;
 }
 
@@ -18,11 +20,15 @@ export interface CreateMembrePayload {
   nom: string;
   role: RoleUtilisateur;
   serviceId?: string;
+  poste?: string;
+  contact?: string;
 }
 
 export interface UpdateMembrePayload {
   role?: RoleUtilisateur;
   serviceId?: string | null;
+  poste?: string;
+  contact?: string;
 }
 
 @Injectable({ providedIn: 'root' })

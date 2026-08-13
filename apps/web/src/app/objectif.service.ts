@@ -6,6 +6,7 @@ export interface Objectif {
   id: string;
   nom: string;
   description?: string | null;
+  sousObjectif?: string | null;
   organisationId: string;
   createdAt: string;
   updatedAt: string;
@@ -14,11 +15,13 @@ export interface Objectif {
 export interface CreateObjectifPayload {
   nom: string;
   description?: string;
+  sousObjectif?: string;
 }
 
 export interface UpdateObjectifPayload {
   nom?: string;
   description?: string;
+  sousObjectif?: string;
 }
 
 @Injectable({ providedIn: 'root' })

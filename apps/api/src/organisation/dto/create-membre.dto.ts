@@ -20,4 +20,14 @@ export class CreateMembreDto {
   @IsUUID()
   @IsOptional()
   serviceId?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  poste?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  contact?: string;
 }

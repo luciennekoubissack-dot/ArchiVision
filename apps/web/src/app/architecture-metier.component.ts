@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
   ArchimateService,
   CapaciteMetier,
@@ -34,12 +35,21 @@ const TYPE_RELATION_LABEL: Record<TypeRelation, string> = {
 };
 const TYPES_RELATION: TypeRelation[] = Object.keys(TYPE_RELATION_LABEL) as TypeRelation[];
 
+const ICONS: Record<string, string> = {
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  trash:
+    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+};
+
 @Component({
   selector: 'app-architecture-metier',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Architecture métier</h2></div>
+    <p class="muted step-question">Comment l'entreprise crée-t-elle de la valeur ? Quels sont ses acteurs, rôles, services et capacités métier ?</p>
 
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'capacites'" (click)="tab = 'capacites'">Capacités</button>
@@ -49,32 +59,147 @@ const TYPES_RELATION: TypeRelation[] = Object.keys(TYPE_RELATION_LABEL) as TypeR
 
     <!-- ── Capacités ─────────────────────────────────────────────────────── -->
     <section *ngIf="tab === 'capacites'">
-      <form class="card form-card" (submit)="createCapacite($event)">
-        <h3>Nouvelle capacité</h3>
-        <label class="field">Nom<input type="text" [value]="newCapacite.nom" (input)="newCapacite.nom = $any($event.target).value" required /></label>
-        <label class="field">Description<textarea [value]="newCapacite.description || ''" (input)="newCapacite.description = $any($event.target).value"></textarea></label>
-        <button type="submit" class="btn btn-primary" [disabled]="creatingCapacite">Créer</button>
-      </form>
-      <section class="card">
+      <div class="page-header">
         <h3>Capacités ({{ capacites.length }})</h3>
+        <button type="button" class="btn btn-primary" (click)="openCreateCapacite()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+          Ajouter une capacité
+        </button>
+      </div>
+      <section class="card">
         <div class="empty-state" *ngIf="capacites.length === 0">Aucune capacité métier.</div>
-        <ul class="list" *ngIf="capacites.length > 0">
-          <li class="list-item" *ngFor="let capacite of capacites">
-            <div>
-              <strong>{{ capacite.nom }}</strong>
-              <p class="muted" *ngIf="capacite.description">{{ capacite.description }}</p>
-              <span class="badge badge-neutral">{{ capacite._count?.elements || 0 }} élément(s) rattaché(s)</span>
-            </div>
-            <button class="btn btn-danger" (click)="removeCapacite(capacite)">Supprimer</button>
-          </li>
-        </ul>
+        <div class="table-scroll" *ngIf="capacites.length > 0">
+          <table class="table">
+            <thead><tr><th>Nom</th><th>Description</th><th>Éléments rattachés</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let capacite of capacites">
+                <td>{{ capacite.nom }}</td>
+                <td>{{ capacite.description || '—' }}</td>
+                <td>{{ capacite._count?.elements || 0 }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openCapaciteView(capacite)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('eye')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-edit" title="Modifier" (click)="openCapaciteEdit(capacite)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeCapacite(capacite)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
 
     <!-- ── Éléments ──────────────────────────────────────────────────────── -->
     <section *ngIf="tab === 'elements'">
-      <form class="card form-card" (submit)="createElement($event)">
-        <h3>Nouvel élément</h3>
+      <div class="page-header">
+        <h3>Éléments ({{ elements.length }})</h3>
+        <div class="header-actions">
+          <select [value]="typeFilter || ''" (change)="filterByType($any($event.target).value)">
+            <option value="">Tous les types</option>
+            <option *ngFor="let t of typesElement" [value]="t">{{ typeElementLabel(t) }}</option>
+          </select>
+          <button type="button" class="btn btn-primary" (click)="openCreateElement()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+            Ajouter un élément
+          </button>
+        </div>
+      </div>
+
+      <section class="card">
+        <div class="empty-state" *ngIf="elements.length === 0">Aucun élément ArchiMate.</div>
+        <div class="table-scroll" *ngIf="elements.length > 0">
+          <table class="table">
+            <thead><tr><th>Nom</th><th>Type</th><th>Capacité</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let element of elements">
+                <td>{{ element.nom }}</td>
+                <td>{{ typeElementLabel(element.type) }}</td>
+                <td>{{ element.capacite?.nom || '—' }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openElementView(element)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('eye')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-edit" title="Modifier" (click)="openElementEdit(element)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeElement(element)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- ── Relations ─────────────────────────────────────────────────────── -->
+    <section *ngIf="tab === 'relations'">
+      <div class="page-header">
+        <h3>Relations ({{ relations.length }})</h3>
+        <button type="button" class="btn btn-primary" (click)="openCreateRelation()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+          Ajouter une relation
+        </button>
+      </div>
+
+      <section class="card">
+        <div class="empty-state" *ngIf="relations.length === 0">Aucune relation.</div>
+        <div class="table-scroll" *ngIf="relations.length > 0">
+          <table class="table">
+            <thead><tr><th>Source</th><th>Cible</th><th>Type</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let relation of relations">
+                <td>{{ relation.source.nom }}</td>
+                <td>{{ relation.target.nom }}</td>
+                <td>{{ typeRelationLabel(relation.type) }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openRelationView(relation)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('eye')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeRelation(relation)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- ── Popover : ajouter une capacité ────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="createCapacitePopover" (click)="closeCreateCapacite()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createCapacite($event)">
+        <div class="popover-head">
+          <h3>Ajouter une capacité</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCreateCapacite()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <label class="field">Nom<input type="text" [value]="newCapacite.nom" (input)="newCapacite.nom = $any($event.target).value" required /></label>
+        <label class="field">Description<textarea [value]="newCapacite.description || ''" (input)="newCapacite.description = $any($event.target).value"></textarea></label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreateCapacite()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creatingCapacite">{{ creatingCapacite ? 'Création…' : 'Créer' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Popover : ajouter un élément ──────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="createElementPopover" (click)="closeCreateElement()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createElement($event)">
+        <div class="popover-head">
+          <h3>Ajouter un élément</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCreateElement()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
         <div class="grid-2">
           <label class="field">Nom<input type="text" [value]="newElement.nom" (input)="newElement.nom = $any($event.target).value" required /></label>
           <label class="field">
@@ -92,37 +217,22 @@ const TYPES_RELATION: TypeRelation[] = Object.keys(TYPE_RELATION_LABEL) as TypeR
           </select>
         </label>
         <label class="field">Description<textarea [value]="newElement.description || ''" (input)="newElement.description = $any($event.target).value"></textarea></label>
-        <button type="submit" class="btn btn-primary" [disabled]="creatingElement">Créer</button>
-      </form>
-
-      <section class="card">
-        <div class="page-header">
-          <h3>Éléments ({{ elements.length }})</h3>
-          <select [value]="typeFilter || ''" (change)="filterByType($any($event.target).value)">
-            <option value="">Tous les types</option>
-            <option *ngFor="let t of typesElement" [value]="t">{{ typeElementLabel(t) }}</option>
-          </select>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreateElement()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creatingElement">{{ creatingElement ? 'Création…' : 'Créer' }}</button>
         </div>
-        <div class="empty-state" *ngIf="elements.length === 0">Aucun élément ArchiMate.</div>
-        <ul class="list" *ngIf="elements.length > 0">
-          <li class="list-item" *ngFor="let element of elements">
-            <div>
-              <strong>{{ element.nom }}</strong>
-              <span class="badge badge-neutral">{{ typeElementLabel(element.type) }}</span>
-              <p class="muted" *ngIf="element.capacite">Capacité : {{ element.capacite.nom }}
-                <button class="btn btn-ghost" (click)="detachCapacite(element)">Détacher</button>
-              </p>
-            </div>
-            <button class="btn btn-danger" (click)="removeElement(element)">Supprimer</button>
-          </li>
-        </ul>
-      </section>
-    </section>
+      </form>
+    </div>
 
-    <!-- ── Relations ─────────────────────────────────────────────────────── -->
-    <section *ngIf="tab === 'relations'">
-      <form class="card form-card" (submit)="createRelation($event)">
-        <h3>Nouvelle relation</h3>
+    <!-- ── Popover : ajouter une relation ────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="createRelationPopover" (click)="closeCreateRelation()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createRelation($event)">
+        <div class="popover-head">
+          <h3>Ajouter une relation</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCreateRelation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
         <div class="grid-2">
           <label class="field">
             Source
@@ -146,32 +256,126 @@ const TYPES_RELATION: TypeRelation[] = Object.keys(TYPE_RELATION_LABEL) as TypeR
           </select>
         </label>
         <p class="field-error" *ngIf="relationError">{{ relationError }}</p>
-        <button type="submit" class="btn btn-primary" [disabled]="creatingRelation">Créer</button>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreateRelation()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creatingRelation">{{ creatingRelation ? 'Création…' : 'Créer' }}</button>
+        </div>
       </form>
+    </div>
 
-      <section class="card">
-        <h3>Relations ({{ relations.length }})</h3>
-        <div class="empty-state" *ngIf="relations.length === 0">Aucune relation.</div>
-        <ul class="list" *ngIf="relations.length > 0">
-          <li class="list-item" *ngFor="let relation of relations">
-            <div>
-              <strong>{{ relation.source.nom }}</strong> → <strong>{{ relation.target.nom }}</strong>
-              <span class="badge badge-neutral">{{ typeRelationLabel(relation.type) }}</span>
-            </div>
-            <button class="btn btn-danger" (click)="removeRelation(relation)">Supprimer</button>
-          </li>
-        </ul>
-      </section>
-    </section>
+    <!-- ── Popover : consulter une capacité ──────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="capaciteViewTarget as c" (click)="closeCapaciteView()">
+      <div class="popover-card" (click)="$event.stopPropagation()">
+        <div class="popover-head">
+          <h3>Fiche capacité</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCapaciteView()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <dl class="fiche-list">
+          <dt>Nom</dt><dd>{{ c.nom }}</dd>
+          <dt>Description</dt><dd>{{ c.description || '—' }}</dd>
+          <dt>Éléments rattachés</dt><dd>{{ c._count?.elements || 0 }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ── Popover : modifier une capacité ───────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="capaciteEditTarget && capaciteEditDraft as draft" (click)="closeCapaciteEdit()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="saveCapaciteEdit($event)">
+        <div class="popover-head">
+          <h3>Modifier « {{ capaciteEditTarget.nom }} »</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCapaciteEdit()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <label class="field">Nom<input type="text" [value]="draft.nom" (input)="draft.nom = $any($event.target).value" required /></label>
+        <label class="field">Description<textarea [value]="draft.description || ''" (input)="draft.description = $any($event.target).value"></textarea></label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCapaciteEdit()">Annuler</button>
+          <button type="submit" class="btn btn-success" [disabled]="savingCapacite">{{ savingCapacite ? 'Enregistrement…' : 'Enregistrer' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Popover : consulter un élément ────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="elementViewTarget as e" (click)="closeElementView()">
+      <div class="popover-card" (click)="$event.stopPropagation()">
+        <div class="popover-head">
+          <h3>Fiche élément</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeElementView()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <dl class="fiche-list">
+          <dt>Nom</dt><dd>{{ e.nom }}</dd>
+          <dt>Type</dt><dd>{{ typeElementLabel(e.type) }}</dd>
+          <dt>Capacité</dt><dd>{{ e.capacite?.nom || '—' }}</dd>
+          <dt>Description</dt><dd>{{ e.description || '—' }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- ── Popover : modifier un élément ─────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="elementEditTarget && elementEditDraft as draft" (click)="closeElementEdit()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="saveElementEdit($event)">
+        <div class="popover-head">
+          <h3>Modifier « {{ elementEditTarget.nom }} »</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeElementEdit()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <div class="grid-2">
+          <label class="field">Nom<input type="text" [value]="draft.nom" (input)="draft.nom = $any($event.target).value" required /></label>
+          <label class="field">
+            Type
+            <select [value]="draft.type" (change)="draft.type = $any($event.target).value">
+              <option *ngFor="let t of typesElement" [value]="t">{{ typeElementLabel(t) }}</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          Capacité métier (optionnel)
+          <select [value]="draft.capaciteMetierId || ''" (change)="draft.capaciteMetierId = $any($event.target).value || null">
+            <option value="">— Aucune —</option>
+            <option *ngFor="let c of capacites" [value]="c.id">{{ c.nom }}</option>
+          </select>
+        </label>
+        <label class="field">Description<textarea [value]="draft.description || ''" (input)="draft.description = $any($event.target).value"></textarea></label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeElementEdit()">Annuler</button>
+          <button type="submit" class="btn btn-success" [disabled]="savingElement">{{ savingElement ? 'Enregistrement…' : 'Enregistrer' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Popover : consulter une relation ──────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="relationViewTarget as r" (click)="closeRelationView()">
+      <div class="popover-card" (click)="$event.stopPropagation()">
+        <div class="popover-head">
+          <h3>Fiche relation</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeRelationView()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <dl class="fiche-list">
+          <dt>Source</dt><dd>{{ r.source.nom }}</dd>
+          <dt>Cible</dt><dd>{{ r.target.nom }}</dd>
+          <dt>Type</dt><dd>{{ typeRelationLabel(r.type) }}</dd>
+        </dl>
+      </div>
+    </div>
   `,
   styles: [
     `
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
-      .form-card { margin-bottom: 1.5rem; }
-      .list { list-style: none; display: grid; gap: 0.75rem; }
-      .list-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 12px; }
+      .header-actions { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+      .header-actions select { padding: 0.5rem 0.7rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+      .table-scroll { overflow-x: auto; }
+      .table { width: 100%; min-width: 520px; border-collapse: collapse; }
+      .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
+      .row-actions { display: flex; gap: 0.4rem; white-space: nowrap; }
       .muted { color: var(--color-text-muted); margin-top: 0.35rem; font-size: 0.9rem; }
-      .badge { margin-left: 0.5rem; }
     `,
   ],
 })
@@ -183,6 +387,11 @@ export class ArchitectureMetierComponent implements OnInit {
   capacites: CapaciteMetier[] = [];
   newCapacite: { nom: string; description?: string } = { nom: '' };
   creatingCapacite = false;
+  createCapacitePopover = false;
+  capaciteViewTarget: CapaciteMetier | null = null;
+  capaciteEditTarget: CapaciteMetier | null = null;
+  capaciteEditDraft: { nom: string; description?: string } | null = null;
+  savingCapacite = false;
 
   elements: ElementArchimate[] = [];
   typeFilter: TypeElement | '' = '';
@@ -191,6 +400,11 @@ export class ArchitectureMetierComponent implements OnInit {
     type: 'ACTEUR_METIER',
   };
   creatingElement = false;
+  createElementPopover = false;
+  elementViewTarget: ElementArchimate | null = null;
+  elementEditTarget: ElementArchimate | null = null;
+  elementEditDraft: { nom: string; type: TypeElement; description?: string; capaciteMetierId?: string | null } | null = null;
+  savingElement = false;
 
   relations: RelationArchimate[] = [];
   newRelation: { type: TypeRelation; sourceId: string; targetId: string } = {
@@ -199,13 +413,48 @@ export class ArchitectureMetierComponent implements OnInit {
     targetId: '',
   };
   creatingRelation = false;
+  createRelationPopover = false;
   relationError = '';
+  relationViewTarget: RelationArchimate | null = null;
 
   constructor(
     private archimateService: ArchimateService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
+    private sanitizer: DomSanitizer,
   ) {}
+
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
+  }
+
+  openCreateCapacite(): void {
+    this.newCapacite = { nom: '' };
+    this.createCapacitePopover = true;
+  }
+
+  closeCreateCapacite(): void {
+    this.createCapacitePopover = false;
+  }
+
+  openCreateElement(): void {
+    this.newElement = { nom: '', type: 'ACTEUR_METIER' };
+    this.createElementPopover = true;
+  }
+
+  closeCreateElement(): void {
+    this.createElementPopover = false;
+  }
+
+  openCreateRelation(): void {
+    this.newRelation = { type: 'ASSIGNATION', sourceId: '', targetId: '' };
+    this.relationError = '';
+    this.createRelationPopover = true;
+  }
+
+  closeCreateRelation(): void {
+    this.createRelationPopover = false;
+  }
 
   ngOnInit(): void {
     this.loadCapacites();
@@ -235,8 +484,8 @@ export class ArchitectureMetierComponent implements OnInit {
     this.archimateService.createCapacite(this.newCapacite).subscribe({
       next: (capacite) => {
         this.capacites = [...this.capacites, capacite];
-        this.newCapacite = { nom: '' };
         this.creatingCapacite = false;
+        this.closeCreateCapacite();
         this.toast.success('Capacité créée.');
       },
       error: () => {
@@ -260,6 +509,42 @@ export class ArchitectureMetierComponent implements OnInit {
     });
   }
 
+  openCapaciteView(capacite: CapaciteMetier): void {
+    this.capaciteViewTarget = capacite;
+  }
+
+  closeCapaciteView(): void {
+    this.capaciteViewTarget = null;
+  }
+
+  openCapaciteEdit(capacite: CapaciteMetier): void {
+    this.capaciteEditTarget = capacite;
+    this.capaciteEditDraft = { nom: capacite.nom, description: capacite.description ?? '' };
+  }
+
+  closeCapaciteEdit(): void {
+    this.capaciteEditTarget = null;
+    this.capaciteEditDraft = null;
+  }
+
+  saveCapaciteEdit(event: Event): void {
+    event.preventDefault();
+    if (!this.capaciteEditTarget || !this.capaciteEditDraft || !this.capaciteEditDraft.nom.trim()) return;
+    this.savingCapacite = true;
+    this.archimateService.updateCapacite(this.capaciteEditTarget.id, this.capaciteEditDraft).subscribe({
+      next: (updated) => {
+        this.capacites = this.capacites.map((c) => (c.id === updated.id ? { ...c, ...updated } : c));
+        this.savingCapacite = false;
+        this.closeCapaciteEdit();
+        this.toast.success('Capacité modifiée.');
+      },
+      error: () => {
+        this.savingCapacite = false;
+        this.toast.error('Impossible de modifier cette capacité.');
+      },
+    });
+  }
+
   // ── Éléments ─────────────────────────────────────────────────────────────
 
   loadElements(): void {
@@ -279,8 +564,8 @@ export class ArchitectureMetierComponent implements OnInit {
     this.creatingElement = true;
     this.archimateService.createElement(this.newElement).subscribe({
       next: () => {
-        this.newElement = { nom: '', type: 'ACTEUR_METIER' };
         this.creatingElement = false;
+        this.closeCreateElement();
         this.loadElements();
         this.toast.success('Élément créé.');
       },
@@ -291,13 +576,44 @@ export class ArchitectureMetierComponent implements OnInit {
     });
   }
 
-  detachCapacite(element: ElementArchimate): void {
-    this.archimateService.updateElement(element.id, { capaciteMetierId: null }).subscribe({
+  openElementView(element: ElementArchimate): void {
+    this.elementViewTarget = element;
+  }
+
+  closeElementView(): void {
+    this.elementViewTarget = null;
+  }
+
+  openElementEdit(element: ElementArchimate): void {
+    this.elementEditTarget = element;
+    this.elementEditDraft = {
+      nom: element.nom,
+      type: element.type,
+      description: element.description ?? '',
+      capaciteMetierId: element.capaciteMetierId ?? null,
+    };
+  }
+
+  closeElementEdit(): void {
+    this.elementEditTarget = null;
+    this.elementEditDraft = null;
+  }
+
+  saveElementEdit(event: Event): void {
+    event.preventDefault();
+    if (!this.elementEditTarget || !this.elementEditDraft || !this.elementEditDraft.nom.trim()) return;
+    this.savingElement = true;
+    this.archimateService.updateElement(this.elementEditTarget.id, this.elementEditDraft).subscribe({
       next: () => {
+        this.savingElement = false;
+        this.closeElementEdit();
         this.loadElements();
-        this.toast.success('Élément détaché de sa capacité.');
+        this.toast.success('Élément modifié.');
       },
-      error: () => this.toast.error('Impossible de détacher cet élément.'),
+      error: () => {
+        this.savingElement = false;
+        this.toast.error('Impossible de modifier cet élément.');
+      },
     });
   }
 
@@ -340,8 +656,8 @@ export class ArchitectureMetierComponent implements OnInit {
     this.archimateService.createRelation(this.newRelation).subscribe({
       next: (relation) => {
         this.relations = [relation, ...this.relations];
-        this.newRelation = { type: 'ASSIGNATION', sourceId: '', targetId: '' };
         this.creatingRelation = false;
+        this.closeCreateRelation();
         this.toast.success('Relation créée.');
       },
       error: () => {
@@ -349,6 +665,14 @@ export class ArchitectureMetierComponent implements OnInit {
         this.toast.error('Impossible de créer cette relation.');
       },
     });
+  }
+
+  openRelationView(relation: RelationArchimate): void {
+    this.relationViewTarget = relation;
+  }
+
+  closeRelationView(): void {
+    this.relationViewTarget = null;
   }
 
   async removeRelation(relation: RelationArchimate): Promise<void> {

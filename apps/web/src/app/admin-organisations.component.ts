@@ -23,8 +23,6 @@ const STATUT_BADGE: Record<StatutOrganisation, string> = {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Entreprises inscrites</h2></div>
-
     <div class="tabs">
       <button class="tab" [class.active]="filtre === 'TOUTES'" (click)="selectFiltre('TOUTES')">Toutes</button>
       <button class="tab" [class.active]="filtre === 'EN_ATTENTE'" (click)="selectFiltre('EN_ATTENTE')">En attente</button>

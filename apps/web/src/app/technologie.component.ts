@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { TechComponent, TechnologieService, TypeTechComponent } from './technologie.service';
 import { Application, UrbanisationService } from './urbanisation.service';
 import { ToastService } from './toast.service';
@@ -14,27 +15,25 @@ const TYPE_LABEL: Record<TypeTechComponent, string> = {
 };
 const TYPES: TypeTechComponent[] = Object.keys(TYPE_LABEL) as TypeTechComponent[];
 
+const ICONS: Record<string, string> = {
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+};
+
 @Component({
   selector: 'app-technologie',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-header"><h2>Architecture technologique</h2></div>
+    <p class="muted step-question">Sur quelle infrastructure (serveurs, réseaux, cloud, bases de données) tournent les applications ?</p>
 
-    <form class="card form-card" (submit)="createComponent($event)">
-      <h3>Nouveau composant</h3>
-      <div class="grid-2">
-        <label class="field">Nom<input type="text" [value]="newComponent.nom" (input)="newComponent.nom = $any($event.target).value" required /></label>
-        <label class="field">
-          Type
-          <select [value]="newComponent.type" (change)="newComponent.type = $any($event.target).value">
-            <option *ngFor="let t of types" [value]="t">{{ typeLabel(t) }}</option>
-          </select>
-        </label>
-      </div>
-      <label class="field">Description<textarea [value]="newComponent.description || ''" (input)="newComponent.description = $any($event.target).value"></textarea></label>
-      <button type="submit" class="btn btn-primary" [disabled]="creating">Créer</button>
-    </form>
+    <div class="page-header">
+      <h3>Composants ({{ components.length }})</h3>
+      <button type="button" class="btn btn-primary" (click)="openCreate()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+        Ajouter un composant
+      </button>
+    </div>
 
     <section class="card" *ngFor="let comp of components">
       <div class="component-header">
@@ -64,11 +63,36 @@ const TYPES: TypeTechComponent[] = Object.keys(TYPE_LABEL) as TypeTechComponent[
     </section>
 
     <div class="empty-state" *ngIf="components.length === 0">Aucun composant technique défini.</div>
+
+    <!-- ── Popover : ajouter un composant ────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="createPopover" (click)="closeCreate()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createComponent($event)">
+        <div class="popover-head">
+          <h3>Ajouter un composant</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeCreate()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <div class="grid-2">
+          <label class="field">Nom<input type="text" [value]="newComponent.nom" (input)="newComponent.nom = $any($event.target).value" required /></label>
+          <label class="field">
+            Type
+            <select [value]="newComponent.type" (change)="newComponent.type = $any($event.target).value">
+              <option *ngFor="let t of types" [value]="t">{{ typeLabel(t) }}</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">Description<textarea [value]="newComponent.description || ''" (input)="newComponent.description = $any($event.target).value"></textarea></label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeCreate()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creating">{{ creating ? 'Création…' : 'Créer' }}</button>
+        </div>
+      </form>
+    </div>
   `,
   styles: [
     `
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
-      .form-card { margin-bottom: 1.5rem; }
       .card { margin-bottom: 1.25rem; }
       .component-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
       .muted { color: var(--color-text-muted); margin-top: 0.25rem; font-size: 0.9rem; }
@@ -87,12 +111,14 @@ export class TechnologieComponent implements OnInit {
 
   newComponent: { nom: string; type: TypeTechComponent; description?: string } = { nom: '', type: 'SERVEUR' };
   creating = false;
+  createPopover = false;
 
   constructor(
     private technologieService: TechnologieService,
     private urbanisationService: UrbanisationService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
@@ -101,6 +127,19 @@ export class TechnologieComponent implements OnInit {
       next: (applications) => (this.applications = applications),
       error: () => this.toast.error('Impossible de charger les applications.'),
     });
+  }
+
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
+  }
+
+  openCreate(): void {
+    this.newComponent = { nom: '', type: 'SERVEUR' };
+    this.createPopover = true;
+  }
+
+  closeCreate(): void {
+    this.createPopover = false;
   }
 
   typeLabel(type: TypeTechComponent): string {
@@ -119,8 +158,8 @@ export class TechnologieComponent implements OnInit {
     this.creating = true;
     this.technologieService.create(this.newComponent).subscribe({
       next: () => {
-        this.newComponent = { nom: '', type: 'SERVEUR' };
         this.creating = false;
+        this.closeCreate();
         this.loadComponents();
         this.toast.success('Composant créé.');
       },

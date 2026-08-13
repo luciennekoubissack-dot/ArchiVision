@@ -40,6 +40,8 @@ model User {
   passwordHash   String
   nom            String
   avatarUrl      String?         @map("avatar_url")
+  poste          String?
+  contact        String?
   organisationId String?
   organisation   Organisation?   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   role           RoleUtilisateur
@@ -117,6 +119,7 @@ model Objectif {
   id             String       @id @default(uuid())
   nom            String
   description    String?
+  sousObjectif   String?      @map("sous_objectif")
   organisationId String
   organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
@@ -272,8 +275,21 @@ model Application {
   deploiements   TechDeploiement[]
   echangesSource ApplicationEchange[] @relation("EchangeSource")
   echangesTarget ApplicationEchange[] @relation("EchangeTarget")
+  services       ApplicationService[]
 
   @@index([organisationId])
+}
+
+/// Service métier/technique fourni par une application (ex. "Facturation",
+/// "Authentification") — identifié par la phase TOGAF Architecture Applicative.
+model ApplicationService {
+  id            String      @id @default(uuid())
+  nom           String
+  description   String?
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
 }
 
 /// Flux d'échange entre deux applications — diagramme de composants UML
@@ -362,10 +378,21 @@ enum TypeBpmn {
 /// l'éditeur bpmn-js (positions, points d'ancrage) ; BpmnElement/BpmnFlow sont
 /// dérivés à la sauvegarde pour les besoins transversaux (assistant, gap
 /// analysis, compteurs) — voir docs/plan superadmin+ADM pour la justification.
+/// Classification d'un processus dans la cartographie de l'entreprise :
+/// METIER (crée directement de la valeur pour le client), SUPPORT (nécessaire
+/// au fonctionnement interne, ex. RH/IT/comptabilité), PILOTAGE (définit la
+/// stratégie et pilote les autres processus, ex. gouvernance/qualité).
+enum TypeProcessus {
+  METIER
+  SUPPORT
+  PILOTAGE
+}
+
 model BpmnProcessus {
   id             String        @id @default(uuid())
   nom            String
   description    String?
+  type           TypeProcessus @default(METIER)
   bpmnXml        String?       @map("bpmn_xml") @db.Text
   organisationId String
   organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
@@ -419,6 +446,7 @@ model DataEntity {
   id             String        @id @default(uuid())
   nom            String
   description    String?
+  proprietaire   String?
   statut         StatutElement @default(LES_DEUX)
   positionX      Float?        @map("position_x")
   positionY      Float?        @map("position_y")
