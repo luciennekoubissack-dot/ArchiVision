@@ -88,6 +88,8 @@ model Organisation {
   sequenceDiagrammes SequenceDiagramme[]
   projets            Projet[]
   canevasRelations   CanevasRelation[]
+  solutions          Solution[]
+  criteresEvaluation CritereEvaluation[]
 }
 
 // ─── Service d'entreprise (département, hiérarchique) ─────────────────────────
@@ -599,4 +601,60 @@ model Projet {
   updatedAt      DateTime       @updatedAt
 
   @@index([organisationId])
+}
+
+// ─── Opportunités & Solutions (phase E de l'ADM TOGAF) ────────────────────────
+
+/// Cycle de vie d'une solution candidate face à un écart identifié.
+enum StatutSolution {
+  PROPOSEE
+  RETENUE
+  REJETEE
+}
+
+model Solution {
+  id             String            @id @default(uuid())
+  nom            String
+  description    String?
+  statut         StatutSolution    @default(PROPOSEE)
+  planMiseOeuvre String?           @map("plan_mise_oeuvre") @db.Text
+  organisationId String
+  organisation   Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  scores         EvaluationScore[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([organisationId])
+}
+
+/// Critère de comparaison utilisé dans la matrice d'évaluation des solutions
+/// (ex. "Coût", "Risque", "Valeur métier").
+model CritereEvaluation {
+  id             String            @id @default(uuid())
+  nom            String
+  description    String?
+  organisationId String
+  organisation   Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  scores         EvaluationScore[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([organisationId])
+}
+
+/// Note d'une solution sur un critère — cellule de la matrice d'évaluation.
+/// Pas d'organisationId propre : l'appartenance tenant est vérifiée via les
+/// FK solutionId/critereId (comme ApplicationEchange/DataRelation).
+model EvaluationScore {
+  id          String            @id @default(uuid())
+  solutionId  String
+  solution    Solution          @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  critereId   String
+  critere     CritereEvaluation @relation(fields: [critereId], references: [id], onDelete: Cascade)
+  score       Int
+  commentaire String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([solutionId, critereId])
 }

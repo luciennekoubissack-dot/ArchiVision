@@ -84,6 +84,16 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/solutions": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/criteres-evaluation": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
   "/admin": {
     "target": "http://localhost:3000",
     "secure": false,

@@ -18,6 +18,7 @@ import { TechnologieModule } from './modules/technologie/technologie.module';
 import { RoadmapModule } from './modules/roadmap/roadmap.module';
 import { PartiesPrenantesModule } from './modules/parties-prenantes/parties-prenantes.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { OpportunitesModule } from './modules/opportunites/opportunites.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     RoadmapModule,
     PartiesPrenantesModule,
     UploadsModule,
+    OpportunitesModule,
     HealthModule,
   ],
   providers: [

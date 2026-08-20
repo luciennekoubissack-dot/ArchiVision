@@ -34,6 +34,7 @@ const TENANT_NAV_GROUPS: NavGroup[] = [
       { label: 'Architecture applicative', path: '/portefeuille-applicatif', icon: 'grid' },
       { label: 'Architecture technologique', path: '/technologique', icon: 'server' },
       { label: 'Analyse des écarts', path: '/analyse-ecarts', icon: 'compare' },
+      { label: 'Opportunités & solutions', path: '/opportunites-solutions', icon: 'target' },
       { label: 'Feuille de route', path: '/roadmap', icon: 'flag' },
       { label: 'Urbanisation', path: '/urbanisation', icon: 'map' },
     ],

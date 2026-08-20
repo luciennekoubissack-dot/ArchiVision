@@ -19,6 +19,7 @@ import { EcartsComponent } from './ecarts.component';
 import { DonneesComponent } from './donnees.component';
 import { TechnologieComponent } from './technologie.component';
 import { RoadmapComponent } from './roadmap.component';
+import { OpportunitesComponent } from './opportunites.component';
 import { WizardComponent } from './wizard.component';
 import { AdminDashboardComponent } from './admin-dashboard.component';
 import { AdminOrganisationsComponent } from './admin-organisations.component';
@@ -56,6 +57,7 @@ export const routes: Routes = [
       { path: 'technologique', component: TechnologieComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'roadmap', component: RoadmapComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'analyse-ecarts', component: EcartsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'opportunites-solutions', component: OpportunitesComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'parametres', component: ParametresComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
     ],
   },

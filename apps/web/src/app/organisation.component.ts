@@ -52,7 +52,7 @@ const ICONS: Record<string, string> = {
       <button class="tab" [class.active]="tab === 'membres'" (click)="tab = 'membres'" *ngIf="canManageMembres">
         Membres
       </button>
-      <button class="tab" [class.active]="tab === 'services'" (click)="tab = 'services'">Services</button>
+      <button class="tab" [class.active]="tab === 'services'" (click)="tab = 'services'">Structures</button>
       <button class="tab" [class.active]="tab === 'organigramme'" (click)="openOrganigramme()">Organigramme</button>
     </div>
 
@@ -243,7 +243,7 @@ const ICONS: Record<string, string> = {
         <div class="empty-state" *ngIf="membres.length === 0">Aucun membre pour l'instant.</div>
         <div class="table-scroll" *ngIf="membres.length > 0">
           <table class="table">
-            <thead><tr><th>Nom complet</th><th>Email</th><th>Service</th><th>Poste</th><th>Contact</th><th></th></tr></thead>
+            <thead><tr><th>Nom complet</th><th>Email</th><th>Structure</th><th>Poste</th><th>Contact</th><th></th></tr></thead>
             <tbody>
               <tr *ngFor="let membre of membres">
                 <td>{{ membre.nom }}</td>
@@ -311,7 +311,7 @@ const ICONS: Record<string, string> = {
           </label>
         </div>
         <label class="field">
-          Service (optionnel)
+          Structure (optionnel)
           <select [value]="newMembre.serviceId || ''" (change)="newMembre.serviceId = $any($event.target).value || undefined">
             <option value="">— Aucun —</option>
             <option *ngFor="let s of flatServices" [value]="s.id">{{ s.indent }}{{ s.nom }}</option>
@@ -337,7 +337,7 @@ const ICONS: Record<string, string> = {
           <dt>Nom</dt><dd>{{ m.nom }}</dd>
           <dt>Email</dt><dd>{{ m.email }}</dd>
           <dt>Rôle</dt><dd>{{ roleLabel(m.role) }}</dd>
-          <dt>Service</dt><dd>{{ serviceName(m.serviceId) }}</dd>
+          <dt>Structure</dt><dd>{{ serviceName(m.serviceId) }}</dd>
           <dt>Poste</dt><dd>{{ m.poste || '—' }}</dd>
           <dt>Contact</dt><dd>{{ m.contact || '—' }}</dd>
         </dl>
@@ -361,7 +361,7 @@ const ICONS: Record<string, string> = {
             </select>
           </label>
           <label class="field">
-            Service
+            Structure
             <select [value]="draft.serviceId || ''" (change)="draft.serviceId = $any($event.target).value || null">
               <option value="">— Aucun —</option>
               <option *ngFor="let s of flatServices" [value]="s.id">{{ s.indent }}{{ s.nom }}</option>
@@ -385,18 +385,18 @@ const ICONS: Record<string, string> = {
       </form>
     </div>
 
-    <!-- ── Services ──────────────────────────────────────────────────────── -->
+    <!-- ── Structures ────────────────────────────────────────────────────── -->
     <section *ngIf="tab === 'services'">
       <div class="page-header">
-        <h3>Services ({{ flatServices.length }})</h3>
+        <h3>Structures ({{ flatServices.length }})</h3>
         <button type="button" class="btn btn-primary" (click)="openServiceCreate()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
-          Ajouter un service
+          Ajouter une structure
         </button>
       </div>
 
       <section class="card">
-        <div class="empty-state" *ngIf="services.length === 0">Aucun service défini pour cette organisation.</div>
+        <div class="empty-state" *ngIf="services.length === 0">Aucune structure définie pour cette organisation.</div>
         <ul class="tree" *ngIf="services.length > 0">
           <ng-container *ngFor="let root of services">
             <ng-container *ngTemplateOutlet="serviceNode; context: { $implicit: root }"></ng-container>
@@ -419,11 +419,11 @@ const ICONS: Record<string, string> = {
       </section>
     </section>
 
-    <!-- ── Popover : ajouter un service ──────────────────────────────────── -->
+    <!-- ── Popover : ajouter une structure ───────────────────────────────── -->
     <div class="popover-backdrop" *ngIf="servicePopover" (click)="closeServicePopover()">
       <form class="popover-card" (click)="$event.stopPropagation()" (submit)="createService($event)">
         <div class="popover-head">
-          <h3>Ajouter un service</h3>
+          <h3>Ajouter une structure</h3>
           <button type="button" class="icon-btn icon-btn-danger" (click)="closeServicePopover()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
           </button>
@@ -433,7 +433,7 @@ const ICONS: Record<string, string> = {
           <input type="text" [value]="newService.nom" (input)="newService.nom = $any($event.target).value" required />
         </label>
         <label class="field">
-          Service parent (optionnel)
+          Structure parente (optionnelle)
           <select [value]="newService.parentId || ''" (change)="newService.parentId = $any($event.target).value || undefined">
             <option value="">— Racine —</option>
             <option *ngFor="let s of flatServices" [value]="s.id">{{ s.indent }}{{ s.nom }}</option>
@@ -445,7 +445,7 @@ const ICONS: Record<string, string> = {
         </label>
         <div class="popover-actions">
           <button type="button" class="btn btn-ghost" (click)="closeServicePopover()">Annuler</button>
-          <button type="submit" class="btn btn-primary" [disabled]="creatingService">{{ creatingService ? 'Création…' : 'Créer le service' }}</button>
+          <button type="submit" class="btn btn-primary" [disabled]="creatingService">{{ creatingService ? 'Création…' : 'Créer la structure' }}</button>
         </div>
       </form>
     </div>
@@ -813,7 +813,7 @@ export class OrganisationComponent implements OnInit {
         }
         this.flatServices = this.flatten(this.services);
       },
-      error: () => this.toast.error('Impossible de charger les services.'),
+      error: () => this.toast.error('Impossible de charger les structures.'),
     });
   }
 
@@ -847,11 +847,11 @@ export class OrganisationComponent implements OnInit {
         this.creatingService = false;
         this.closeServicePopover();
         this.loadServices();
-        this.toast.success('Service créé.');
+        this.toast.success('Structure créée.');
       },
       error: () => {
         this.creatingService = false;
-        this.toast.error('Impossible de créer ce service.');
+        this.toast.error('Impossible de créer cette structure.');
       },
     });
   }
@@ -861,16 +861,16 @@ export class OrganisationComponent implements OnInit {
     const hasMembres = (service._count?.membres ?? 0) > 0;
     const warning =
       hasChildren || hasMembres
-        ? ` Ce service contient ${hasMembres ? `${service._count!.membres} membre(s)` : ''}${hasChildren && hasMembres ? ' et ' : ''}${hasChildren ? 'des sous-services' : ''} qui seront également supprimés.`
+        ? ` Cette structure contient ${hasMembres ? `${service._count!.membres} membre(s)` : ''}${hasChildren && hasMembres ? ' et ' : ''}${hasChildren ? 'des sous-structures' : ''} qui seront également supprimés.`
         : '';
-    const confirmed = await this.confirmDialog.confirm(`Supprimer le service « ${service.nom} » ?${warning}`);
+    const confirmed = await this.confirmDialog.confirm(`Supprimer la structure « ${service.nom} » ?${warning}`);
     if (!confirmed) return;
     this.serviceEntrepriseService.delete(service.id).subscribe({
       next: () => {
         this.loadServices();
-        this.toast.success('Service supprimé.');
+        this.toast.success('Structure supprimée.');
       },
-      error: () => this.toast.error('Impossible de supprimer ce service.'),
+      error: () => this.toast.error('Impossible de supprimer cette structure.'),
     });
   }
 
