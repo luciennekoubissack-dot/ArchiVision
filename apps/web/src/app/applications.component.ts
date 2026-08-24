@@ -48,13 +48,14 @@ const ICONS: Record<string, string> = {
         <div class="empty-state" *ngIf="applications.length === 0">Aucune application dans le portefeuille.</div>
         <div class="table-scroll" *ngIf="applications.length > 0">
           <table class="table">
-            <thead><tr><th>Nom</th><th>Criticité</th><th>Description</th><th>Services</th><th>Affectations</th><th></th></tr></thead>
+            <thead><tr><th>Nom</th><th>Criticité</th><th>Description</th><th>Services</th><th>Liens</th><th>Affectations</th><th></th></tr></thead>
             <tbody>
               <tr *ngFor="let app of applications">
                 <td>{{ app.nom }}</td>
                 <td><span class="badge" [class]="criticiteBadge(app.criticite)">{{ app.criticite }}</span></td>
                 <td>{{ app.description || '—' }}</td>
                 <td>{{ app._count?.services || 0 }}</td>
+                <td>{{ linkCount(app) }}</td>
                 <td>{{ app._count?.zones || 0 }}</td>
                 <td class="row-actions">
                   <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openView(app)">
@@ -137,6 +138,19 @@ const ICONS: Record<string, string> = {
           <input type="text" placeholder="Description (facultatif)" [value]="newService.description || ''" (input)="newService.description = $any($event.target).value" />
           <button type="submit" class="btn btn-outline">Ajouter</button>
         </form>
+        <hr />
+        <h4>Liens applicatifs (interactions avec d'autres systèmes)</h4>
+        <p class="muted">Créés depuis le diagramme de composants, en reliant deux applications.</p>
+        <div class="empty-state" *ngIf="appLinks(app).length === 0">Aucune interaction définie avec une autre application.</div>
+        <ul class="zone-list" *ngIf="appLinks(app).length > 0">
+          <li *ngFor="let link of appLinks(app)">
+            <div>
+              <strong>{{ link.direction }} {{ link.otherNom }}</strong>
+              <p class="muted" *ngIf="link.meta">{{ link.meta }}</p>
+            </div>
+            <button class="btn btn-ghost" (click)="removeLink(app, link.id)">Retirer</button>
+          </li>
+        </ul>
         <hr />
         <h4>Affectations</h4>
         <div class="empty-state" *ngIf="!app.zones || app.zones.length === 0">Non affectée à un îlot pour l'instant.</div>
@@ -233,6 +247,39 @@ export class ApplicationsComponent implements OnInit {
     return CRITICITE_BADGE[criticite];
   }
 
+  linkCount(app: Application): number {
+    return (app._count?.echangesSource ?? 0) + (app._count?.echangesTarget ?? 0);
+  }
+
+  /** Fusionne échangesSource/échangesTarget en une liste unique orientée depuis `app`. */
+  appLinks(app: Application): { id: string; direction: string; otherNom: string; meta: string }[] {
+    const asSource = (app.echangesSource ?? []).map((e) => ({
+      id: e.id,
+      direction: '→',
+      otherNom: e.target?.nom ?? '?',
+      meta: [e.description, e.protocole].filter(Boolean).join(' · '),
+    }));
+    const asTarget = (app.echangesTarget ?? []).map((e) => ({
+      id: e.id,
+      direction: '←',
+      otherNom: e.source?.nom ?? '?',
+      meta: [e.description, e.protocole].filter(Boolean).join(' · '),
+    }));
+    return [...asSource, ...asTarget];
+  }
+
+  removeLink(app: Application, echangeId: string): void {
+    this.urbanisationService.deleteEchange(echangeId).subscribe({
+      next: () => {
+        app.echangesSource = (app.echangesSource ?? []).filter((e) => e.id !== echangeId);
+        app.echangesTarget = (app.echangesTarget ?? []).filter((e) => e.id !== echangeId);
+        this.load();
+        this.toast.success('Lien retiré.');
+      },
+      error: () => this.toast.error('Impossible de retirer ce lien.'),
+    });
+  }
+
   load(): void {
     this.urbanisationService.listApplications().subscribe({
       next: (apps) => (this.applications = apps),
@@ -272,12 +319,15 @@ export class ApplicationsComponent implements OnInit {
   openView(app: Application): void {
     this.viewTarget = app;
     this.newService = { nom: '' };
-    if (app.zones && app.services) return; // déjà chargé
-    // GET /applications/:id renvoie les zones affectées et les services, absents de la liste.
+    if (app.zones && app.services && app.echangesSource && app.echangesTarget) return; // déjà chargé
+    // GET /applications/:id renvoie les zones affectées, les services et les
+    // liens applicatifs (échanges), absents de la liste du portefeuille.
     this.urbanisationService.getApplication(app.id).subscribe({
       next: (detail) => {
         app.zones = detail.zones;
         app.services = detail.services;
+        app.echangesSource = detail.echangesSource;
+        app.echangesTarget = detail.echangesTarget;
       },
       error: () => this.toast.error("Impossible de charger le détail de cette application."),
     });
@@ -293,7 +343,12 @@ export class ApplicationsComponent implements OnInit {
     this.urbanisationService.addService(app.id, this.newService).subscribe({
       next: (service) => {
         app.services = [...(app.services ?? []), service];
-        app._count = { zones: app._count?.zones ?? 0, services: (app._count?.services ?? 0) + 1 };
+        app._count = {
+          zones: app._count?.zones ?? 0,
+          services: (app._count?.services ?? 0) + 1,
+          echangesSource: app._count?.echangesSource ?? 0,
+          echangesTarget: app._count?.echangesTarget ?? 0,
+        };
         this.newService = { nom: '' };
         this.toast.success('Service ajouté.');
       },

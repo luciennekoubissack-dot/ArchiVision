@@ -46,7 +46,10 @@ describe('AuthController (HTTP)', () => {
     jest.clearAllMocks();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }), AuthModule],
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => ({ JWT_SECRET: 'test-secret' })] }),
+        AuthModule,
+      ],
       providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
     })
       .overrideProvider(PrismaService)

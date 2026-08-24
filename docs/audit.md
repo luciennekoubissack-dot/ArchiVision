@@ -429,3 +429,115 @@ traitement de 2 des 3 points 🟠 ouverts depuis le 2026-08-18.
 - Build production frontend : aucun avertissement de budget.
 - Navigateur : dashboard (Chart.js) et canevas (Konva) rechargés et
   fonctionnels après le passage en lazy-loading.
+
+## 2026-08-24 (suite 4) : traitement des points 🔴 sécurité de l'audit initial
+
+Sur demande explicite de l'utilisateur ("réglons la sécurité"), 3 des 5
+points 🔴 ouverts depuis le 2026-08-18.
+
+### 1. Upload de logo public
+
+- L'audit suggérait de retirer `@Public()` de `/uploads/logo`. Vérifié
+  avant de le faire : cet endpoint est appelé pendant l'inscription
+  ([register.component.ts](../apps/web/src/app/register.component.ts)),
+  *avant* qu'un compte/JWT n'existe, donc le rendre authentifié aurait
+  cassé l'inscription. Traité le risque réel (XSS stocké) plutôt que le
+  symptôme littéral de l'audit : SVG retiré des types acceptés
+  ([uploads.config.ts](../apps/api/src/modules/uploads/uploads.config.ts))
+  puisqu'un SVG peut embarquer du `<script>` exécuté à l'ouverture directe
+  du fichier, alors que PNG/JPEG/WEBP ne le peuvent pas. Le `accept` des
+  deux `<input type="file">` correspondants (inscription + Prelim) mis à
+  jour en cohérence.
+- Le risque de saturation disque par upload répété (toujours d'actualité
+  sur un endpoint public) est couvert par le rate-limiting ci-dessous.
+
+### 2. Secret JWT par défaut
+
+- `jwt.strategy.ts` et `auth.module.ts` utilisaient
+  `config.get('JWT_SECRET') ?? 'secretKey'`. Nouvelle fonction partagée
+  `requireJwtSecret()` ([libs/shared/src/utils/require-jwt-secret.ts](../libs/shared/src/utils/require-jwt-secret.ts))
+  qui lève une erreur explicite au démarrage si la variable est absente,
+  utilisée aux deux endroits. `docker-compose.yml` mis en cohérence :
+  `JWT_SECRET: ${JWT_SECRET:-changeme-in-production}` remplacé par
+  `${JWT_SECRET:?...}` (Compose refuse de démarrer le service sans la
+  variable exportée), sinon le nouveau garde-fou côté code n'aurait servi
+  à rien pour un déploiement via Compose.
+- Deux tests mettaient l'ancien comportement sous test et ont dû être
+  corrigés : `jwt.strategy.spec.ts` attendait explicitly qu'une absence de
+  secret *ne lève pas* d'erreur (inversé) ; `auth.controller.spec.ts`
+  construisait son module de test avec `ignoreEnvFile: true` et aucun
+  `JWT_SECRET` de substitution, donc échouait à la compilation du module
+  (corrigé en injectant un secret de test via `ConfigModule.forRoot({
+  load: [...] })`).
+
+### 3. Rate-limiting
+
+- `@nestjs/throttler` ajouté : limite globale par défaut (100 req/min)
+  dans [app.module.ts](../apps/api/src/app.module.ts) en défense en
+  profondeur, et limite stricte dédiée (5 req/min) sur `/auth/login` et
+  `/auth/register` via `@Throttle()` sur
+  [auth.controller.ts](../apps/api/src/modules/auth/auth.controller.ts),
+  plus 10 req/min sur `/uploads/logo`. Vérifié en conditions réelles : 5
+  tentatives de login échouées passent, la 6e renvoie `429`.
+
+### Non traités dans cette session
+
+- **Token JWT en `localStorage`** : l'audit le marque déjà "pas urgent,
+  changement lourd, à planifier" (migration vers cookie `httpOnly` +
+  CSRF touche l'intégralité du flux d'auth frontend/backend). Laissé de
+  côté pour la même raison que la pagination : à cadrer explicitement
+  avant de s'y lancer.
+- **Mot de passe Postgres par défaut** dans `docker-compose.yml`
+  (`POSTGRES_PASSWORD: postgres`, sans variable d'env). Seul le
+  `JWT_SECRET` a été durci ici (impact direct : forge de token) ; le mot
+  de passe Postgres reste en dur, risque moindre tant que le port
+  Postgres n'est exposé qu'en local, mais à corriger avant tout
+  déploiement réel du Compose fourni.
+
+### Vérifié
+
+- Suite backend complète : 278/278 (après correction des 2 tests
+  devenus obsolètes).
+- `tsc --noEmit` backend et frontend : aucune erreur.
+- Build production frontend inchangé (338,66 Ko initial).
+- En conditions réelles sur le serveur dev : upload SVG rejeté (`400`),
+  upload PNG accepté (`201`), 6e tentative de login en moins d'une
+  minute rejetée (`429`).
+
+## 2026-08-24 (suite 5) : liens applicatifs visibles dans l'inventaire (Architecture Système)
+
+Sur relecture d'un extrait de cahier des charges pour le module
+Architecture Système, écart constaté : "Inventaire des applications de
+l'entreprise, description et de leurs liens" n'était que partiellement
+couvert. Le diagramme de composants (`applications-canevas.component.ts`)
+permet déjà de créer des `ApplicationEchange` (interactions entre
+systèmes) en reliant deux applications à la souris, mais ces liens
+étaient invisibles depuis le Portefeuille (tableau d'inventaire) et la
+fiche détail d'une application, alors que le modèle de données et
+l'API existaient déjà pour les deux sens de la relation
+(`echangesSource`/`echangesTarget`).
+
+- Backend ([urbanisation.service.ts](../apps/api/src/modules/urbanisation/urbanisation.service.ts)) :
+  `findAllApplications()` inclut désormais `echangesSource`/`echangesTarget`
+  dans `_count` ; `findOneApplication()` inclut les échanges eux-mêmes
+  (avec le nom de l'application à l'autre bout du lien).
+- Frontend ([applications.component.ts](../apps/web/src/app/applications.component.ts)) :
+  colonne « Liens » ajoutée au tableau du Portefeuille ; section « Liens
+  applicatifs » ajoutée à la fiche détail (sens de la relation `→`/`←`,
+  nom de l'autre application, description/protocole, bouton Retirer
+  réutilisant `deleteEchange()` déjà exposé par le service).
+- Le diagramme de composants restait la seule fonctionnalité déjà
+  couverte par le cahier des charges (modélisation des applications,
+  interactions entre systèmes) ; seule la visibilité dans l'inventaire
+  manquait.
+
+### Vérifié
+
+- `tsc --noEmit` backend et frontend, build frontend : aucune erreur.
+- Suite backend complète : 278/278 (aucun test n'asserte la forme exacte
+  de l'`include` Prisma modifié, donc pas de régression).
+- En conditions réelles : 2 applications créées, un échange créé entre
+  elles → colonne Liens à 1 des deux côtés, section détail affichant
+  « → Portail RH · Synchronisation des comptes · REST » ; clic sur
+  Retirer → lien supprimé, compteur repassé à 0 des deux côtés. Données
+  de test nettoyées après vérification.

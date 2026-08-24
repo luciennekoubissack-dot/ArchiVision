@@ -14,9 +14,11 @@ export interface Application {
   positionY?: number | null;
   createdAt: string;
   updatedAt: string;
-  _count?: { zones: number; services: number };
+  _count?: { zones: number; services: number; echangesSource: number; echangesTarget: number };
   zones?: { zone: { id: string; nom: string; type: TypeZone } }[];
   services?: ApplicationServiceItem[];
+  echangesSource?: ApplicationEchangeLink[];
+  echangesTarget?: ApplicationEchangeLink[];
 }
 
 export interface ApplicationServiceItem {
@@ -35,6 +37,15 @@ export interface ApplicationEchange {
   createdAt: string;
   source: Application;
   target: Application;
+}
+
+/** Échange vu depuis une seule application (fiche détail) : ne référence que l'application à l'autre bout du lien. */
+export interface ApplicationEchangeLink {
+  id: string;
+  description?: string | null;
+  protocole?: string | null;
+  source?: { id: string; nom: string };
+  target?: { id: string; nom: string };
 }
 
 export interface ZoneUrbanisation {

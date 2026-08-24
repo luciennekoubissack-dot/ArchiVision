@@ -11,7 +11,11 @@ export const UPLOADS_DIR = join(process.cwd(), 'apps', 'api', 'uploads');
 
 mkdirSync(UPLOADS_DIR, { recursive: true });
 
-const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+// SVG volontairement exclu : un SVG peut embarquer du <script> exécuté si le
+// fichier est ouvert directement dans un onglet, et cet endpoint est public
+// (utilisé pendant l'inscription, avant qu'un compte/JWT n'existe) — pas de
+// sanitisation fiable ici qui justifierait de le réautoriser.
+const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 export const logoMulterOptions: MulterOptions = {
   storage: diskStorage({
@@ -23,7 +27,7 @@ export const logoMulterOptions: MulterOptions = {
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      callback(new BadRequestException('Format de fichier non supporté (PNG, JPEG, WEBP ou SVG attendu).'), false);
+      callback(new BadRequestException('Format de fichier non supporté (PNG, JPEG ou WEBP attendu).'), false);
       return;
     }
     callback(null, true);

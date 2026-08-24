@@ -28,7 +28,9 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/archivision?schema=public
-      JWT_SECRET: ${JWT_SECRET:-changeme-in-production}
+      # Pas de valeur par défaut : l'API refuse de démarrer si JWT_SECRET
+      # n'est pas exporté avant `docker compose up` (voir requireJwtSecret()).
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET doit être défini (export JWT_SECRET=... avant docker compose up)}
       PORT: 3000
     ports:
       - '3000:3000'

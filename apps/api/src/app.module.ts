@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@archivision/infrastructure';
 import { JwtAuthGuard, SuperAdminGuard } from '@archivision/shared';
 import { OrganisationModule } from './organisation/organisation.module';
@@ -26,6 +27,10 @@ import { VisionCanvasModule } from './modules/vision-canvas/vision-canvas.module
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env'] }),
+    // Limite globale par défaut (défense en profondeur) ; /auth/login,
+    // /auth/register et /uploads/logo posent une limite plus stricte via
+    // @Throttle() vu qu'ils sont publics et sensibles (brute force / DoS disque).
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     PrismaModule,
     AuthModule,
     OrganisationModule,
@@ -48,8 +53,13 @@ import { VisionCanvasModule } from './modules/vision-canvas/vision-canvas.module
     HealthModule,
   ],
   providers: [
-    // Ordre important : JwtAuthGuard peuple request.user avant que
-    // SuperAdminGuard ne le lise pour bloquer les fuites cross-tenant.
+    // Ordre important : ThrottlerGuard rejette les requêtes en excès avant
+    // tout travail d'auth ; JwtAuthGuard peuple ensuite request.user avant
+    // que SuperAdminGuard ne le lise pour bloquer les fuites cross-tenant.
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

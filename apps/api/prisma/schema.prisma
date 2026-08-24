@@ -263,20 +263,12 @@ model CanevasRelation {
 
 // ─── Urbanisation ─────────────────────────────────────────────────────────────
 
-/// 3 valeurs de criticité.
-enum Criticite {
-  HAUTE
-  MOYENNE
-  BASSE
-}
-
 /// Application du portefeuille applicatif.
-/// Champs : id, nom, description, criticite, organisationId → Organisation
+/// Champs : id, nom, description, organisationId → Organisation
 model Application {
   id             String        @id @default(uuid())
   nom            String
   description    String?
-  criticite      Criticite     @default(MOYENNE)
   statut         StatutElement @default(LES_DEUX)
   positionX      Float?        @map("position_x")
   positionY      Float?        @map("position_y")

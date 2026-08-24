@@ -25,7 +25,7 @@ export class UrbanisationService {
       orderBy: { nom: 'asc' },
       include: {
         services: true,
-        _count: { select: { zones: true, services: true } },
+        _count: { select: { zones: true, services: true, echangesSource: true, echangesTarget: true } },
       },
     });
   }
@@ -40,6 +40,10 @@ export class UrbanisationService {
           },
         },
         services: true,
+        // Liens applicatifs (interactions entre systèmes) dans les deux sens :
+        // cette application peut être la source ou la cible de l'échange.
+        echangesSource: { include: { target: { select: { id: true, nom: true } } } },
+        echangesTarget: { include: { source: { select: { id: true, nom: true } } } },
       },
     });
     if (!app || app.organisationId !== organisationId) {

@@ -12,9 +12,9 @@ describe('JwtStrategy', () => {
     expect(strategy).toBeDefined();
   });
 
-  it('utilise une clé par défaut si JWT_SECRET est absent', () => {
+  it('refuse de se construire si JWT_SECRET est absent (pas de secret par défaut)', () => {
     const configWithoutSecret = { get: jest.fn().mockReturnValue(undefined) } as unknown as ConfigService;
-    expect(() => new JwtStrategy(configWithoutSecret)).not.toThrow();
+    expect(() => new JwtStrategy(configWithoutSecret)).toThrow('JWT_SECRET');
   });
 
   describe('validate', () => {

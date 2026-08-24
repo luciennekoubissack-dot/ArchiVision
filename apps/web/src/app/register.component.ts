@@ -131,7 +131,7 @@ const CRITICITES: { value: NonNullable<ApplicationItem['criticite']>; label: str
                   <svg *ngIf="!logoPreview" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('camera')"></svg>
                 </button>
                 <span class="photo-label">{{ uploadingLogo ? 'Envoi…' : 'Logo' }}</span>
-                <input #fileInput type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden (change)="onLogoSelected($event)" />
+                <input #fileInput type="file" accept="image/png,image/jpeg,image/webp" hidden (change)="onLogoSelected($event)" />
               </div>
             </div>
 
