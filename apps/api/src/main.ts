@@ -3,6 +3,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
+import compression from 'compression';
 import { HttpExceptionFilter } from '@archivision/shared';
 import { AppModule } from './app.module';
 import { UPLOADS_DIR } from './modules/uploads/uploads.config';
@@ -13,6 +14,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
+  app.use(compression());
   app.useStaticAssets(UPLOADS_DIR, { prefix: '/uploads/' });
 
   app.useGlobalPipes(

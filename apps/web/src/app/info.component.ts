@@ -12,9 +12,7 @@ import { PublicHeaderComponent } from './public-header.component';
       <h2>À propos</h2>
       <p>
         ArchiVision est une plateforme de modélisation d'architecture d'entreprise
-        conforme au référentiel Métier ArchiMate. Le référentiel — organisations,
-        capacités, éléments métier, applications, zones d'urbanisation — est la source
-        unique de vérité ; les vues sont générées à la demande, jamais dessinées à la main.
+        conforme à Archimate , BPMN et TOGAF. 
       </p>
       <section>
         <h3>Vision</h3>

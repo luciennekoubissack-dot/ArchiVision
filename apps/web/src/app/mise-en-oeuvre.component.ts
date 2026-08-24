@@ -30,7 +30,7 @@ const AVANCEMENTS: AvancementSolution[] = ['NON_DEMARRE', 'EN_COURS', 'TERMINE',
 
     <section class="card">
       <div class="empty-state" *ngIf="solutions.length === 0">
-        Aucune solution retenue pour l'instant — validez-en depuis le module Opportunités & solutions.
+        Aucune solution retenue pour l'instant .
       </div>
       <ul class="list" *ngIf="solutions.length > 0">
         <li class="list-item" *ngFor="let s of solutions">

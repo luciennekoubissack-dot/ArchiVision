@@ -24,7 +24,7 @@ const ICONS: Record<string, string> = {
   imports: [CommonModule],
   template: `
     <p class="muted intro">
-      Chaque processus défini dans le module Vision dispose ici de son diagramme BPMN généré — sélectionnez un
+      Chaque processus défini dans le module Vision dispose ici de son diagramme BPMN généré  sélectionnez un
       processus, dans n'importe quelle catégorie, pour l'afficher.
     </p>
 

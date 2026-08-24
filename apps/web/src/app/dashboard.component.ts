@@ -96,7 +96,7 @@ const KPIS: Kpi[] = [
       <section class="card chart-card card-hover">
         <h3>Répartition des éléments ArchiMate par type</h3>
         <div class="empty-state" *ngIf="loaded && counts.elements === 0">
-          Aucun élément ArchiMate pour l'instant — la répartition apparaîtra dès que vous en créerez.
+          Aucun élément ArchiMate pour l'instant .
         </div>
         <div class="chart-wrap" [style.display]="counts.elements > 0 ? 'block' : 'none'">
           <canvas #elementsChart></canvas>
@@ -106,7 +106,7 @@ const KPIS: Kpi[] = [
       <section class="card chart-card card-hover">
         <h3>Applications par criticité</h3>
         <div class="empty-state" *ngIf="loaded && counts.applications === 0">
-          Aucune application pour l'instant — le suivi apparaîtra dès que vous en créerez.
+          Aucune application pour l'instant .
         </div>
         <div class="chart-wrap" [style.display]="counts.applications > 0 ? 'block' : 'none'">
           <canvas #criticiteChart></canvas>

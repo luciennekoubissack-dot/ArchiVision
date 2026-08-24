@@ -47,7 +47,7 @@ interface PendingEchange {
 
     <div class="stage-wrap">
       <div class="empty-state" *ngIf="!loading && applications.length === 0">
-        Aucune application pour l'instant — ajoutez-en depuis l'onglet Portefeuille.
+        Aucune application pour l'instant .
       </div>
       <div #stageHost class="stage-host"></div>
     </div>

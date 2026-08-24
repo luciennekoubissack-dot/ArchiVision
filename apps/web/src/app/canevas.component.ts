@@ -74,7 +74,7 @@ interface PendingRelation {
   imports: [CommonModule, CanevasPaletteComponent],
   template: `
     <p class="hint">
-      Pour relier deux éléments : survolez un élément — 4 petits points apparaissent sur ses bords — puis glissez
+      Pour relier deux éléments : survolez un élément 4 petits points apparaissent sur ses bords  puis glissez
       depuis l'un de ces points jusqu'à l'élément cible. Pour supprimer un élément, survolez-le et cliquez sur le
       « × » rouge en haut à droite.
     </p>
@@ -100,7 +100,7 @@ interface PendingRelation {
 
       <div class="stage-wrap">
         <div class="empty-state" *ngIf="!loading && elements.length === 0">
-          Aucun élément pour l'instant — glissez un élément depuis la palette ou cliquez sur « Générer ».
+          Aucun élément pour l'instant , glissez un élément depuis la palette ou cliquez sur « Générer ».
         </div>
         <div
           #stageHost

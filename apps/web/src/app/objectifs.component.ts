@@ -40,7 +40,7 @@ const ICONS: Record<string, string> = {
         </button>
       </div>
     </div>
-    <p class="hint" *ngIf="!canWrite">Lecture seule — seuls les rôles Administrateur et Architecte peuvent modifier les objectifs.</p>
+    <p class="hint" *ngIf="!canWrite">Lecture seule .</p>
 
     <section class="card">
       <div class="empty-state" *ngIf="objectifs.length === 0">Aucun objectif défini pour cette organisation.</div>

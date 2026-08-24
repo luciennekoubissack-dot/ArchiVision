@@ -162,7 +162,7 @@ interface Pos {
   template: `
     <p class="hint">
       Glissez une icône de la palette sur le plan pour ajouter une étape. Pour relier deux étapes : survolez une
-      étape — 4 points apparaissent sur ses bords — puis glissez depuis l'un de ces points jusqu'à l'étape cible.
+      étape , 4 points apparaissent sur ses bords  puis glissez depuis l'un de ces points jusqu'à l'étape cible.
       Survolez une étape : cliquez sur le crayon pour la modifier (nom, AS-IS/TO-BE), ou sur le « × » rouge pour la
       supprimer.
     </p>

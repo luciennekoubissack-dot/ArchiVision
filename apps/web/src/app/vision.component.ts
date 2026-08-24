@@ -389,18 +389,6 @@ export class VisionComponent implements OnInit {
     );
   }
 
-  exportGroupe(categorie: CategorieExigence): void {
-    const rows = (categorie === 'FONCTIONNELLE' ? this.fonctionnelles : this.nonFonctionnelles).map((e) => ({
-      Nom: e.nom,
-      Description: e.description ?? '',
-    }));
-    exportToExcel(
-      categorie === 'FONCTIONNELLE' ? 'exigences-fonctionnelles' : 'exigences-non-fonctionnelles',
-      'Exigences',
-      rows,
-    );
-  }
-
   async importExigences(event: Event): Promise<void> {
     const file = (event.target as HTMLInputElement).files?.[0];
     (event.target as HTMLInputElement).value = '';

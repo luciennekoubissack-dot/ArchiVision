@@ -11,7 +11,7 @@ import { PublicHeaderComponent } from './public-header.component';
     <main class="howto-page">
       <h2>Comment utiliser ArchiVision</h2>
       <ol>
-        <li>Créez votre organisation (nom, secteur, taille, pays) — vous devenez son premier Architecte.</li>
+        <li>Créez votre organisation (nom, secteur, taille, pays) et devenez son premier Architecte.</li>
         <li>Structurez vos services et invitez vos collègues avec le rôle adapté (Dirigeant, Représentant, Collaborateur).</li>
         <li>Définissez vos objectifs stratégiques.</li>
         <li>Modélisez vos capacités métier, éléments ArchiMate et leurs relations.</li>

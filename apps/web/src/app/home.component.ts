@@ -17,8 +17,8 @@ import { PublicFooterComponent } from './public-footer.component';
           <span class="eyebrow">Plateforme d'architecture d'entreprise</span>
           <h1>Pensez, modélisez, faites évoluer votre architecture d'entreprise</h1>
           <p>
-            Renseignez votre référentiel — vision, procédures, capacités métier, données,
-            applications, infrastructure — grâce à un assistant guidé, puis visualisez et
+            Renseignez votre référentiel vision, procédures, capacités métier, données,
+            applications, infrastructure  grâce à un assistant guidé, puis visualisez et
             modifiez votre architecture sur un canevas interactif : glisser-déposer, connexions
             entre les différentes couches, export en image.
           </p>
@@ -45,7 +45,7 @@ import { PublicFooterComponent } from './public-footer.component';
             <article class="step-card">
               <span class="step-number">2</span>
               <h3>Suivez l'assistant</h3>
-              <p>7 étapes guidées — vision, procédures, architecture métier, données, applicatif, technologique, roadmap — chacune avec une question pour savoir quoi renseigner.</p>
+              <p>Etapes guidées vision, procédures, architecture métier, données, applicatif, technologique, roadmap .</p>
             </article>
             <article class="step-card">
               <span class="step-number">3</span>
