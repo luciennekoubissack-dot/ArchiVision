@@ -40,7 +40,8 @@ describe('ArchimateViewService', () => {
     expect(result.elementCount).toBe(2);
     expect(result.relationCount).toBe(1);
     expect(result.svg).toContain('Responsable Formation');
-    expect(result.svg).toContain('Planifier une formation');
+    expect(result.svg).toContain('Planifier une');
+    expect(result.svg).toContain('formation');
     expect(result.svg).toContain('<svg');
   });
 
@@ -73,9 +74,10 @@ describe('ArchimateViewService', () => {
 
     const result = await service.generate('org-001');
 
-    expect(result.svg).toContain('Devenir leader régional');
-    expect(result.svg).toContain('#E6E6FA');
-    expect(result.svg).toContain('#FFFFB3');
+    expect(result.svg).toContain('Devenir leader');
+    expect(result.svg).toContain('régional');
+    expect(result.svg).toContain('#D6CCF5');
+    expect(result.svg).toContain('#FFF3A3');
   });
 
   it('ignore une relation dont un élément référencé serait absent de la liste (défensif)', async () => {

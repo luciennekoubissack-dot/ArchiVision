@@ -15,8 +15,11 @@ const TYPE_BPMN_LABEL: Record<TypeBpmn, string> = {
   EVENEMENT_FIN: 'Événement de fin',
   EVENEMENT_INTERMEDIAIRE: 'Événement intermédiaire',
   TACHE: 'Tâche',
+  SOUS_PROCESSUS: 'Sous-processus',
   PASSERELLE_EXCLUSIVE: 'Passerelle exclusive',
   PASSERELLE_PARALLELE: 'Passerelle parallèle',
+  PASSERELLE_INCLUSIVE: 'Passerelle inclusive',
+  PASSERELLE_EVENEMENTIELLE: 'Passerelle événementielle',
 };
 
 interface GapElement extends BpmnElement {

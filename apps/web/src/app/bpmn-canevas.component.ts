@@ -14,7 +14,7 @@ import { CommonModule } from '@angular/common';
 import Konva from 'konva';
 import { forkJoin, Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
-import { BpmnElement, BpmnFlow, BpmnService, StatutElement, TypeBpmn } from './bpmn.service';
+import { BpmnElement, BpmnFlow, BpmnService, DeclencheurEvenement, StatutElement, TypeBpmn, TypeTache } from './bpmn.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
 
@@ -28,8 +28,11 @@ const SHAPE_SIZE: Record<TypeBpmn, ShapeSize> = {
   EVENEMENT_FIN: { w: 48, h: 48 },
   EVENEMENT_INTERMEDIAIRE: { w: 48, h: 48 },
   TACHE: { w: 150, h: 64 },
+  SOUS_PROCESSUS: { w: 150, h: 64 },
   PASSERELLE_EXCLUSIVE: { w: 56, h: 56 },
   PASSERELLE_PARALLELE: { w: 56, h: 56 },
+  PASSERELLE_INCLUSIVE: { w: 56, h: 56 },
+  PASSERELLE_EVENEMENTIELLE: { w: 56, h: 56 },
 };
 
 export const TYPE_BPMN_LABEL: Record<TypeBpmn, string> = {
@@ -37,11 +40,49 @@ export const TYPE_BPMN_LABEL: Record<TypeBpmn, string> = {
   EVENEMENT_FIN: 'Événement de fin',
   EVENEMENT_INTERMEDIAIRE: 'Événement intermédiaire',
   TACHE: 'Tâche',
+  SOUS_PROCESSUS: 'Sous-processus',
   PASSERELLE_EXCLUSIVE: 'Passerelle exclusive',
   PASSERELLE_PARALLELE: 'Passerelle parallèle',
+  PASSERELLE_INCLUSIVE: 'Passerelle inclusive',
+  PASSERELLE_EVENEMENTIELLE: 'Passerelle événementielle',
 };
 
-const TYPES: TypeBpmn[] = ['EVENEMENT_DEBUT', 'TACHE', 'PASSERELLE_EXCLUSIVE', 'PASSERELLE_PARALLELE', 'EVENEMENT_INTERMEDIAIRE', 'EVENEMENT_FIN'];
+const TYPES: TypeBpmn[] = [
+  'EVENEMENT_DEBUT',
+  'TACHE',
+  'SOUS_PROCESSUS',
+  'PASSERELLE_EXCLUSIVE',
+  'PASSERELLE_PARALLELE',
+  'PASSERELLE_INCLUSIVE',
+  'PASSERELLE_EVENEMENTIELLE',
+  'EVENEMENT_INTERMEDIAIRE',
+  'EVENEMENT_FIN',
+];
+
+/** Types événement — pour lesquels le formulaire propose un déclencheur. */
+const EVENT_TYPES: TypeBpmn[] = ['EVENEMENT_DEBUT', 'EVENEMENT_FIN', 'EVENEMENT_INTERMEDIAIRE'];
+
+export const DECLENCHEUR_LABEL: Record<DeclencheurEvenement, string> = {
+  MESSAGE: 'Message',
+  MINUTERIE: 'Minuterie',
+  ERREUR: 'Erreur',
+  SIGNAL: 'Signal',
+  CONDITIONNEL: 'Conditionnel',
+  TERMINAISON: 'Terminaison',
+  ESCALADE: 'Escalade',
+};
+const DECLENCHEURS: DeclencheurEvenement[] = ['MESSAGE', 'MINUTERIE', 'ERREUR', 'SIGNAL', 'CONDITIONNEL', 'ESCALADE', 'TERMINAISON'];
+
+export const TYPE_TACHE_LABEL: Record<TypeTache, string> = {
+  UTILISATEUR: 'Utilisateur',
+  SERVICE: 'Service',
+  MANUELLE: 'Manuelle',
+  ENVOI: 'Envoi',
+  RECEPTION: 'Réception',
+  REGLE_METIER: 'Règle métier',
+  SCRIPT: 'Script',
+};
+const TYPE_TACHES: TypeTache[] = ['UTILISATEUR', 'SERVICE', 'MANUELLE', 'ENVOI', 'RECEPTION', 'REGLE_METIER', 'SCRIPT'];
 
 /** Icônes de palette : même vocabulaire visuel (triangle de lancement, carré
  * d'arrêt, horloge, document, ×, +) que les glyphes dessinés sur le canevas
@@ -55,10 +96,16 @@ const PALETTE_ICON: Record<TypeBpmn, string> = {
     '<circle cx="12" cy="12" r="8" fill="none" stroke="#E29E09" stroke-width="1.6"/><circle cx="12" cy="12" r="5.3" fill="none" stroke="#E29E09" stroke-width="1.1"/><path d="M12,9 L12,12 L14.2,13.3" fill="none" stroke="#E29E09" stroke-width="1.3" stroke-linecap="round"/>',
   TACHE:
     '<rect x="5" y="5" width="14" height="14" rx="2.5" fill="#1E283D"/><rect x="8" y="8.6" width="8" height="1.5" rx="0.7" fill="#ffffff"/><rect x="8" y="11.3" width="8" height="1.5" rx="0.7" fill="#ffffff"/><rect x="8" y="14" width="5" height="1.5" rx="0.7" fill="#ffffff"/>',
+  SOUS_PROCESSUS:
+    '<rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="#1E283D" stroke-width="1.5"/><rect x="9.5" y="11.5" width="5" height="5" fill="none" stroke="#1E283D" stroke-width="1.1"/><path d="M10.5,14 L13.5,14 M12,12.5 L12,15.5" stroke="#1E283D" stroke-width="1.1" stroke-linecap="round"/>',
   PASSERELLE_EXCLUSIVE:
     '<polygon points="12,4 20,12 12,20 4,12" fill="none" stroke="#6A1B9A" stroke-width="1.6"/><path d="M9.5,9.5 L14.5,14.5 M14.5,9.5 L9.5,14.5" stroke="#6A1B9A" stroke-width="1.6" stroke-linecap="round"/>',
   PASSERELLE_PARALLELE:
     '<polygon points="12,4 20,12 12,20 4,12" fill="none" stroke="#6A1B9A" stroke-width="1.6"/><path d="M12,8.5 L12,15.5 M8.5,12 L15.5,12" stroke="#6A1B9A" stroke-width="1.6" stroke-linecap="round"/>',
+  PASSERELLE_INCLUSIVE:
+    '<polygon points="12,4 20,12 12,20 4,12" fill="none" stroke="#6A1B9A" stroke-width="1.6"/><circle cx="12" cy="12" r="4" fill="none" stroke="#6A1B9A" stroke-width="1.6"/>',
+  PASSERELLE_EVENEMENTIELLE:
+    '<polygon points="12,4 20,12 12,20 4,12" fill="none" stroke="#6A1B9A" stroke-width="1.6"/><circle cx="12" cy="12" r="4.4" fill="none" stroke="#6A1B9A" stroke-width="1"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="#6A1B9A" stroke-width="1"/>',
 };
 
 const GAP_X = 40;
@@ -82,12 +129,17 @@ interface PendingCreate {
   y: number;
   nom: string;
   statut: StatutElement;
+  declencheur: DeclencheurEvenement | '';
+  typeTache: TypeTache | '';
 }
 
 interface PendingEdit {
   id: string;
+  type: TypeBpmn;
   nom: string;
   statut: StatutElement;
+  declencheur: DeclencheurEvenement | '';
+  typeTache: TypeTache | '';
 }
 
 interface PendingFlow {
@@ -144,10 +196,24 @@ interface Pos {
           Nom
           <input type="text" [value]="p.nom" (input)="p.nom = $any($event.target).value" required autofocus />
         </label>
+        <label class="field" *ngIf="isEventType(p.type)">
+          Déclencheur
+          <select (change)="p.declencheur = $any($event.target).value">
+            <option value="" [selected]="!p.declencheur">Générique</option>
+            <option *ngFor="let d of declencheurs" [value]="d" [selected]="d === p.declencheur">{{ declencheurLabel(d) }}</option>
+          </select>
+        </label>
+        <label class="field" *ngIf="p.type === 'TACHE'">
+          Nature de la tâche
+          <select (change)="p.typeTache = $any($event.target).value">
+            <option value="" [selected]="!p.typeTache">Générique</option>
+            <option *ngFor="let t of typeTaches" [value]="t" [selected]="t === p.typeTache">{{ typeTacheLabel(t) }}</option>
+          </select>
+        </label>
         <label class="field">
           Statut
-          <select [value]="p.statut" (change)="p.statut = $any($event.target).value">
-            <option *ngFor="let s of statuts" [value]="s">{{ statutLabel(s) }}</option>
+          <select (change)="p.statut = $any($event.target).value">
+            <option *ngFor="let s of statuts" [value]="s" [selected]="s === p.statut">{{ statutLabel(s) }}</option>
           </select>
         </label>
         <div class="pending-actions">
@@ -164,10 +230,24 @@ interface Pos {
           Nom
           <input type="text" [value]="pe.nom" (input)="pe.nom = $any($event.target).value" required autofocus />
         </label>
+        <label class="field" *ngIf="isEventType(pe.type)">
+          Déclencheur
+          <select (change)="pe.declencheur = $any($event.target).value">
+            <option value="" [selected]="!pe.declencheur">Générique</option>
+            <option *ngFor="let d of declencheurs" [value]="d" [selected]="d === pe.declencheur">{{ declencheurLabel(d) }}</option>
+          </select>
+        </label>
+        <label class="field" *ngIf="pe.type === 'TACHE'">
+          Nature de la tâche
+          <select (change)="pe.typeTache = $any($event.target).value">
+            <option value="" [selected]="!pe.typeTache">Générique</option>
+            <option *ngFor="let t of typeTaches" [value]="t" [selected]="t === pe.typeTache">{{ typeTacheLabel(t) }}</option>
+          </select>
+        </label>
         <label class="field">
           Statut
-          <select [value]="pe.statut" (change)="pe.statut = $any($event.target).value">
-            <option *ngFor="let s of statuts" [value]="s">{{ statutLabel(s) }}</option>
+          <select (change)="pe.statut = $any($event.target).value">
+            <option *ngFor="let s of statuts" [value]="s" [selected]="s === pe.statut">{{ statutLabel(s) }}</option>
           </select>
         </label>
         <div class="pending-actions">
@@ -250,6 +330,8 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
 
   types = TYPES;
   statuts = STATUTS;
+  declencheurs = DECLENCHEURS;
+  typeTaches = TYPE_TACHES;
   loading = true;
   elements: BpmnElement[] = [];
   flows: BpmnFlow[] = [];
@@ -318,6 +400,18 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
 
   paletteIcon(type: TypeBpmn): string {
     return PALETTE_ICON[type];
+  }
+
+  declencheurLabel(declencheur: DeclencheurEvenement): string {
+    return DECLENCHEUR_LABEL[declencheur];
+  }
+
+  typeTacheLabel(typeTache: TypeTache): string {
+    return TYPE_TACHE_LABEL[typeTache];
+  }
+
+  isEventType(type: TypeBpmn): boolean {
+    return EVENT_TYPES.includes(type);
   }
 
   elementLabel(id: string): string {
@@ -389,59 +483,187 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
     return result;
   }
 
-  private buildIcon(type: TypeBpmn, w: number, h: number): Konva.Group {
+  private buildIcon(element: BpmnElement, w: number, h: number): Konva.Group {
     const g = new Konva.Group({ listening: false });
     const cx = w / 2;
     const cy = h / 2;
-    switch (type) {
+    switch (element.type) {
       case 'EVENEMENT_DEBUT': {
         const r = Math.min(w, h) / 2 - 3;
         g.add(new Konva.Circle({ x: cx, y: cy, radius: r, stroke: '#2E7D32', strokeWidth: 1.6, fill: '#E8F5E9' }));
-        g.add(new Konva.RegularPolygon({ x: cx + 2, y: cy, sides: 3, radius: 7, rotation: 90, fill: '#2E7D32' }));
+        this.drawEventGlyph(g, element.declencheur, cx, cy, '#2E7D32');
         break;
       }
       case 'EVENEMENT_FIN': {
         const r = Math.min(w, h) / 2 - 3;
         g.add(new Konva.Circle({ x: cx, y: cy, radius: r, stroke: '#C62828', strokeWidth: 2.6, fill: '#FDECEA' }));
-        g.add(new Konva.Rect({ x: cx - 6, y: cy - 6, width: 12, height: 12, fill: '#C62828' }));
+        this.drawEventGlyph(g, element.declencheur, cx, cy, '#C62828');
         break;
       }
       case 'EVENEMENT_INTERMEDIAIRE': {
         const r = Math.min(w, h) / 2 - 3;
         g.add(new Konva.Circle({ x: cx, y: cy, radius: r, stroke: '#E29E09', strokeWidth: 1.4, fill: '#FEF6E6' }));
         g.add(new Konva.Circle({ x: cx, y: cy, radius: r - 4, stroke: '#E29E09', strokeWidth: 1.1 }));
-        g.add(new Konva.Line({ points: [cx, cy, cx, cy - r + 8], stroke: '#E29E09', strokeWidth: 1.4, lineCap: 'round' }));
-        g.add(new Konva.Line({ points: [cx, cy, cx + r - 10, cy - 2], stroke: '#E29E09', strokeWidth: 1.4, lineCap: 'round' }));
+        this.drawEventGlyph(g, element.declencheur, cx, cy, '#E29E09');
         break;
       }
       case 'TACHE': {
         g.add(new Konva.Rect({ x: 10, y: 10, width: 22, height: 22, cornerRadius: 4, fill: '#33415A' }));
+        this.drawTaskGlyph(g, element.typeTache, 10, 10);
+        break;
+      }
+      case 'PASSERELLE_EXCLUSIVE':
+      case 'PASSERELLE_PARALLELE':
+      case 'PASSERELLE_INCLUSIVE':
+      case 'PASSERELLE_EVENEMENTIELLE':
+        this.drawGatewaySymbol(g, element.type, cx, cy);
+        break;
+    }
+    return g;
+  }
+
+  /** Symbole distinctif au centre du losange selon le type de passerelle — même vocabulaire que la génération SVG. */
+  private drawGatewaySymbol(g: Konva.Group, type: TypeBpmn, cx: number, cy: number): void {
+    switch (type) {
+      case 'PASSERELLE_EXCLUSIVE':
+        g.add(new Konva.Line({ points: [cx - 8, cy - 8, cx + 8, cy + 8], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
+        g.add(new Konva.Line({ points: [cx + 8, cy - 8, cx - 8, cy + 8], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
+        break;
+      case 'PASSERELLE_PARALLELE':
+        g.add(new Konva.Line({ points: [cx, cy - 9, cx, cy + 9], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
+        g.add(new Konva.Line({ points: [cx - 9, cy, cx + 9, cy], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
+        break;
+      case 'PASSERELLE_INCLUSIVE':
+        g.add(new Konva.Circle({ x: cx, y: cy, radius: 8, stroke: '#6A1B9A', strokeWidth: 2.2 }));
+        break;
+      case 'PASSERELLE_EVENEMENTIELLE':
+        g.add(new Konva.Circle({ x: cx, y: cy, radius: 9, stroke: '#6A1B9A', strokeWidth: 1.3 }));
+        g.add(new Konva.Circle({ x: cx, y: cy, radius: 5.5, stroke: '#6A1B9A', strokeWidth: 1.3 }));
+        break;
+    }
+  }
+
+  /** Glyphe interne d'un événement selon son déclencheur — absent = événement générique ("none"), aucun glyphe. */
+  private drawEventGlyph(g: Konva.Group, declencheur: DeclencheurEvenement | null | undefined, cx: number, cy: number, color: string): void {
+    if (!declencheur) return;
+    switch (declencheur) {
+      case 'MESSAGE':
+        g.add(new Konva.Rect({ x: cx - 8, y: cy - 5.5, width: 16, height: 11, stroke: color, strokeWidth: 1.3 }));
+        g.add(new Konva.Path({ data: `M${cx - 8},${cy - 5.5} L${cx},${cy + 1} L${cx + 8},${cy - 5.5}`, stroke: color, strokeWidth: 1.3 }));
+        break;
+      case 'MINUTERIE':
+        g.add(new Konva.Circle({ x: cx, y: cy, radius: 9, stroke: color, strokeWidth: 1.2 }));
+        g.add(new Konva.Path({ data: `M${cx},${cy - 6} L${cx},${cy} L${cx + 4},${cy + 2}`, stroke: color, strokeWidth: 1.2, lineCap: 'round' }));
+        break;
+      case 'ERREUR':
+        g.add(
+          new Konva.Path({
+            data: `M${cx - 7},${cy + 7} L${cx - 1},${cy - 6} L${cx + 2},${cy} L${cx + 7},${cy - 7} L${cx + 1},${cy + 6} L${cx - 2},${cy} Z`,
+            fill: color,
+          }),
+        );
+        break;
+      case 'SIGNAL':
+        g.add(new Konva.Line({ points: [cx, cy - 8, cx + 8, cy + 7, cx - 8, cy + 7], closed: true, stroke: color, strokeWidth: 1.3 }));
+        break;
+      case 'CONDITIONNEL':
+        g.add(new Konva.Rect({ x: cx - 7, y: cy - 8, width: 14, height: 16, stroke: color, strokeWidth: 1.1 }));
+        g.add(
+          new Konva.Path({
+            data: `M${cx - 4},${cy - 4} L${cx + 4},${cy - 4} M${cx - 4},${cy} L${cx + 4},${cy} M${cx - 4},${cy + 4} L${cx + 4},${cy + 4}`,
+            stroke: color,
+            strokeWidth: 1,
+          }),
+        );
+        break;
+      case 'ESCALADE':
+        g.add(
+          new Konva.Line({
+            points: [cx - 6, cy + 6, cx, cy - 6, cx + 6, cy + 6],
+            stroke: color,
+            strokeWidth: 1.5,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }),
+        );
+        break;
+      case 'TERMINAISON':
+        g.add(new Konva.Circle({ x: cx, y: cy, radius: 6, fill: color }));
+        break;
+    }
+  }
+
+  /** Icône dans le coin de la boîte tâche selon sa nature — sans typeTache, glyphe générique (document). */
+  private drawTaskGlyph(g: Konva.Group, typeTache: TypeTache | null | undefined, x: number, y: number): void {
+    const c = '#ffffff';
+    switch (typeTache) {
+      case 'UTILISATEUR':
+        g.add(new Konva.Circle({ x: x + 11, y: y + 6, radius: 4, stroke: c, strokeWidth: 1.3 }));
+        g.add(new Konva.Path({ data: `M${x + 4},${y + 20} Q${x + 11},${y + 12} ${x + 18},${y + 20}`, stroke: c, strokeWidth: 1.3 }));
+        break;
+      case 'SERVICE':
+        g.add(new Konva.Circle({ x: x + 11, y: y + 11, radius: 6, stroke: c, strokeWidth: 1.3 }));
+        g.add(
+          new Konva.Path({
+            data: `M${x + 11},${y + 2} L${x + 11},${y + 5} M${x + 11},${y + 17} L${x + 11},${y + 20} M${x + 2},${y + 11} L${x + 5},${y + 11} M${x + 17},${y + 11} L${x + 20},${y + 11}`,
+            stroke: c,
+            strokeWidth: 1.3,
+            lineCap: 'round',
+          }),
+        );
+        break;
+      case 'MANUELLE':
+        g.add(
+          new Konva.Path({
+            data: `M${x + 3},${y + 18} L${x + 3},${y + 10} Q${x + 3},${y + 7} ${x + 6},${y + 7} L${x + 16},${y + 7} Q${x + 19},${y + 7} ${x + 19},${y + 10} L${x + 19},${y + 18}`,
+            stroke: c,
+            strokeWidth: 1.3,
+          }),
+        );
+        break;
+      case 'ENVOI':
+        g.add(new Konva.Line({ points: [x + 2, y + 5, x + 20, y + 5, x + 20, y + 17, x + 2, y + 17], closed: true, fill: c }));
+        g.add(new Konva.Path({ data: `M${x + 2},${y + 5} L${x + 11},${y + 12} L${x + 20},${y + 5}`, stroke: '#1E283D', strokeWidth: 1.2 }));
+        break;
+      case 'RECEPTION':
+        g.add(new Konva.Rect({ x: x + 2, y: y + 5, width: 18, height: 12, stroke: c, strokeWidth: 1.3 }));
+        g.add(new Konva.Path({ data: `M${x + 2},${y + 5} L${x + 11},${y + 12} L${x + 20},${y + 5}`, stroke: c, strokeWidth: 1.3 }));
+        break;
+      case 'REGLE_METIER':
+        g.add(new Konva.Rect({ x: x + 2, y: y + 3, width: 18, height: 16, stroke: c, strokeWidth: 1.2 }));
+        g.add(
+          new Konva.Path({
+            data: `M${x + 2},${y + 9} L${x + 20},${y + 9} M${x + 9},${y + 3} L${x + 9},${y + 19}`,
+            stroke: c,
+            strokeWidth: 1,
+          }),
+        );
+        break;
+      case 'SCRIPT':
+        g.add(
+          new Konva.Path({
+            data: `M${x + 8},${y + 4} L${x + 3},${y + 11} L${x + 8},${y + 18} M${x + 14},${y + 4} L${x + 19},${y + 11} L${x + 14},${y + 18}`,
+            stroke: c,
+            strokeWidth: 1.3,
+            lineCap: 'round',
+            lineJoin: 'round',
+          }),
+        );
+        break;
+      default:
         [0, 1, 2].forEach((i) =>
           g.add(
             new Konva.Rect({
-              x: 14,
-              y: 15 + i * 5,
+              x: x + 4,
+              y: y + 6 + i * 5,
               width: i === 2 ? 9 : 14,
-              height: 2.4,
-              cornerRadius: 1.2,
-              fill: '#ffffff',
+              height: 1.6,
+              fill: c,
             }),
           ),
         );
         break;
-      }
-      case 'PASSERELLE_EXCLUSIVE': {
-        g.add(new Konva.Line({ points: [cx - 8, cy - 8, cx + 8, cy + 8], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
-        g.add(new Konva.Line({ points: [cx + 8, cy - 8, cx - 8, cy + 8], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
-        break;
-      }
-      case 'PASSERELLE_PARALLELE': {
-        g.add(new Konva.Line({ points: [cx, cy - 9, cx, cy + 9], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
-        g.add(new Konva.Line({ points: [cx - 9, cy, cx + 9, cy], stroke: '#6A1B9A', strokeWidth: 2.2, lineCap: 'round' }));
-        break;
-      }
     }
-    return g;
   }
 
   private buildBox(element: BpmnElement, pos: Pos): Konva.Group {
@@ -451,7 +673,7 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
 
     if (element.type === 'TACHE') {
       group.add(new Konva.Rect({ width: size.w, height: size.h, fill: '#1E283D', cornerRadius: 10 }));
-      group.add(this.buildIcon(element.type, size.w, size.h));
+      group.add(this.buildIcon(element, size.w, size.h));
       group.add(
         new Konva.Text({
           x: 40,
@@ -467,6 +689,34 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
           wrap: 'word',
         }),
       );
+    } else if (element.type === 'SOUS_PROCESSUS') {
+      group.add(new Konva.Rect({ width: size.w, height: size.h, fill: '#ffffff', stroke: '#1E283D', strokeWidth: 1.8, cornerRadius: 8 }));
+      group.add(
+        new Konva.Text({
+          x: 8,
+          y: 0,
+          width: size.w - 16,
+          height: size.h - 20,
+          text: element.nom,
+          fontSize: 12,
+          fontStyle: 'bold',
+          fill: '#1a1a1a',
+          align: 'center',
+          verticalAlign: 'middle',
+          wrap: 'word',
+        }),
+      );
+      const markerCx = size.w / 2;
+      const markerY = size.h - 12;
+      group.add(new Konva.Rect({ x: markerCx - 7, y: markerY - 7, width: 14, height: 14, stroke: '#1E283D', strokeWidth: 1.4 }));
+      group.add(
+        new Konva.Path({
+          data: `M${markerCx - 4},${markerY} L${markerCx + 4},${markerY} M${markerCx},${markerY - 4} L${markerCx},${markerY + 4}`,
+          stroke: '#1E283D',
+          strokeWidth: 1.4,
+          lineCap: 'round',
+        }),
+      );
     } else if (element.type.startsWith('PASSERELLE')) {
       group.add(
         new Konva.RegularPolygon({
@@ -480,7 +730,7 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
           strokeWidth: 1.6,
         }),
       );
-      group.add(this.buildIcon(element.type, size.w, size.h));
+      group.add(this.buildIcon(element, size.w, size.h));
       group.add(
         new Konva.Text({
           x: -42,
@@ -494,7 +744,7 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
         }),
       );
     } else {
-      group.add(this.buildIcon(element.type, size.w, size.h));
+      group.add(this.buildIcon(element, size.w, size.h));
       group.add(
         new Konva.Text({
           x: -50,
@@ -834,7 +1084,7 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
     const x = (event.clientX - rect.left - this.stage.x()) / scale - size.w / 2;
     const y = (event.clientY - rect.top - this.stage.y()) / scale - size.h / 2;
 
-    this.pendingCreate = { type, x, y, nom: '', statut: 'LES_DEUX' };
+    this.pendingCreate = { type, x, y, nom: '', statut: 'LES_DEUX', declencheur: '', typeTache: '' };
   }
 
   cancelCreate(): void {
@@ -847,23 +1097,38 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
     if (!p || !p.nom.trim()) return;
     const nom = p.nom.trim();
 
-    this.bpmnService.addElement(this.processusId, { nom, type: p.type, statut: p.statut }).subscribe({
-      next: (created) => {
-        this.bpmnService.updateElement(created.id, { positionX: p.x, positionY: p.y }).subscribe();
-        this.elements = [...this.elements, { ...created, positionX: p.x, positionY: p.y }];
-        this.pendingCreate = null;
-        this.render();
-        this.toast.success('Étape ajoutée.');
-        this.changed.emit();
-      },
-      error: () => this.toast.error("Impossible d'ajouter cette étape."),
-    });
+    this.bpmnService
+      .addElement(this.processusId, {
+        nom,
+        type: p.type,
+        statut: p.statut,
+        declencheur: p.declencheur || undefined,
+        typeTache: p.typeTache || undefined,
+      })
+      .subscribe({
+        next: (created) => {
+          this.bpmnService.updateElement(created.id, { positionX: p.x, positionY: p.y }).subscribe();
+          this.elements = [...this.elements, { ...created, positionX: p.x, positionY: p.y }];
+          this.pendingCreate = null;
+          this.render();
+          this.toast.success('Étape ajoutée.');
+          this.changed.emit();
+        },
+        error: () => this.toast.error("Impossible d'ajouter cette étape."),
+      });
   }
 
   // ── Modification ─────────────────────────────────────────────────────────
 
   openEditElement(element: BpmnElement): void {
-    this.pendingEdit = { id: element.id, nom: element.nom, statut: element.statut };
+    this.pendingEdit = {
+      id: element.id,
+      type: element.type,
+      nom: element.nom,
+      statut: element.statut,
+      declencheur: element.declencheur ?? '',
+      typeTache: element.typeTache ?? '',
+    };
   }
 
   cancelEdit(): void {
@@ -876,16 +1141,18 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
     if (!pe || !pe.nom.trim()) return;
     const nom = pe.nom.trim();
 
-    this.bpmnService.updateElement(pe.id, { nom, statut: pe.statut }).subscribe({
-      next: (updated) => {
-        this.elements = this.elements.map((e) => (e.id === updated.id ? { ...e, ...updated } : e));
-        this.pendingEdit = null;
-        this.render();
-        this.toast.success('Étape modifiée.');
-        this.changed.emit();
-      },
-      error: () => this.toast.error("Impossible de modifier cette étape."),
-    });
+    this.bpmnService
+      .updateElement(pe.id, { nom, statut: pe.statut, declencheur: pe.declencheur || undefined, typeTache: pe.typeTache || undefined })
+      .subscribe({
+        next: (updated) => {
+          this.elements = this.elements.map((e) => (e.id === updated.id ? { ...e, ...updated } : e));
+          this.pendingEdit = null;
+          this.render();
+          this.toast.success('Étape modifiée.');
+          this.changed.emit();
+        },
+        error: () => this.toast.error("Impossible de modifier cette étape."),
+      });
   }
 
   // ── Suppression ──────────────────────────────────────────────────────────

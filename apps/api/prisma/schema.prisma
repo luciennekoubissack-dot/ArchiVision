@@ -386,6 +386,33 @@ enum TypeBpmn {
   TACHE
   PASSERELLE_EXCLUSIVE
   PASSERELLE_PARALLELE
+  PASSERELLE_INCLUSIVE
+  PASSERELLE_EVENEMENTIELLE
+  SOUS_PROCESSUS
+}
+
+/// Déclencheur d'un événement — pertinent uniquement quand TypeBpmn est un
+/// des 3 types événement (début/intermédiaire/fin) ; pilote l'icône interne,
+/// la bordure du cercle continue de coder la position dans le flux.
+enum DeclencheurEvenement {
+  MESSAGE
+  MINUTERIE
+  ERREUR
+  SIGNAL
+  CONDITIONNEL
+  TERMINAISON
+  ESCALADE
+}
+
+/// Nature d'une tâche — pertinent uniquement quand TypeBpmn = TACHE.
+enum TypeTache {
+  UTILISATEUR
+  SERVICE
+  MANUELLE
+  ENVOI
+  RECEPTION
+  REGLE_METIER
+  SCRIPT
 }
 
 /// Un diagramme de processus métier. `bpmnXml` est la source de vérité pour
@@ -421,6 +448,8 @@ model BpmnElement {
   id          String        @id @default(uuid())
   nom         String
   type        TypeBpmn
+  declencheur DeclencheurEvenement? @map("declencheur")
+  typeTache   TypeTache?    @map("type_tache")
   statut      StatutElement @default(LES_DEUX)
   positionX   Float?        @map("position_x")
   positionY   Float?        @map("position_y")

@@ -210,3 +210,136 @@ S'y ajoute, du fait de la croissance rapide du produit :
 |---|---|---|
 | 🟡 | Bundle dev passé de ~898 kB à 3.78 MB depuis le premier audit (ajout de 6 modules, 3 canevas Konva, Chart.js déjà compté) — le lazy-loading des routes (déjà recommandé le 2026-08-18) devient plus urgent à mesure que l'app grossit | à faire |
 | 🟡 | Lien processus↔éléments ArchiMate pour un vrai filtrage par processus dans Architecture Métier, si le besoin se confirme | à évaluer |
+
+## 2026-08-24 — Génération de diagrammes BPMN à partir des processus Vision + extension du vocabulaire BPMN
+
+### Ce qui a été fait
+
+- **Génération automatique de diagrammes BPMN** : Architecture Métier
+  affiche désormais, pour chaque processus défini dans Vision (toutes
+  catégories confondues), un diagramme BPMN généré côté serveur
+  (nouveau `BpmnViewService`, même pattern SVG-brut sans librairie
+  cliente que `ArchimateViewService`) plutôt que de dupliquer la saisie.
+  Positionnement : position enregistrée par l'éditeur Konva si elle
+  existe, sinon repli en cascade gauche→droite avec passage à la ligne
+  au-delà de 1000px de large — un processus de plusieurs dizaines
+  d'étapes reste lisible sans étalement infini.
+- **Extension du vocabulaire BPMN** (`TypeBpmn` : 6 → 9 valeurs +
+  `PASSERELLE_INCLUSIVE`, `PASSERELLE_EVENEMENTIELLE`,
+  `SOUS_PROCESSUS` ; + 2 classificateurs optionnels
+  `DeclencheurEvenement` sur les événements et `TypeTache` sur les
+  tâches). Choix architectural : plutôt que d'exploser `TypeBpmn` en
+  dizaines de valeurs combinées (`EVENEMENT_FIN_MESSAGE`,
+  `EVENEMENT_FIN_ERREUR`...), reprise du pattern déjà validé pour
+  `categorieExigence` sur `ElementArchimate` — un type de base inchangé
+  + un classificateur optionnel qui pilote uniquement l'icône. Recherche
+  BPMN 2.0 menée avant implémentation pour s'assurer que le découpage
+  (7 déclencheurs, 7 natures de tâche, 4 passerelles) correspond à la
+  norme réelle plutôt qu'à une extrapolation ad hoc.
+- **Trois surfaces tenues synchronisées** pour le même vocabulaire :
+  génération SVG serveur ([bpmn-view.service.ts](../apps/api/src/modules/bpmn/bpmn-view.service.ts)),
+  éditeur interactif Konva ([bpmn-canevas.component.ts](../apps/web/src/app/bpmn-canevas.component.ts)),
+  et DTOs de validation. Les glyphes (enveloppe, horloge, éclair,
+  triangle, personnage, engrenage, etc.) sont dessinés deux fois — une
+  fois en chaînes SVG côté serveur, une fois en formes Konva côté
+  client — avec les mêmes coordonnées et couleurs, pour que ce que
+  l'utilisateur dessine dans l'éditeur ressemble exactement au diagramme
+  généré.
+- **Processus de démonstration reconstruit** ("Démonstration —
+  vocabulaire BPMN complet", 22 éléments, 23 flux) pour couvrir la
+  totalité du vocabulaire : les 9 types, les 7 déclencheurs, les 7
+  natures de tâche — vérifié à la fois via `bpmn-view.service.spec.ts`
+  (7 tests dédiés) et en rejouant la génération + la création manuelle
+  d'éléments dans le navigateur.
+
+### Point de vigilance
+
+- Cette extension **duplique intentionnellement** la logique de dessin
+  d'icônes entre backend (chaînes SVG) et frontend (formes Konva) faute
+  de langage de description partagé entre les deux runtimes — tout
+  nouveau déclencheur/nature de tâche futur nécessitera de modifier les
+  deux fichiers en parallèle, avec le risque de désynchronisation
+  visuelle si l'un des deux est oublié. Pas de correctif proposé ici
+  (changer d'approche, ex. un descripteur de glyphe unique interprété
+  différemment par les deux moteurs de rendu, serait un chantier séparé
+  et non justifié pour l'ampleur actuelle du vocabulaire).
+
+## 2026-08-24 (suite) — Édition des processus, correctif de mise en page, identité visuelle globale, refonte de la notation ArchiMate
+
+### 🔴 Bug réel trouvé et corrigé : cartes de processus qui débordent
+
+- **`bpmn.component.ts`** (liste des processus, module Vision) :
+  `.list` utilisait `display: grid` sans `grid-template-columns` — la
+  colonne implicite se dimensionnait alors sur le contenu le plus large
+  plutôt que sur la largeur de la carte. Une description de processus
+  un peu longue (`white-space: nowrap` pour l'ellipse) suffisait à
+  forcer une ligne à ~1495px de large *à l'intérieur* d'une carte de
+  481px, faisant sortir le bouton « Supprimer » très à droite, hors de
+  sa carte. Repéré visuellement par l'utilisateur, confirmé en mesurant
+  les rects DOM réels dans le navigateur. Corrigé par
+  `grid-template-columns: minmax(0, 1fr)` sur `.list` + `min-width: 0`
+  sur `.list-item` — classique "flexbox/grid overflow" quand un
+  descendant en `nowrap` n'a pas de contrainte de largeur explicite en
+  amont.
+- **Bug latent découvert en même temps** : les `<select>` natifs liés
+  via `[value]="expr"` sur l'élément `<select>` lui-même (plutôt que
+  `[selected]` sur chaque `<option>` généré par `*ngFor`) affichaient
+  systématiquement la première option au lieu de la valeur réellement
+  liée — un travers connu d'Angular quand le binding de valeur du
+  `<select>` s'applique avant que ses `<option>` enfants existent dans
+  le DOM. Corrigé dans `bpmn.component.ts` (2 select) et
+  `bpmn-canevas.component.ts` (6 select, ajoutés dans la session
+  précédente). Le même motif existe encore dans 8 autres fichiers
+  (`architecture-metier`, `gouvernance`, `technologie`, `donnees`,
+  `canevas`, `urbanisation`, `roadmap`, `register`) — non corrigés ici
+  (hors périmètre de cette session), signalé comme tâche de fond.
+
+### Fonctionnalité ajoutée : consultation/édition des processus
+
+- Bouton « Modifier » (icône crayon) sur chaque carte de processus et
+  dans le panneau de détail, ouvrant une bulle pré-remplie
+  (nom/description/catégorie) qui appelle `bpmnService.update()`
+  (l'endpoint existait déjà côté API, seule l'IHM manquait). Le panneau
+  de détail affiche désormais aussi la catégorie et la description
+  complètes, pas seulement le nom.
+
+### Identité visuelle globale
+
+- Police changée pour **Times New Roman** (`body { font-family }`) sur
+  toute l'application, import Google Fonts « Manrope » retiré de
+  `index.html` (plus utilisé).
+- Taille de base réduite via `html { font-size }` (16px navigateur →
+  valeur réduite) : comme la quasi-totalité des paddings/gaps/tailles
+  de police des composants sont exprimés en `rem`, ce seul levier
+  rétrécit l'ensemble des composants de façon homogène sans retoucher
+  chaque fichier — au prix de ne pas réduire les rares tailles fixées
+  en `px` (rayons de bordure, largeurs de panneaux type `.palette`).
+
+### Refonte de la notation des diagrammes ArchiMate
+
+- `archimate-view.service.ts` (génération SVG serveur du diagramme
+  Motivation + Métier) revu pour se rapprocher de la notation Archi
+  officielle illustrée par `archimate-template.png` :
+  pictogramme distinctif **en haut à droite** de chaque boîte (position
+  standard, le générateur le plaçait auparavant en haut à gauche) pour
+  les 9 types (acteur = silhouette, rôle = pilule sur tige, processus =
+  chevron, service = flèche arrondie, objet métier = icône « classe »
+  à bandeau, exigence = flèche en pointillés dans le coin coupé, but =
+  cible, principe = fanion, vision = œil) ; étiquette de type textuelle
+  supprimée au profit du seul nom de l'élément, réparti sur 2 lignes
+  maximum (repris du motif `wrap()` déjà utilisé pour BPMN) pour
+  matcher le rendu du gabarit de référence ; couleurs de couche
+  affinées (violet motivation, jaune métier) pour rester lisibles sans
+  glisser vers un lavande presque blanc ; relation d'assignation
+  complétée d'un petit disque plein à la source (notation officielle),
+  en plus de la flèche déjà correcte à la cible.
+- Portée volontairement limitée aux 9 types Motivation/Métier déjà
+  modélisés (`TypeElement` du schéma) — les couches Application et
+  Technologie ont leurs propres générateurs dédiés
+  (`applications-canevas`, `technologie` : diagrammes de composants et
+  de déploiement), non touchés ici.
+- Vérifié : `archimate-view.service.spec.ts` (5 tests, dont 2 mis à
+  jour pour le nouveau wrap sur 2 lignes) + suite complète (278/278) ;
+  diagramme régénéré et inspecté dans le navigateur (couleurs, formes,
+  pictogrammes, retour à la ligne des noms longs) sur les données
+  existantes de l'organisation de démonstration.

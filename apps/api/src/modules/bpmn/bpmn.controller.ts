@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import { BpmnService } from './bpmn.service';
+import { BpmnViewService } from './bpmn-view.service';
 import { CreateBpmnProcessusDto } from './dto/create-bpmn-processus.dto';
 import { UpdateBpmnProcessusDto } from './dto/update-bpmn-processus.dto';
 import { CreateBpmnElementDto } from './dto/create-bpmn-element.dto';
@@ -10,7 +11,10 @@ import { CreateBpmnFlowDto } from './dto/create-bpmn-flow.dto';
 
 @Controller('bpmn-processus')
 export class BpmnController {
-  constructor(private readonly bpmnService: BpmnService) {}
+  constructor(
+    private readonly bpmnService: BpmnService,
+    private readonly viewService: BpmnViewService,
+  ) {}
 
   @Get()
   findAll(@CurrentUser() user: AuthUser) {
@@ -20,6 +24,11 @@ export class BpmnController {
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.bpmnService.findOne(id, requireOrganisationId(user));
+  }
+
+  @Get(':id/generate-vue')
+  generateVue(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.viewService.generate(id, requireOrganisationId(user));
   }
 
   @Post()

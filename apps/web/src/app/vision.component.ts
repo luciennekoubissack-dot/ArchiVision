@@ -9,7 +9,7 @@ import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
 import { exportToExcel, importFromExcel } from './excel.util';
 
-type Tab = 'processus' | 'exigences' | 'diagramme' | 'fnf';
+type Tab = 'processus' | 'exigences' | 'diagramme';
 
 interface VisionBlock {
   field: VisionCanvasField;
@@ -109,7 +109,6 @@ const ICONS: Record<string, string> = {
       <button class="tab" [class.active]="tab === 'processus'" (click)="tab = 'processus'">Processus</button>
       <button class="tab" [class.active]="tab === 'exigences'" (click)="tab = 'exigences'">Exigence</button>
       <button class="tab" [class.active]="tab === 'diagramme'" (click)="selectCanvas()">Diagramme de vision</button>
-      <button class="tab" [class.active]="tab === 'fnf'" (click)="tab = 'fnf'">Exigences fonctionnelles / non-fonctionnelles</button>
     </div>
 
     <!-- ── Processus ─────────────────────────────────────────────────────── -->
@@ -210,43 +209,6 @@ const ICONS: Record<string, string> = {
         </div>
       </div>
     </section>
-
-    <!-- ── Exigences fonctionnelles / non-fonctionnelles ─────────────────── -->
-    <section *ngIf="tab === 'fnf'">
-      <div class="fnf-grid">
-        <section class="card">
-          <div class="page-header">
-            <h3>Fonctionnelles ({{ fonctionnelles.length }})</h3>
-            <button type="button" class="icon-btn" title="Exporter (Excel)" *ngIf="fonctionnelles.length > 0" (click)="exportGroupe('FONCTIONNELLE')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-            </button>
-          </div>
-          <div class="empty-state" *ngIf="fonctionnelles.length === 0">Aucune exigence fonctionnelle classée.</div>
-          <ul class="list" *ngIf="fonctionnelles.length > 0">
-            <li class="list-item" *ngFor="let e of fonctionnelles">
-              <div><strong>{{ e.nom }}</strong><p class="muted" *ngIf="e.description">{{ e.description }}</p></div>
-            </li>
-          </ul>
-        </section>
-        <section class="card">
-          <div class="page-header">
-            <h3>Non fonctionnelles ({{ nonFonctionnelles.length }})</h3>
-            <button type="button" class="icon-btn" title="Exporter (Excel)" *ngIf="nonFonctionnelles.length > 0" (click)="exportGroupe('NON_FONCTIONNELLE')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-            </button>
-          </div>
-          <div class="empty-state" *ngIf="nonFonctionnelles.length === 0">Aucune exigence non fonctionnelle classée.</div>
-          <ul class="list" *ngIf="nonFonctionnelles.length > 0">
-            <li class="list-item" *ngFor="let e of nonFonctionnelles">
-              <div><strong>{{ e.nom }}</strong><p class="muted" *ngIf="e.description">{{ e.description }}</p></div>
-            </li>
-          </ul>
-        </section>
-      </div>
-      <p class="hint" *ngIf="nonClassees.length > 0">
-        {{ nonClassees.length }} exigence(s) non classée(s) — assignez une catégorie depuis l'onglet « Exigence ».
-      </p>
-    </section>
   `,
   styles: [
     `
@@ -256,7 +218,6 @@ const ICONS: Record<string, string> = {
       .table { width: 100%; min-width: 640px; border-collapse: collapse; }
       .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
       .row-actions { display: flex; gap: 0.4rem; white-space: nowrap; }
-      .fnf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 
       .vc-header {
         background: #4b4b4b;
@@ -309,13 +270,6 @@ const ICONS: Record<string, string> = {
         .vc-grid { grid-template-columns: 1fr; }
         .vc-header { flex-direction: column; gap: 0.4rem; }
       }
-      .list { list-style: none; display: grid; gap: 0.5rem; }
-      .list-item { padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 10px; }
-      .muted { color: var(--color-text-muted); font-size: 0.88rem; margin-top: 0.2rem; }
-      .hint { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 1rem; }
-      @media (max-width: 760px) {
-        .fnf-grid { grid-template-columns: 1fr; }
-      }
     `,
   ],
 })
@@ -356,16 +310,6 @@ export class VisionComponent implements OnInit {
 
   categorieLabel(c: CategorieExigence): string {
     return CATEGORIE_LABEL[c];
-  }
-
-  get fonctionnelles(): ElementArchimate[] {
-    return this.exigences.filter((e) => e.categorieExigence === 'FONCTIONNELLE');
-  }
-  get nonFonctionnelles(): ElementArchimate[] {
-    return this.exigences.filter((e) => e.categorieExigence === 'NON_FONCTIONNELLE');
-  }
-  get nonClassees(): ElementArchimate[] {
-    return this.exigences.filter((e) => !e.categorieExigence);
   }
 
   // ── Exigences clés ──────────────────────────────────────────────────────

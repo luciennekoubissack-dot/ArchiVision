@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
-import { StatutElement, TypeBpmn } from '@prisma/client';
+import { DeclencheurEvenement, StatutElement, TypeBpmn, TypeTache } from '@prisma/client';
 
 export class UpdateBpmnElementDto {
   @IsString()
@@ -11,6 +11,14 @@ export class UpdateBpmnElementDto {
   @IsEnum(TypeBpmn)
   @IsOptional()
   type?: TypeBpmn;
+
+  @IsEnum(DeclencheurEvenement)
+  @IsOptional()
+  declencheur?: DeclencheurEvenement;
+
+  @IsEnum(TypeTache)
+  @IsOptional()
+  typeTache?: TypeTache;
 
   @IsEnum(StatutElement)
   @IsOptional()

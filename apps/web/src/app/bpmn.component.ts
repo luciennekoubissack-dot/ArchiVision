@@ -26,6 +26,7 @@ const ICONS: Record<string, string> = {
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   trash:
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
 };
 
 @Component({
@@ -66,9 +67,14 @@ const ICONS: Record<string, string> = {
                   <p class="muted" *ngIf="p.description">{{ p.description }}</p>
                   <span class="badge badge-neutral">{{ p._count?.elements || 0 }} élément(s)</span>
                 </div>
-                <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeProcessus(p, $event)">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
-                </button>
+                <div class="list-item-actions">
+                  <button type="button" class="icon-btn" title="Modifier" (click)="openEdit(p, $event)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeProcessus(p, $event)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </div>
               </li>
             </ul>
           </section>
@@ -76,7 +82,17 @@ const ICONS: Record<string, string> = {
       </div>
 
       <section class="card processus-detail" *ngIf="selected">
-        <h3>{{ selected.nom }}</h3>
+        <div class="processus-detail-head">
+          <div>
+            <span class="badge badge-neutral">{{ typeProcessusLabel(selected.type) }}</span>
+            <h3>{{ selected.nom }}</h3>
+            <p class="muted" *ngIf="selected.description">{{ selected.description }}</p>
+          </div>
+          <button type="button" class="btn btn-ghost" (click)="openEdit(selected, $event)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
+            Modifier
+          </button>
+        </div>
         <app-bpmn-canevas [processusId]="selected.id" (changed)="loadProcessus()" />
       </section>
     </div>
@@ -94,13 +110,37 @@ const ICONS: Record<string, string> = {
         <label class="field">Description<input type="text" [value]="newProcessus.description || ''" (input)="newProcessus.description = $any($event.target).value" /></label>
         <label class="field">
           Catégorie
-          <select [value]="newProcessus.type" (change)="newProcessus.type = $any($event.target).value">
-            <option *ngFor="let t of typesProcessus" [value]="t">{{ typeProcessusLabel(t) }}</option>
+          <select (change)="newProcessus.type = $any($event.target).value">
+            <option *ngFor="let t of typesProcessus" [value]="t" [selected]="t === newProcessus.type">{{ typeProcessusLabel(t) }}</option>
           </select>
         </label>
         <div class="popover-actions">
           <button type="button" class="btn btn-ghost" (click)="closeCreate()">Annuler</button>
           <button type="submit" class="btn btn-primary" [disabled]="creatingProcessus">{{ creatingProcessus ? 'Création…' : 'Créer' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Popover : modifier un processus ───────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="editPopover as e" (click)="closeEdit()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="saveEdit($event)">
+        <div class="popover-head">
+          <h3>Modifier le processus</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeEdit()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <label class="field">Nom<input type="text" [value]="e.nom" (input)="e.nom = $any($event.target).value" required /></label>
+        <label class="field">Description<input type="text" [value]="e.description || ''" (input)="e.description = $any($event.target).value" /></label>
+        <label class="field">
+          Catégorie
+          <select (change)="e.type = $any($event.target).value">
+            <option *ngFor="let t of typesProcessus" [value]="t" [selected]="t === e.type">{{ typeProcessusLabel(t) }}</option>
+          </select>
+        </label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeEdit()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingEdit">{{ savingEdit ? 'Enregistrement…' : 'Enregistrer' }}</button>
         </div>
       </form>
     </div>
@@ -113,13 +153,18 @@ const ICONS: Record<string, string> = {
       .processus-groupe .hint { margin-top: 0; font-size: 0.85rem; }
       .layout { display: flex; flex-direction: column; gap: 1.25rem; }
       .processus-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; align-items: start; }
-      .list { list-style: none; display: grid; gap: 0.6rem; margin-top: 1rem; }
-      .list-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.85rem; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; }
+      .processus-groupe { min-width: 0; }
+      .list { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.6rem; margin-top: 1rem; }
+      .list-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.85rem; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; min-width: 0; }
+      .list-item-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
       .processus-info { flex: 1; min-width: 0; }
       .processus-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .processus-info p.muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .processus-list .list-item.selected { border-color: var(--color-primary); background: var(--color-primary-light); }
       .processus-detail .list-item { cursor: default; }
+      .processus-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+      .processus-detail-head h3 { margin: 0.3rem 0 0.2rem; }
+      .processus-detail-head .btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.4rem; }
       .muted { color: var(--color-text-muted); margin-top: 0.25rem; font-size: 0.88rem; }
 
       @media (max-width: 900px) {
@@ -136,6 +181,9 @@ export class BpmnComponent implements OnInit {
   newProcessus: { nom: string; description?: string; type: TypeProcessus } = { nom: '', type: 'METIER' };
   creatingProcessus = false;
   createPopover = false;
+
+  editPopover: { id: string; nom: string; description?: string; type: TypeProcessus } | null = null;
+  savingEdit = false;
 
   constructor(
     private bpmnService: BpmnService,
@@ -213,5 +261,34 @@ export class BpmnComponent implements OnInit {
 
   select(p: BpmnProcessus): void {
     this.selected = p;
+  }
+
+  openEdit(p: BpmnProcessus, event: Event): void {
+    event.stopPropagation();
+    this.editPopover = { id: p.id, nom: p.nom, description: p.description ?? '', type: p.type };
+  }
+
+  closeEdit(): void {
+    this.editPopover = null;
+  }
+
+  saveEdit(event: Event): void {
+    event.preventDefault();
+    const e = this.editPopover;
+    if (!e || !e.nom.trim()) return;
+    this.savingEdit = true;
+    this.bpmnService.update(e.id, { nom: e.nom.trim(), description: e.description, type: e.type }).subscribe({
+      next: (updated) => {
+        this.savingEdit = false;
+        this.editPopover = null;
+        if (this.selected?.id === updated.id) this.selected = updated;
+        this.loadProcessus();
+        this.toast.success('Processus modifié.');
+      },
+      error: () => {
+        this.savingEdit = false;
+        this.toast.error('Impossible de modifier ce processus.');
+      },
+    });
   }
 }

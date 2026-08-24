@@ -13,7 +13,7 @@ import {
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
 import { downloadPng, downloadSvg } from './download.util';
-import { BpmnComponent } from './bpmn.component';
+import { BpmnVuesComponent } from './bpmn-vues.component';
 
 type MainTab = 'bpmn' | 'archimate';
 type Tab = 'capacites' | 'elements' | 'relations' | 'diagramme';
@@ -54,7 +54,7 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-architecture-metier',
   standalone: true,
-  imports: [CommonModule, BpmnComponent],
+  imports: [CommonModule, BpmnVuesComponent],
   template: `
     <p class="muted step-question">Comment l'entreprise crée-t-elle de la valeur ? Quels sont ses processus, acteurs, rôles, services et capacités métier ?</p>
 
@@ -64,7 +64,7 @@ const ICONS: Record<string, string> = {
     </div>
 
     <!-- ── Diagrammes BPMN ───────────────────────────────────────────────── -->
-    <app-bpmn *ngIf="mainTab === 'bpmn'" />
+    <app-bpmn-vues *ngIf="mainTab === 'bpmn'" />
 
     <!-- ── Diagramme ArchiMate (sous-onglets) ─────────────────────────────── -->
     <div class="tabs sub-tabs" *ngIf="mainTab === 'archimate'">

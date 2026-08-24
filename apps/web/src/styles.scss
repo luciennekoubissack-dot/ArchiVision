@@ -42,9 +42,17 @@
   padding: 0;
 }
 
+html {
+  /* Base réduite : tous les paddings/gaps/tailles de police exprimés en rem
+     dans les composants s'échelonnent sur cette valeur (au lieu des 16px
+     par défaut du navigateur), ce qui rétrécit l'ensemble des composants
+     de façon homogène sans devoir retoucher chaque fichier. */
+  font-size: 15px;
+}
+
 body {
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14.5px;
+  font-family: 'Times New Roman', Times, Georgia, serif;
+  font-size: 0.9rem;
   line-height: 1.5;
   color: var(--color-text);
   background-color: var(--color-surface);

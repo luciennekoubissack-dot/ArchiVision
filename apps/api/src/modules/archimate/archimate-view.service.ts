@@ -22,18 +22,6 @@ export const ROW_ORDER: TypeElement[] = [
   TypeElement.OBJET_METIER,
 ];
 
-const TYPE_LABEL: Record<TypeElement, string> = {
-  VISION: 'Vision',
-  OBJECTIF_ARCHIMATE: "Objectif d'architecture",
-  PRINCIPE: 'Principe',
-  EXIGENCE: 'Exigence',
-  ACTEUR_METIER: 'Acteur métier',
-  ROLE_METIER: 'Rôle métier',
-  PROCESSUS_METIER: 'Processus métier',
-  SERVICE_METIER: 'Service métier',
-  OBJET_METIER: 'Objet métier',
-};
-
 const MOTIVATION_TYPES = new Set<TypeElement>([
   TypeElement.VISION,
   TypeElement.OBJECTIF_ARCHIMATE,
@@ -41,18 +29,11 @@ const MOTIVATION_TYPES = new Set<TypeElement>([
   TypeElement.EXIGENCE,
 ]);
 
-/** Jaune ArchiMate pour la couche Métier, lavande pour la couche Motivation. */
+/** Violet ArchiMate pour la couche Motivation, jaune pour la couche Métier — mêmes teintes que la notation officielle (cf. archimate-template.png). */
 const TYPE_COLOR = (type: TypeElement): { fill: string; stroke: string; text: string } =>
   MOTIVATION_TYPES.has(type)
-    ? { fill: '#E6E6FA', stroke: '#7A6FBE', text: '#4A4177' }
-    : { fill: '#FFFFB3', stroke: '#C6A700', text: '#7A6400' };
-
-const RELATION_LABEL: Record<TypeRelation, string> = {
-  ASSIGNATION: 'assignation',
-  COMPOSITION: 'composition',
-  REALISATION: 'réalisation',
-  ASSOCIATION: 'association',
-};
+    ? { fill: '#D6CCF5', stroke: '#6C5CE7', text: '#3D2E7C' }
+    : { fill: '#FFF3A3', stroke: '#D4A017', text: '#5C4A00' };
 
 interface Position {
   x: number;
@@ -114,9 +95,19 @@ export class ArchimateViewService {
       .map((element) => this.renderBox(element, positions.get(element.id)!))
       .join('\n');
 
-    const relationsSvg = relations
-      .filter((r) => positions.has(r.source.id) && positions.has(r.target.id))
-      .map((relation) => this.renderRelation(relation, positions))
+    const visibleRelations = relations.filter((r) => positions.has(r.source.id) && positions.has(r.target.id));
+    // Compte le rang de chaque relation parmi celles qui partagent la même paire
+    // source→cible, pour les répartir en éventail plutôt que de les superposer
+    // exactement (deux éléments peuvent légitimement avoir plusieurs relations,
+    // ex. une association ET une réalisation).
+    const pairSeen = new Map<string, number>();
+    const relationsSvg = visibleRelations
+      .map((relation) => {
+        const key = `${relation.source.id}→${relation.target.id}`;
+        const rank = pairSeen.get(key) ?? 0;
+        pairSeen.set(key, rank + 1);
+        return this.renderRelation(relation, positions, rank);
+      })
       .join('\n');
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="Arial, sans-serif">
@@ -128,17 +119,21 @@ ${boxesSvg}
     return { svg, elementCount: elements.length, relationCount: relations.length };
   }
 
+  /**
+   * Boîte façon notation ArchiMate officielle : forme + pictogramme distinctif
+   * en haut à droite (convention Archi) + nom seul, centré et réparti sur
+   * jusqu'à 2 lignes — sans étiquette de type séparée, pour rester fidèle au
+   * gabarit de référence (archimate-template.png).
+   */
   private renderBox(element: ElementLike, pos: Position): string {
-    const { x, y } = pos;
+    const { x, y, cx, cy } = pos;
     const color = TYPE_COLOR(element.type);
     const shape = this.renderShape(element.type, x, y, color);
-    const pictogram = this.renderPictogram(element.type, x, y, color.stroke);
-    const labelX = pictogram ? x + 22 : x + 8;
+    const pictogram = this.renderPictogram(element.type, x, y, color.text);
     return `<g>
   ${shape}
   ${pictogram}
-  <text x="${labelX}" y="${y + 16}" font-size="9" fill="${color.text}">${this.escape(TYPE_LABEL[element.type])}</text>
-  <text x="${x + BOX_WIDTH / 2}" y="${y + BOX_HEIGHT / 2 + 12}" font-size="12" text-anchor="middle" fill="#1a1a1a">${this.escape(this.truncate(element.nom, 28))}</text>
+  <text x="${cx}" y="${cy + 4}" font-size="11" text-anchor="middle" fill="#1a1a1a">${this.wrap(element.nom, 22, cx)}</text>
 </g>`;
   }
 
@@ -148,47 +143,88 @@ ${boxesSvg}
       return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="${BOX_HEIGHT / 2}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
     }
     if (type === TypeElement.EXIGENCE) {
-      const cut = 10;
+      const cut = 16;
       const w = BOX_WIDTH;
       const h = BOX_HEIGHT;
       return `<path d="M${x},${y} L${x + w - cut},${y} L${x + w},${y + cut} L${x + w},${y + h} L${x},${y + h} Z" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" stroke-linejoin="round" />`;
     }
+    if (type === TypeElement.OBJET_METIER) {
+      return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="2" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
+    }
     return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="4" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
   }
 
-  /** Petit pictogramme distinctif en haut à gauche de la boîte, façon notation ArchiMate officielle. */
-  private renderPictogram(type: TypeElement, x: number, y: number, stroke: string): string {
-    const cx = x + 12;
-    const cy = y + 10;
+  /**
+   * Petit pictogramme distinctif en haut à droite de la boîte — position
+   * standard de la notation ArchiMate officielle (Archi, archimate-template.png).
+   * Sans classificateur reconnu, aucun glyphe n'est dessiné (forme + couleur
+   * de couche suffisent à identifier l'élément).
+   */
+  private renderPictogram(type: TypeElement, x: number, y: number, c: string): string {
+    const icx = x + BOX_WIDTH - 11;
+    const icy = y + 11;
     switch (type) {
+      case TypeElement.VISION:
+        return `<ellipse cx="${icx}" cy="${icy}" rx="6" ry="3.4" fill="none" stroke="${c}" stroke-width="1.1" />
+  <circle cx="${icx}" cy="${icy}" r="1.6" fill="${c}" />`;
+      case TypeElement.OBJECTIF_ARCHIMATE:
+        return `<circle cx="${icx}" cy="${icy}" r="5" fill="none" stroke="${c}" stroke-width="1" />
+  <circle cx="${icx}" cy="${icy}" r="2.6" fill="none" stroke="${c}" stroke-width="1" />
+  <circle cx="${icx}" cy="${icy}" r="0.9" fill="${c}" />`;
+      case TypeElement.PRINCIPE:
+        return `<line x1="${icx - 4}" y1="${icy - 5}" x2="${icx - 4}" y2="${icy + 5}" stroke="${c}" stroke-width="1.1" stroke-linecap="round" />
+  <path d="M${icx - 4},${icy - 5} L${icx + 4},${icy - 2.5} L${icx - 4},${icy} Z" fill="${c}" />`;
+      case TypeElement.EXIGENCE: {
+        const fx = x + BOX_WIDTH - 9;
+        const fy = y + 8;
+        return `<path d="M${fx - 6},${fy + 5} L${fx},${fy - 1} M${fx - 3},${fy - 1} L${fx},${fy - 1} L${fx},${fy + 2}" fill="none" stroke="${c}" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />`;
+      }
       case TypeElement.ACTEUR_METIER:
-        return `<circle cx="${cx}" cy="${cy - 2.5}" r="2.3" fill="none" stroke="${stroke}" stroke-width="1.1" />
-  <path d="M${cx - 4},${cy + 5} Q${cx},${cy - 0.5} ${cx + 4},${cy + 5}" fill="none" stroke="${stroke}" stroke-width="1.1" stroke-linecap="round" />`;
+        return `<circle cx="${icx}" cy="${icy - 4}" r="1.8" fill="none" stroke="${c}" stroke-width="1.1" />
+  <line x1="${icx}" y1="${icy - 2}" x2="${icx}" y2="${icy + 3}" stroke="${c}" stroke-width="1.1" stroke-linecap="round" />
+  <line x1="${icx - 3}" y1="${icy}" x2="${icx + 3}" y2="${icy}" stroke="${c}" stroke-width="1.1" stroke-linecap="round" />
+  <line x1="${icx}" y1="${icy + 3}" x2="${icx - 2.5}" y2="${icy + 6}" stroke="${c}" stroke-width="1.1" stroke-linecap="round" />
+  <line x1="${icx}" y1="${icy + 3}" x2="${icx + 2.5}" y2="${icy + 6}" stroke="${c}" stroke-width="1.1" stroke-linecap="round" />`;
       case TypeElement.ROLE_METIER:
-        return `<circle cx="${cx}" cy="${cy}" r="4" fill="none" stroke="${stroke}" stroke-width="1.1" />
-  <circle cx="${cx}" cy="${cy}" r="1.3" fill="${stroke}" />`;
+        return `<circle cx="${icx}" cy="${icy - 3}" r="3" fill="none" stroke="${c}" stroke-width="1.1" />
+  <line x1="${icx}" y1="${icy}" x2="${icx}" y2="${icy + 6}" stroke="${c}" stroke-width="1.1" stroke-linecap="round" />`;
       case TypeElement.PROCESSUS_METIER:
-        return `<path d="M${cx - 3},${cy - 4} L${cx + 3},${cy} L${cx - 3},${cy + 4}" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />`;
+        return `<path d="M${icx - 3},${icy - 4} L${icx + 3},${icy} L${icx - 3},${icy + 4}" fill="none" stroke="${c}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />`;
+      case TypeElement.SERVICE_METIER:
+        return `<path d="M${icx - 4},${icy} A4,4 0 1 1 ${icx},${icy + 4}" fill="none" stroke="${c}" stroke-width="1.1" />
+  <path d="M${icx - 1.5},${icy + 4.8} L${icx},${icy + 4} L${icx + 0.3},${icy + 1.8}" fill="none" stroke="${c}" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" />`;
+      case TypeElement.OBJET_METIER:
+        return `<rect x="${icx - 5}" y="${icy - 5}" width="10" height="10" fill="none" stroke="${c}" stroke-width="1" />
+  <line x1="${icx - 5}" y1="${icy - 2}" x2="${icx + 5}" y2="${icy - 2}" stroke="${c}" stroke-width="1" />`;
       default:
         return '';
     }
   }
 
-  private renderRelation(relation: RelationLike, positions: Map<string, Position>): string {
+  /**
+   * Trait de relation — pas d'étiquette de type flottante : la notation
+   * ArchiMate officielle distingue chaque relation uniquement par le style
+   * du trait et la pointe (cf. archimate-template.png), pas par du texte.
+   * `rank` : quand plusieurs relations relient la même paire source→cible
+   * (légitime, ex. une association ET une réalisation), les suivantes sont
+   * dessinées en arc plutôt que superposées exactement sur la première.
+   */
+  private renderRelation(relation: RelationLike, positions: Map<string, Position>, rank: number): string {
     const from = positions.get(relation.source.id)!;
     const to = positions.get(relation.target.id)!;
 
     const start = this.rectBorderPoint(from, to);
     const end = this.rectBorderPoint(to, from);
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
 
     let strokeDash = '';
     let markerStart = '';
     let markerEnd = '';
+    let startDot = '';
     switch (relation.type) {
       case TypeRelation.ASSIGNATION:
+        // Assignation ArchiMate : petit disque plein à la source, flèche pleine à la cible.
         markerEnd = 'marker-end="url(#arrow)"';
+        startDot = `<circle cx="${start.x}" cy="${start.y}" r="3" fill="#555" />`;
         break;
       case TypeRelation.COMPOSITION:
         markerStart = 'marker-start="url(#diamond)"';
@@ -201,10 +237,32 @@ ${boxesSvg}
         break;
     }
 
+    const path = this.relationPath(start, end, rank);
+
     return `<g>
-  <line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="#555" stroke-width="1.5" ${strokeDash} ${markerStart} ${markerEnd} />
-  <text x="${midX}" y="${midY - 4}" font-size="9" text-anchor="middle" fill="#555">${this.escape(RELATION_LABEL[relation.type])}</text>
+  <path d="${path}" fill="none" stroke="#555" stroke-width="1.5" ${strokeDash} ${markerStart} ${markerEnd} />
+  ${startDot}
 </g>`;
+  }
+
+  /** Segment droit pour la 1ère relation d'une paire, arc de cercle décalé pour les suivantes. */
+  private relationPath(start: { x: number; y: number }, end: { x: number; y: number }, rank: number): string {
+    if (rank === 0) {
+      return `M${start.x},${start.y} L${end.x},${end.y}`;
+    }
+    const midX = (start.x + end.x) / 2;
+    const midY = (start.y + end.y) / 2;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Normale unitaire, alternée de part et d'autre du trait à chaque rang.
+    const side = rank % 2 === 1 ? 1 : -1;
+    const offset = side * (14 * Math.ceil(rank / 2));
+    const nx = (-dy / len) * offset;
+    const ny = (dx / len) * offset;
+    const cx = midX + nx;
+    const cy = midY + ny;
+    return `M${start.x},${start.y} Q${cx},${cy} ${end.x},${end.y}`;
   }
 
   /** Point sur le bord du rectangle centré en `from`, en direction de `to`. */
@@ -242,8 +300,25 @@ ${boxesSvg}
 </svg>`;
   }
 
-  private truncate(value: string, max: number): string {
-    return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+  /** Découpe le nom en lignes tspan (max 2) pour tenir dans la boîte, centré verticalement autour de `cy`. */
+  private wrap(value: string, maxCharsPerLine: number, x: number): string {
+    const words = value.split(' ');
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (candidate.length > maxCharsPerLine && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current) lines.push(current);
+    const limited = lines.slice(0, 2);
+    return limited
+      .map((line, i) => `<tspan x="${x}" dy="${i === 0 ? -((limited.length - 1) * 7) : 14}">${this.escape(line)}</tspan>`)
+      .join('');
   }
 
   private escape(value: string): string {
