@@ -111,3 +111,102 @@ responsive, accessibilité). À faire lors d'un prochain passage.
 | 🟡 | Réorganiser `apps/web/src/app` en dossiers par feature | à faire |
 | 🟡 | Migrer le token vers cookie `httpOnly` + CSRF | à faire |
 | 🟡 | Pagination des `findMany` | à faire |
+
+---
+
+## 2026-08-21 — Refonte de l'IA produit (10 modules ADM) + module Opportunités & Solutions
+
+Deux chantiers livrés dans la même session : le module "Opportunités &
+Solutions" (phase E de l'ADM, entièrement nouveau — `Solution`,
+`CritereEvaluation`, `EvaluationScore`), puis une restructuration complète
+de la navigation pour refléter le cycle ADM TOGAF A→H : renommage de
+"Stratégie de l'organisation" → "Prelim / Préparation de l'organisation"
+et "Procédure" → "Vision" (avec ajout d'exigences fonctionnelles/non
+fonctionnelles, diagramme de vision filtré, import/export Excel),
+enrichissement d'Architecture Métier (3 onglets : BPMN, ArchiMate,
+structure organisationnelle) et d'Architecture Technologique (nouveau
+canevas Konva de diagramme de déploiement), renommage d'Architecture
+Système et Migration Planning, et création de 3 modules entièrement
+nouveaux : Mise en œuvre, Gouvernance (politiques, matrice de conformité,
+gestion des changements, rapport), Évaluation et amélioration continue
+(import Excel/CSV d'enquêtes, rapport avec graphique Chart.js).
+
+### Points forts constatés
+
+- **Réutilisation disciplinée** : chaque nouvel écran a été construit en
+  copiant un pattern déjà validé dans le repo (CRUD façon
+  `objectifs.component.ts`, matrice façon la propre matrice
+  d'évaluation d'Opportunités, vue SVG façon `vues.component.ts`,
+  canevas Konva façon `applications-canevas.component.ts`) plutôt que
+  d'inventer de nouvelles conventions — la base de code reste homogène
+  malgré l'ampleur du changement.
+- **Tests systématiques maintenus** : les 2 nouveaux modules backend
+  (Gouvernance, Évaluation) ont chacun leur couverture `.spec.ts`
+  complète (service + contrôleur HTTP, y compris les cas 403
+  cross-role) ; suite passée de 231 à 266 tests, aucune régression.
+- **Vérification de bout en bout réelle** : au-delà du build/tests
+  automatisés, chaque flux a été rejoué dans le navigateur (créer une
+  solution → la marquer Retenue → vérifier qu'elle apparaît dans Mise
+  en œuvre ; créer une politique → noter une conformité → vérifier le
+  comptage dans le Rapport ; importer un CSV d'enquête). Cette
+  vérification a payé : voir bugs ci-dessous, invisibles aux tests
+  unitaires seuls.
+
+### 🔴 Bugs réels trouvés et corrigés pendant cette session
+
+1. **`Solution.create()`/`update()` sans `include: { scores: true }`** —
+   [solution.service.ts](../apps/api/src/modules/opportunites/solution.service.ts).
+   Une solution fraîchement créée ou éditée revenait sans son tableau
+   `scores`, faisant planter `noteMoyenne()`/`initMatrixRow()` côté
+   frontend (`Cannot read properties of undefined`). Le popover de
+   création restait bloqué sur "Création…" sans jamais se fermer.
+   Trouvé uniquement en testant la création réelle dans le navigateur —
+   les tests unitaires mockaient la réponse Prisma donc ne l'auraient
+   jamais révélé.
+2. **`excel.util.ts` corrompait les accents à l'import** —
+   `readAsBinaryString` + `XLSX.read(..., {type:'binary'})` mésinterprète
+   l'UTF-8 des CSV, transformant "Répondant"/"Catégorie" en
+   "RÃ©pondant"/"CatÃ©gorie" → aucune ligne ne matchait jamais les
+   en-têtes attendus, échec silencieux de tout import sur une
+   application **entièrement en français**. Corrigé en lisant les CSV
+   via `readAsText` (UTF-8 natif) et les `.xlsx`/`.xls` via
+   `readAsArrayBuffer` + `{type:'array'}`. Ce bug touchait les 3 écrans
+   d'import (Vision, Prelim implicitement via export, Évaluation) — un
+   seul correctif dans l'utilitaire partagé a suffi.
+
+**Enseignement** : les deux bugs étaient invisibles en lecture de code et
+en tests unitaires (mocks Prisma, pas de vrai fichier CSV) — seule
+l'exécution réelle dans le navigateur, avec de vraies données
+accentuées, les a révélés. À reproduire systématiquement pour tout
+futur écran d'import/export.
+
+### 🟡 Simplifications assumées (à surveiller)
+
+- **Architecture Métier** n'a pas de lien 1-à-1 processus↔éléments
+  ArchiMate en base (absent du schéma) — le module montre les 3
+  livrables (BPMN, ArchiMate, organigramme) côte à côte plutôt que
+  filtrés par processus sélectionné. Extension possible mais non faite
+  ici (chantier séparé, nécessiterait une nouvelle relation).
+- **Diagramme de déploiement** ne rend pas les Applications comme
+  boîtes déplaçables indépendantes : `Application.positionX/Y` est déjà
+  utilisé par le diagramme de composants (Architecture Système) — les
+  réutiliser aurait fait interférer les deux diagrammes. Les
+  applications déployées sont listées à l'intérieur de la boîte
+  `TechComponent` (comme les services dans les boîtes du diagramme de
+  composants), seul `TechComponent.positionX/Y` est déplaçable/persisté.
+- **Gouvernance "suivi de conformité"** est scopé aux `Solution`
+  uniquement (pas aux projets/éléments ArchiMate) — décision prise pour
+  rester cohérent avec le flux Opportunités → Mise en œuvre →
+  Gouvernance déjà en place, à réévaluer si le besoin s'étend.
+
+### Plan d'action priorisé (mise à jour au 2026-08-21)
+
+Aucun des points 🔴/🟠/🟡 de l'entrée du 2026-08-18 n'a été traité dans
+cette session (hors périmètre — c'était une session de fonctionnalités,
+pas de durcissement sécurité/perf). Ils restent valables tels quels.
+S'y ajoute, du fait de la croissance rapide du produit :
+
+| Priorité | Action | Statut |
+|---|---|---|
+| 🟡 | Bundle dev passé de ~898 kB à 3.78 MB depuis le premier audit (ajout de 6 modules, 3 canevas Konva, Chart.js déjà compté) — le lazy-loading des routes (déjà recommandé le 2026-08-18) devient plus urgent à mesure que l'app grossit | à faire |
+| 🟡 | Lien processus↔éléments ArchiMate pour un vrai filtrage par processus dans Architecture Métier, si le besoin se confirme | à évaluer |

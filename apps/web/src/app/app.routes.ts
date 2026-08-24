@@ -14,12 +14,15 @@ import { ApplicationsComponent } from './applications.component';
 import { UrbanisationComponent } from './urbanisation.component';
 import { VuesComponent } from './vues.component';
 import { ParametresComponent } from './parametres.component';
-import { BpmnComponent } from './bpmn.component';
+import { VisionComponent } from './vision.component';
 import { EcartsComponent } from './ecarts.component';
 import { DonneesComponent } from './donnees.component';
 import { TechnologieComponent } from './technologie.component';
 import { RoadmapComponent } from './roadmap.component';
 import { OpportunitesComponent } from './opportunites.component';
+import { MiseEnOeuvreComponent } from './mise-en-oeuvre.component';
+import { GouvernanceComponent } from './gouvernance.component';
+import { EvaluationComponent } from './evaluation.component';
 import { WizardComponent } from './wizard.component';
 import { AdminDashboardComponent } from './admin-dashboard.component';
 import { AdminOrganisationsComponent } from './admin-organisations.component';
@@ -49,13 +52,16 @@ export const routes: Routes = [
       { path: 'strategie', redirectTo: 'organisation', pathMatch: 'full' },
       { path: 'architecture-metier', component: ArchitectureMetierComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'canevas', component: CanevasComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
-      { path: 'portefeuille-applicatif', component: ApplicationsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'architecture-systeme', component: ApplicationsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'urbanisation', component: UrbanisationComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'vues', component: VuesComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
-      { path: 'processus', component: BpmnComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'vision', component: VisionComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'donnees', component: DonneesComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'technologique', component: TechnologieComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
-      { path: 'roadmap', component: RoadmapComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'migration-planning', component: RoadmapComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'mise-en-oeuvre', component: MiseEnOeuvreComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'gouvernance', component: GouvernanceComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
+      { path: 'evaluation', component: EvaluationComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'analyse-ecarts', component: EcartsComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'opportunites-solutions', component: OpportunitesComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },
       { path: 'parametres', component: ParametresComponent, canActivate: [RoleGuard], data: { roles: TENANT_ROLES } },

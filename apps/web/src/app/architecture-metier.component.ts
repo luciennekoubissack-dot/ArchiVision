@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
   ArchimateService,
+  ArchimateView,
   CapaciteMetier,
   ElementArchimate,
   RelationArchimate,
@@ -11,8 +12,11 @@ import {
 } from './archimate.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
+import { downloadPng, downloadSvg } from './download.util';
+import { BpmnComponent } from './bpmn.component';
 
-type Tab = 'capacites' | 'elements' | 'relations';
+type MainTab = 'bpmn' | 'archimate';
+type Tab = 'capacites' | 'elements' | 'relations' | 'diagramme';
 
 const TYPE_ELEMENT_LABEL: Record<TypeElement, string> = {
   VISION: 'Vision',
@@ -42,23 +46,60 @@ const ICONS: Record<string, string> = {
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   trash:
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
 };
 
 @Component({
   selector: 'app-architecture-metier',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, BpmnComponent],
   template: `
-    <p class="muted step-question">Comment l'entreprise crée-t-elle de la valeur ? Quels sont ses acteurs, rôles, services et capacités métier ?</p>
+    <p class="muted step-question">Comment l'entreprise crée-t-elle de la valeur ? Quels sont ses processus, acteurs, rôles, services et capacités métier ?</p>
 
     <div class="tabs">
+      <button class="tab" [class.active]="mainTab === 'bpmn'" (click)="mainTab = 'bpmn'">Diagrammes BPMN</button>
+      <button class="tab" [class.active]="mainTab === 'archimate'" (click)="mainTab = 'archimate'">Diagramme ArchiMate</button>
+    </div>
+
+    <!-- ── Diagrammes BPMN ───────────────────────────────────────────────── -->
+    <app-bpmn *ngIf="mainTab === 'bpmn'" />
+
+    <!-- ── Diagramme ArchiMate (sous-onglets) ─────────────────────────────── -->
+    <div class="tabs sub-tabs" *ngIf="mainTab === 'archimate'">
       <button class="tab" [class.active]="tab === 'capacites'" (click)="tab = 'capacites'">Capacités</button>
       <button class="tab" [class.active]="tab === 'elements'" (click)="tab = 'elements'">Éléments</button>
       <button class="tab" [class.active]="tab === 'relations'" (click)="tab = 'relations'">Relations</button>
+      <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme</button>
     </div>
 
+    <!-- ── Diagramme (SVG) ───────────────────────────────────────────────── -->
+    <section class="card" *ngIf="mainTab === 'archimate' && tab === 'diagramme'">
+      <div class="page-header">
+        <p class="summary">{{ diagrammeSummary }}</p>
+        <div class="actions">
+          <button type="button" class="icon-btn" title="Générer" [disabled]="diagrammeLoading" (click)="generateDiagramme()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+          </button>
+          <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="diagrammeSvg" (click)="clearDiagramme()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
+          </button>
+          <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="diagrammeSvg" (click)="exportDiagramme('svg')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          </button>
+          <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="diagrammeSvg" (click)="exportDiagramme('png')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          </button>
+        </div>
+      </div>
+      <div class="empty-state" *ngIf="diagrammeLoading">Génération de la vue…</div>
+      <div class="empty-state" *ngIf="!diagrammeLoading && !diagrammeSvg">Cliquez sur « Générer » pour afficher le diagramme.</div>
+      <div class="svg-container" *ngIf="diagrammeTrustedSvg" [innerHTML]="diagrammeTrustedSvg"></div>
+    </section>
+
     <!-- ── Capacités ─────────────────────────────────────────────────────── -->
-    <section *ngIf="tab === 'capacites'">
+    <section *ngIf="mainTab === 'archimate' && tab === 'capacites'">
       <div class="page-header">
         <h3>Capacités ({{ capacites.length }})</h3>
         <button type="button" class="btn btn-primary" (click)="openCreateCapacite()">
@@ -95,7 +136,7 @@ const ICONS: Record<string, string> = {
     </section>
 
     <!-- ── Éléments ──────────────────────────────────────────────────────── -->
-    <section *ngIf="tab === 'elements'">
+    <section *ngIf="mainTab === 'archimate' && tab === 'elements'">
       <div class="page-header">
         <h3>Éléments ({{ elements.length }})</h3>
         <div class="header-actions">
@@ -139,7 +180,7 @@ const ICONS: Record<string, string> = {
     </section>
 
     <!-- ── Relations ─────────────────────────────────────────────────────── -->
-    <section *ngIf="tab === 'relations'">
+    <section *ngIf="mainTab === 'archimate' && tab === 'relations'">
       <div class="page-header">
         <h3>Relations ({{ relations.length }})</h3>
         <button type="button" class="btn btn-primary" (click)="openCreateRelation()">
@@ -376,13 +417,24 @@ const ICONS: Record<string, string> = {
       .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
       .row-actions { display: flex; gap: 0.4rem; white-space: nowrap; }
       .muted { color: var(--color-text-muted); margin-top: 0.35rem; font-size: 0.9rem; }
+      .sub-tabs { margin: 1rem 0 1.25rem; }
+      .summary { color: var(--color-text-muted); }
+      .actions { display: flex; gap: 0.5rem; }
+      .svg-container { overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; }
+      .svg-container ::ng-deep svg { max-width: 100%; height: auto; }
     `,
   ],
 })
 export class ArchitectureMetierComponent implements OnInit {
+  mainTab: MainTab = 'bpmn';
   tab: Tab = 'capacites';
   typesElement = TYPES_ELEMENT;
   typesRelation = TYPES_RELATION;
+
+  diagrammeSvg = '';
+  diagrammeTrustedSvg: SafeHtml | null = null;
+  diagrammeSummary = '';
+  diagrammeLoading = false;
 
   capacites: CapaciteMetier[] = [];
   newCapacite: { nom: string; description?: string } = { nom: '' };
@@ -687,5 +739,36 @@ export class ArchitectureMetierComponent implements OnInit {
       },
       error: () => this.toast.error('Impossible de supprimer cette relation.'),
     });
+  }
+
+  // ── Diagramme ArchiMate ──────────────────────────────────────────────────
+
+  generateDiagramme(): void {
+    this.diagrammeLoading = true;
+    this.archimateService.generateView().subscribe({
+      next: (view: ArchimateView) => {
+        this.diagrammeSvg = view.svg;
+        this.diagrammeTrustedSvg = this.sanitizer.bypassSecurityTrustHtml(view.svg);
+        this.diagrammeSummary = `${view.elementCount} élément(s) — ${view.relationCount} relation(s)`;
+        this.diagrammeLoading = false;
+      },
+      error: () => {
+        this.diagrammeLoading = false;
+        this.toast.error('Impossible de générer le diagramme ArchiMate.');
+      },
+    });
+  }
+
+  clearDiagramme(): void {
+    this.diagrammeSvg = '';
+    this.diagrammeTrustedSvg = null;
+    this.diagrammeSummary = '';
+  }
+
+  exportDiagramme(format: 'svg' | 'png'): void {
+    if (!this.diagrammeSvg) return;
+    const filename = `diagramme-archimate.${format}`;
+    if (format === 'svg') downloadSvg(this.diagrammeSvg, filename);
+    else downloadPng(this.diagrammeSvg, filename);
   }
 }

@@ -55,6 +55,7 @@ describe('SolutionService', () => {
     expect(result).toEqual(mockSolution);
     expect(prismaMock.solution.create).toHaveBeenCalledWith({
       data: { nom: mockSolution.nom, organisationId: ORG_ID },
+      include: { scores: true },
     });
   });
 

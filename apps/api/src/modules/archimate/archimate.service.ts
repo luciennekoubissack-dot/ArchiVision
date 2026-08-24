@@ -62,6 +62,7 @@ export class ArchimateService {
         nom: dto.nom,
         type: dto.type,
         description: dto.description,
+        categorieExigence: dto.categorieExigence,
         positionX: dto.positionX,
         positionY: dto.positionY,
         ...(dto.capaciteMetierId && { capaciteMetierId: dto.capaciteMetierId }),
@@ -115,6 +116,7 @@ export class ArchimateService {
         ...(dto.nom !== undefined && { nom: dto.nom }),
         ...(dto.type !== undefined && { type: dto.type }),
         ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.categorieExigence !== undefined && { categorieExigence: dto.categorieExigence }),
         ...(dto.positionX !== undefined && { positionX: dto.positionX }),
         ...(dto.positionY !== undefined && { positionY: dto.positionY }),
         // null permet de détacher la capacité, undefined l'ignore

@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export type StatutSolution = 'PROPOSEE' | 'RETENUE' | 'REJETEE';
+export type AvancementSolution = 'NON_DEMARRE' | 'EN_COURS' | 'TERMINE' | 'BLOQUE';
 
 export interface EvaluationScore {
   id: string;
@@ -17,6 +18,8 @@ export interface Solution {
   description?: string | null;
   statut: StatutSolution;
   planMiseOeuvre?: string | null;
+  avancement: AvancementSolution;
+  commentaireSuivi?: string | null;
   scores: EvaluationScore[];
 }
 
@@ -27,7 +30,10 @@ export interface CreateSolutionPayload {
   planMiseOeuvre?: string;
 }
 
-export interface UpdateSolutionPayload extends Partial<CreateSolutionPayload> {}
+export interface UpdateSolutionPayload extends Partial<CreateSolutionPayload> {
+  avancement?: AvancementSolution;
+  commentaireSuivi?: string;
+}
 
 export interface ScoreItem {
   critereId: string;

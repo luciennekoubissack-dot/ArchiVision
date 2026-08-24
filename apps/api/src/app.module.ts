@@ -19,6 +19,9 @@ import { RoadmapModule } from './modules/roadmap/roadmap.module';
 import { PartiesPrenantesModule } from './modules/parties-prenantes/parties-prenantes.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { OpportunitesModule } from './modules/opportunites/opportunites.module';
+import { GouvernanceModule } from './modules/gouvernance/gouvernance.module';
+import { EvaluationModule } from './modules/evaluation/evaluation.module';
+import { VisionCanvasModule } from './modules/vision-canvas/vision-canvas.module';
 
 @Module({
   imports: [
@@ -39,6 +42,9 @@ import { OpportunitesModule } from './modules/opportunites/opportunites.module';
     PartiesPrenantesModule,
     UploadsModule,
     OpportunitesModule,
+    GouvernanceModule,
+    EvaluationModule,
+    VisionCanvasModule,
     HealthModule,
   ],
   providers: [

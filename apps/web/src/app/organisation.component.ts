@@ -9,6 +9,7 @@ import { PartiesPrenantesService, PartiePrenante } from './parties-prenantes.ser
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
 import { downloadPng, downloadSvg } from './download.util';
+import { exportToExcel } from './excel.util';
 import { ObjectifsComponent } from './objectifs.component';
 
 type Tab = 'infos' | 'strategie' | 'membres' | 'services' | 'organigramme';
@@ -39,6 +40,9 @@ const ICONS: Record<string, string> = {
   camera: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/>',
   users:
     '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
 };
 
 @Component({
@@ -53,7 +57,7 @@ const ICONS: Record<string, string> = {
         Membres
       </button>
       <button class="tab" [class.active]="tab === 'services'" (click)="tab = 'services'">Structures</button>
-      <button class="tab" [class.active]="tab === 'organigramme'" (click)="openOrganigramme()">Organigramme</button>
+      <button class="tab" [class.active]="tab === 'organigramme'" (click)="tab = 'organigramme'">Organigramme</button>
     </div>
 
     <!-- ── Objectifs ─────────────────────────────────────────────────────── -->
@@ -110,9 +114,14 @@ const ICONS: Record<string, string> = {
       <div class="popover-card" (click)="$event.stopPropagation()">
         <div class="popover-head">
           <h3>Fiche d'identité</h3>
-          <button type="button" class="icon-btn icon-btn-danger" (click)="closeIdentite()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
-          </button>
+          <div class="popover-head-actions">
+            <button type="button" class="icon-btn" title="Exporter (Excel)" (click)="exportFicheSignaletique(org)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn-danger" (click)="closeIdentite()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+            </button>
+          </div>
         </div>
         <div class="fiche-logo" *ngIf="org.logoUrl"><img [src]="org.logoUrl" alt="" /></div>
         <dl class="fiche-list">
@@ -192,9 +201,14 @@ const ICONS: Record<string, string> = {
       <div class="popover-card" (click)="$event.stopPropagation()">
         <div class="popover-head">
           <h3>Parties prenantes</h3>
-          <button type="button" class="icon-btn icon-btn-danger" (click)="partiesMode = null">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
-          </button>
+          <div class="popover-head-actions">
+            <button type="button" class="icon-btn" title="Exporter (Excel)" *ngIf="partiesPrenantes.length > 0" (click)="exportPartiesPrenantes()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn-danger" (click)="partiesMode = null">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+            </button>
+          </div>
         </div>
         <div class="empty-state" *ngIf="partiesPrenantes.length === 0">Aucune partie prenante renseignée.</div>
         <ul class="list" *ngIf="partiesPrenantes.length > 0">
@@ -454,16 +468,28 @@ const ICONS: Record<string, string> = {
     <section class="card" *ngIf="tab === 'organigramme'">
       <div class="page-header">
         <h3>Organigramme</h3>
-        <div class="actions" *ngIf="organigrammeSvg">
-          <button class="btn btn-outline" (click)="exportOrganigramme('svg')">Exporter SVG</button>
-          <button class="btn btn-outline" (click)="exportOrganigramme('png')">Exporter PNG</button>
+        <div class="actions">
+          <button type="button" class="icon-btn" title="Générer" (click)="openOrganigramme()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+          </button>
+          <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="organigrammeSvg" (click)="clearOrganigramme()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
+          </button>
+          <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="organigrammeSvg" (click)="exportOrganigramme('svg')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          </button>
+          <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="organigrammeSvg" (click)="exportOrganigramme('png')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          </button>
         </div>
       </div>
+      <div class="empty-state" *ngIf="!organigrammeSvg">Cliquez sur « Générer » pour afficher l'organigramme.</div>
       <div class="svg-container" *ngIf="organigrammeTrustedSvg" [innerHTML]="organigrammeTrustedSvg"></div>
     </section>
   `,
   styles: [
     `
+      .popover-head-actions { display: flex; align-items: center; gap: 0.5rem; }
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
       .hint { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 0.75rem; }
       .table-scroll { overflow-x: auto; }
@@ -638,6 +664,20 @@ export class OrganisationComponent implements OnInit {
 
   openIdentiteView(): void {
     this.identiteMode = 'view';
+  }
+
+  exportFicheSignaletique(org: Organisation): void {
+    exportToExcel('fiche-signaletique', 'Organisation', [
+      {
+        Nom: org.nom,
+        Description: org.description ?? '',
+        Secteur: org.secteur ?? '',
+        Taille: org.taille ?? '',
+        Pays: org.pays ?? '',
+        Vision: org.vision ?? '',
+        'Problèmes à résoudre': org.problemesResoudre ?? '',
+      },
+    ]);
   }
 
   openIdentiteEdit(): void {
@@ -887,6 +927,11 @@ export class OrganisationComponent implements OnInit {
     });
   }
 
+  clearOrganigramme(): void {
+    this.organigrammeSvg = '';
+    this.organigrammeTrustedSvg = null;
+  }
+
   exportOrganigramme(format: 'svg' | 'png'): void {
     if (!this.organigrammeSvg) return;
     const filename = `organigramme.${format}`;
@@ -914,6 +959,14 @@ export class OrganisationComponent implements OnInit {
       },
       error: () => this.toast.error("Impossible d'ajouter cette partie prenante."),
     });
+  }
+
+  exportPartiesPrenantes(): void {
+    exportToExcel(
+      'parties-prenantes',
+      'Parties prenantes',
+      this.partiesPrenantes.map((p) => ({ Nom: p.nom, Rôle: p.role ?? '' })),
+    );
   }
 
   removePartiePrenante(p: PartiePrenante): void {

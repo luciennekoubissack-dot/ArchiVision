@@ -5,6 +5,9 @@ import { TechComponent, TechnologieService, TypeTechComponent } from './technolo
 import { Application, UrbanisationService } from './urbanisation.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
+import { TechnologieCanevasComponent } from './technologie-canevas.component';
+
+type Tab = 'composants' | 'diagramme';
 
 const TYPE_LABEL: Record<TypeTechComponent, string> = {
   SERVEUR: 'Serveur',
@@ -23,10 +26,18 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-technologie',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TechnologieCanevasComponent],
   template: `
-    <p class="muted step-question">Sur quelle infrastructure (serveurs, réseaux, cloud, bases de données) tournent les applications ?</p>
+    <p class="muted step-question">Sur quelle infrastructure (serveurs, réseaux, cloud, bases de données) tournent les applications, et pourquoi ces choix ?</p>
 
+    <div class="tabs">
+      <button class="tab" [class.active]="tab === 'composants'" (click)="tab = 'composants'">Composants</button>
+      <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme de déploiement</button>
+    </div>
+
+    <app-technologie-canevas *ngIf="tab === 'diagramme'" />
+
+    <ng-container *ngIf="tab === 'composants'">
     <div class="page-header">
       <h3>Composants ({{ components.length }})</h3>
       <button type="button" class="btn btn-primary" (click)="openCreate()">
@@ -63,6 +74,7 @@ const ICONS: Record<string, string> = {
     </section>
 
     <div class="empty-state" *ngIf="components.length === 0">Aucun composant technique défini.</div>
+    </ng-container>
 
     <!-- ── Popover : ajouter un composant ────────────────────────────────── -->
     <div class="popover-backdrop" *ngIf="createPopover" (click)="closeCreate()">
@@ -82,7 +94,7 @@ const ICONS: Record<string, string> = {
             </select>
           </label>
         </div>
-        <label class="field">Description<textarea [value]="newComponent.description || ''" (input)="newComponent.description = $any($event.target).value"></textarea></label>
+        <label class="field">Justification<textarea placeholder="Pourquoi ce choix technologique ?" [value]="newComponent.description || ''" (input)="newComponent.description = $any($event.target).value"></textarea></label>
         <div class="popover-actions">
           <button type="button" class="btn btn-ghost" (click)="closeCreate()">Annuler</button>
           <button type="submit" class="btn btn-primary" [disabled]="creating">{{ creating ? 'Création…' : 'Créer' }}</button>
@@ -104,6 +116,7 @@ const ICONS: Record<string, string> = {
   ],
 })
 export class TechnologieComponent implements OnInit {
+  tab: Tab = 'composants';
   types = TYPES;
   components: TechComponent[] = [];
   applications: Application[] = [];

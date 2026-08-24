@@ -27,15 +27,18 @@ const TENANT_NAV_GROUPS: NavGroup[] = [
   {
     label: "Architecture d'entreprise",
     items: [
-      { label: "Stratégie de l'organisation", path: '/organisation', icon: 'building' },
-      { label: 'Procédure', path: '/processus', icon: 'flow' },
+      { label: "Prelim / Préparation de l'organisation", path: '/organisation', icon: 'building' },
+      { label: 'Vision', path: '/vision', icon: 'flow' },
       { label: 'Architecture métier', path: '/architecture-metier', icon: 'layers' },
       { label: 'Architecture des données', path: '/donnees', icon: 'database' },
-      { label: 'Architecture applicative', path: '/portefeuille-applicatif', icon: 'grid' },
+      { label: 'Architecture Système', path: '/architecture-systeme', icon: 'grid' },
       { label: 'Architecture technologique', path: '/technologique', icon: 'server' },
       { label: 'Analyse des écarts', path: '/analyse-ecarts', icon: 'compare' },
       { label: 'Opportunités & solutions', path: '/opportunites-solutions', icon: 'target' },
-      { label: 'Feuille de route', path: '/roadmap', icon: 'flag' },
+      { label: 'Migration Planning', path: '/migration-planning', icon: 'flag' },
+      { label: 'Mise en œuvre', path: '/mise-en-oeuvre', icon: 'checklist' },
+      { label: 'Gouvernance', path: '/gouvernance', icon: 'shield' },
+      { label: 'Évaluation et amélioration continue', path: '/evaluation', icon: 'clipboard' },
       { label: 'Urbanisation', path: '/urbanisation', icon: 'map' },
     ],
   },
@@ -82,6 +85,9 @@ const ICON_PATHS: Record<string, string> = {
   users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   canvas: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 9v12"/>',
   compare: '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 15V9a3 3 0 0 1 3-3h6"/><path d="M18 9v6a3 3 0 0 1-3 3H9"/>',
+  checklist: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 12l3 3 7-7"/>',
+  shield: '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="M9 12l2 2 4-4"/>',
+  clipboard: '<rect x="6" y="4" width="12" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6M9 15h6"/>',
 };
 
 const ROLE_LABEL: Record<string, string> = {

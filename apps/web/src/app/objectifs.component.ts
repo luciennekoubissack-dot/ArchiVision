@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { ObjectifService, Objectif } from './objectif.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
+import { exportToExcel } from './excel.util';
 
 interface ObjectifDraft {
   nom: string;
@@ -19,6 +20,7 @@ const ICONS: Record<string, string> = {
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
 };
 
 @Component({
@@ -28,10 +30,15 @@ const ICONS: Record<string, string> = {
   template: `
     <div class="page-header">
       <h3>Objectifs ({{ objectifs.length }})</h3>
-      <button type="button" class="btn btn-primary" *ngIf="canWrite" (click)="openCreate()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
-        Ajouter un objectif
-      </button>
+      <div class="header-actions">
+        <button type="button" class="icon-btn" title="Exporter (Excel)" *ngIf="objectifs.length > 0" (click)="exportObjectifs()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+        </button>
+        <button type="button" class="btn btn-primary" *ngIf="canWrite" (click)="openCreate()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+          Ajouter un objectif
+        </button>
+      </div>
     </div>
     <p class="hint" *ngIf="!canWrite">Lecture seule — seuls les rôles Administrateur et Architecte peuvent modifier les objectifs.</p>
 
@@ -140,6 +147,7 @@ const ICONS: Record<string, string> = {
   styles: [
     `
       .hint { color: var(--color-text-muted); margin: -0.75rem 0 1.5rem; font-size: 0.9rem; }
+      .header-actions { display: flex; align-items: center; gap: 0.5rem; }
       .table-scroll { overflow-x: auto; }
       .table { width: 100%; min-width: 560px; border-collapse: collapse; }
       .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
@@ -208,6 +216,14 @@ export class ObjectifsComponent implements OnInit {
         this.toast.error("Impossible de créer l'objectif.");
       },
     });
+  }
+
+  exportObjectifs(): void {
+    exportToExcel(
+      'objectifs',
+      'Objectifs',
+      this.objectifs.map((o) => ({ Intitulé: o.nom, Description: o.description ?? '', 'Sous-objectif': o.sousObjectif ?? '' })),
+    );
   }
 
   openView(objectif: Objectif): void {

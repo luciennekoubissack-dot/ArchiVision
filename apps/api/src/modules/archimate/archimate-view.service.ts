@@ -90,9 +90,13 @@ export class ArchimateViewService {
       this.archimateService.findAllRelations(organisationId) as unknown as RelationLike[],
     ]);
 
+    return this.render(elements, relations, 'Aucun élément ArchiMate pour cette organisation.');
+  }
+
+  private render(elements: ElementLike[], relations: RelationLike[], emptyMessage: string): ArchimateViewResult {
     if (elements.length === 0) {
       return {
-        svg: this.buildEmptySvg('Aucun élément ArchiMate pour cette organisation.'),
+        svg: this.buildEmptySvg(emptyMessage),
         elementCount: 0,
         relationCount: relations.length,
       };
@@ -127,11 +131,47 @@ ${boxesSvg}
   private renderBox(element: ElementLike, pos: Position): string {
     const { x, y } = pos;
     const color = TYPE_COLOR(element.type);
+    const shape = this.renderShape(element.type, x, y, color);
+    const pictogram = this.renderPictogram(element.type, x, y, color.stroke);
+    const labelX = pictogram ? x + 22 : x + 8;
     return `<g>
-  <rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="4" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />
-  <text x="${x + 8}" y="${y + 16}" font-size="9" fill="${color.text}">${this.escape(TYPE_LABEL[element.type])}</text>
+  ${shape}
+  ${pictogram}
+  <text x="${labelX}" y="${y + 16}" font-size="9" fill="${color.text}">${this.escape(TYPE_LABEL[element.type])}</text>
   <text x="${x + BOX_WIDTH / 2}" y="${y + BOX_HEIGHT / 2 + 12}" font-size="12" text-anchor="middle" fill="#1a1a1a">${this.escape(this.truncate(element.nom, 28))}</text>
 </g>`;
+  }
+
+  /** Forme de la boîte selon le type — pilule pour un service, coin coupé pour une exigence, rectangle sinon. */
+  private renderShape(type: TypeElement, x: number, y: number, color: { fill: string; stroke: string }): string {
+    if (type === TypeElement.SERVICE_METIER) {
+      return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="${BOX_HEIGHT / 2}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
+    }
+    if (type === TypeElement.EXIGENCE) {
+      const cut = 10;
+      const w = BOX_WIDTH;
+      const h = BOX_HEIGHT;
+      return `<path d="M${x},${y} L${x + w - cut},${y} L${x + w},${y + cut} L${x + w},${y + h} L${x},${y + h} Z" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" stroke-linejoin="round" />`;
+    }
+    return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="4" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
+  }
+
+  /** Petit pictogramme distinctif en haut à gauche de la boîte, façon notation ArchiMate officielle. */
+  private renderPictogram(type: TypeElement, x: number, y: number, stroke: string): string {
+    const cx = x + 12;
+    const cy = y + 10;
+    switch (type) {
+      case TypeElement.ACTEUR_METIER:
+        return `<circle cx="${cx}" cy="${cy - 2.5}" r="2.3" fill="none" stroke="${stroke}" stroke-width="1.1" />
+  <path d="M${cx - 4},${cy + 5} Q${cx},${cy - 0.5} ${cx + 4},${cy + 5}" fill="none" stroke="${stroke}" stroke-width="1.1" stroke-linecap="round" />`;
+      case TypeElement.ROLE_METIER:
+        return `<circle cx="${cx}" cy="${cy}" r="4" fill="none" stroke="${stroke}" stroke-width="1.1" />
+  <circle cx="${cx}" cy="${cy}" r="1.3" fill="${stroke}" />`;
+      case TypeElement.PROCESSUS_METIER:
+        return `<path d="M${cx - 3},${cy - 4} L${cx + 3},${cy} L${cx - 3},${cy + 4}" fill="none" stroke="${stroke}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />`;
+      default:
+        return '';
+    }
   }
 
   private renderRelation(relation: RelationLike, positions: Map<string, Position>): string {

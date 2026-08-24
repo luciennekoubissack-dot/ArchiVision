@@ -94,6 +94,31 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/politiques-gouvernance": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/demandes-changement": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/conformites-solutions": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/enquete-reponses": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/vision-canvas": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "changeOrigin": true
+  },
   "/admin": {
     "target": "http://localhost:3000",
     "secure": false,

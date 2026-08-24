@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import { StatutSolution } from '@prisma/client';
+import { AvancementSolution, StatutSolution } from '@prisma/client';
 
 export class UpdateSolutionDto {
   @IsString()
@@ -21,4 +21,13 @@ export class UpdateSolutionDto {
   @IsOptional()
   @MaxLength(4000)
   planMiseOeuvre?: string;
+
+  @IsEnum(AvancementSolution)
+  @IsOptional()
+  avancement?: AvancementSolution;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
+  commentaireSuivi?: string;
 }

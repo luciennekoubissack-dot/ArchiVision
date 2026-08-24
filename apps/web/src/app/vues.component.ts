@@ -22,6 +22,12 @@ function emptyState(): VueState {
   return { svg: '', trustedSvg: null, loading: false, loaded: false, summary: '' };
 }
 
+const ICONS: Record<string, string> = {
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
+};
+
 @Component({
   selector: 'app-vues',
   standalone: true,
@@ -36,12 +42,23 @@ function emptyState(): VueState {
     <section class="card">
       <div class="page-header">
         <p class="summary">{{ current.summary }}</p>
-        <div class="actions" *ngIf="current.svg">
-          <button class="btn btn-outline" (click)="export('svg')">Exporter SVG</button>
-          <button class="btn btn-outline" (click)="export('png')">Exporter PNG</button>
+        <div class="actions">
+          <button type="button" class="icon-btn" title="Générer" [disabled]="current.loading" (click)="generate(tab)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+          </button>
+          <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="current.svg" (click)="clear(tab)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
+          </button>
+          <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="current.svg" (click)="export('svg')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          </button>
+          <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="current.svg" (click)="export('png')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          </button>
         </div>
       </div>
       <div class="empty-state" *ngIf="current.loading">Génération de la vue…</div>
+      <div class="empty-state" *ngIf="!current.loading && !current.svg">Cliquez sur « Générer » pour afficher cette vue.</div>
       <div class="svg-container" *ngIf="current.trustedSvg" [innerHTML]="current.trustedSvg"></div>
     </section>
   `,
@@ -69,21 +86,21 @@ export class VuesComponent {
     private serviceEntrepriseService: ServiceEntrepriseService,
     private toast: ToastService,
     private sanitizer: DomSanitizer,
-  ) {
-    this.select('archimate');
-  }
+  ) {}
 
   get current(): VueState {
     return this.states[this.tab];
   }
 
-  select(tab: VueTab): void {
-    this.tab = tab;
-    if (this.states[tab].loaded) return;
-    this.load(tab);
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
   }
 
-  private load(tab: VueTab): void {
+  select(tab: VueTab): void {
+    this.tab = tab;
+  }
+
+  generate(tab: VueTab): void {
     const state = this.states[tab];
     state.loading = true;
 
@@ -107,6 +124,10 @@ export class VuesComponent {
         this.toast.error('Impossible de générer cette vue.');
       },
     });
+  }
+
+  clear(tab: VueTab): void {
+    this.states[tab] = emptyState();
   }
 
   private summaryFor(tab: VueTab, view: any): string {

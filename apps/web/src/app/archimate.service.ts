@@ -15,6 +15,8 @@ export type TypeElement =
 
 export type TypeRelation = 'ASSIGNATION' | 'COMPOSITION' | 'REALISATION' | 'ASSOCIATION';
 
+export type CategorieExigence = 'FONCTIONNELLE' | 'NON_FONCTIONNELLE';
+
 export interface CapaciteMetier {
   id: string;
   nom: string;
@@ -29,6 +31,7 @@ export interface ElementArchimate {
   nom: string;
   type: TypeElement;
   description?: string | null;
+  categorieExigence?: CategorieExigence | null;
   capaciteMetierId?: string | null;
   capacite?: { id: string; nom: string } | null;
   positionX?: number | null;
@@ -86,6 +89,7 @@ export class ArchimateService {
     type: TypeElement;
     nom: string;
     description?: string;
+    categorieExigence?: CategorieExigence;
     capaciteMetierId?: string;
     positionX?: number;
     positionY?: number;
@@ -99,6 +103,7 @@ export class ArchimateService {
       nom?: string;
       type?: TypeElement;
       description?: string;
+      categorieExigence?: CategorieExigence;
       capaciteMetierId?: string | null;
       positionX?: number;
       positionY?: number;

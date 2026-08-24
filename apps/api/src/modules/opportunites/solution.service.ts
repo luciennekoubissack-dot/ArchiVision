@@ -9,7 +9,7 @@ export class SolutionService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(organisationId: string, dto: CreateSolutionDto) {
-    return this.prisma.solution.create({ data: { ...dto, organisationId } });
+    return this.prisma.solution.create({ data: { ...dto, organisationId }, include: { scores: true } });
   }
 
   findAll(organisationId: string) {
@@ -33,7 +33,7 @@ export class SolutionService {
 
   async update(id: string, organisationId: string, dto: UpdateSolutionDto) {
     await this.assertExists(id, organisationId);
-    return this.prisma.solution.update({ where: { id }, data: dto });
+    return this.prisma.solution.update({ where: { id }, data: dto, include: { scores: true } });
   }
 
   async remove(id: string, organisationId: string) {

@@ -90,6 +90,10 @@ model Organisation {
   canevasRelations   CanevasRelation[]
   solutions          Solution[]
   criteresEvaluation CritereEvaluation[]
+  politiquesGouvernance PolitiqueGouvernance[]
+  demandesChangement    DemandeChangement[]
+  enqueteReponses       EnqueteReponse[]
+  visionCanvas          VisionCanvas?
 }
 
 // ─── Service d'entreprise (département, hiérarchique) ─────────────────────────
@@ -166,6 +170,12 @@ enum TypeElement {
   OBJET_METIER
 }
 
+/// Sous-catégorie d'une exigence (TypeElement.EXIGENCE uniquement) — module Vision.
+enum CategorieExigence {
+  FONCTIONNELLE
+  NON_FONCTIONNELLE
+}
+
 /// 4 valeurs exactement — referentiel.md interdit d'en ajouter en v1.
 enum TypeRelation {
   ASSIGNATION
@@ -181,6 +191,8 @@ model ElementArchimate {
   nom              String
   type             TypeElement
   description      String?
+  /// Uniquement pertinent quand type = EXIGENCE (module Vision).
+  categorieExigence CategorieExigence? @map("categorie_exigence")
   statut           StatutElement   @default(LES_DEUX)
   /// Position/taille manuelles dans le canevas — null tant que l'utilisateur
   /// n'a pas déplacé/redimensionné l'élément (l'auto-layout s'applique alors).
@@ -612,17 +624,28 @@ enum StatutSolution {
   REJETEE
 }
 
+/// Avancement de la mise en œuvre d'une solution retenue (module Mise en œuvre).
+enum AvancementSolution {
+  NON_DEMARRE
+  EN_COURS
+  TERMINE
+  BLOQUE
+}
+
 model Solution {
-  id             String            @id @default(uuid())
-  nom            String
-  description    String?
-  statut         StatutSolution    @default(PROPOSEE)
-  planMiseOeuvre String?           @map("plan_mise_oeuvre") @db.Text
-  organisationId String
-  organisation   Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  scores         EvaluationScore[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id                String              @id @default(uuid())
+  nom               String
+  description       String?
+  statut            StatutSolution      @default(PROPOSEE)
+  planMiseOeuvre    String?             @map("plan_mise_oeuvre") @db.Text
+  avancement        AvancementSolution  @default(NON_DEMARRE)
+  commentaireSuivi  String?             @map("commentaire_suivi") @db.Text
+  organisationId    String
+  organisation      Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  scores            EvaluationScore[]
+  conformites       ConformiteSolution[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@index([organisationId])
 }
@@ -657,4 +680,101 @@ model EvaluationScore {
   updatedAt   DateTime          @updatedAt
 
   @@unique([solutionId, critereId])
+}
+
+// ─── Gouvernance (phase G de l'ADM TOGAF) ─────────────────────────────────────
+
+/// Statut de conformité d'une solution vis-à-vis d'une politique de gouvernance.
+enum StatutConformite {
+  CONFORME
+  NON_CONFORME
+  A_EVALUER
+}
+
+/// Cycle de vie d'une demande de changement architectural.
+enum StatutChangement {
+  PROPOSE
+  APPROUVE
+  REJETE
+  IMPLEMENTE
+}
+
+/// Règle/standard d'architecture que les solutions doivent respecter.
+model PolitiqueGouvernance {
+  id             String               @id @default(uuid())
+  nom            String
+  description    String?
+  organisationId String
+  organisation   Organisation         @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  conformites    ConformiteSolution[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([organisationId])
+}
+
+/// Évaluation de conformité d'une solution vis-à-vis d'une politique — cellule
+/// de la matrice de conformité. Pas d'organisationId propre : appartenance
+/// tenant vérifiée via les FK solutionId/politiqueId (comme EvaluationScore).
+model ConformiteSolution {
+  id          String               @id @default(uuid())
+  solutionId  String
+  solution    Solution             @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  politiqueId String
+  politique   PolitiqueGouvernance @relation(fields: [politiqueId], references: [id], onDelete: Cascade)
+  statut      StatutConformite     @default(A_EVALUER)
+  commentaire String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([solutionId, politiqueId])
+}
+
+/// Demande de changement architectural (gestion des évolutions).
+model DemandeChangement {
+  id             String           @id @default(uuid())
+  titre          String
+  description    String?
+  statut         StatutChangement @default(PROPOSE)
+  organisationId String
+  organisation   Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([organisationId])
+}
+
+// ─── Évaluation et amélioration continue (phase H de l'ADM TOGAF) ─────────────
+
+/// Réponse importée d'une enquête de satisfaction auprès des parties prenantes.
+model EnqueteReponse {
+  id             String       @id @default(uuid())
+  repondant      String
+  score          Int
+  commentaire    String?
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organisationId])
+}
+
+// ─── Vision Canvas (module Vision — étape 1 de l'assistant TOGAF ADM) ─────────
+
+/// Canevas de vision stratégique (façon Business Model Canvas), une ligne par
+/// organisation. Champs volontairement en anglais — termes standards du
+/// canevas (Target Group, Needs, Product...).
+model VisionCanvas {
+  id             String       @id @default(uuid())
+  organisationId String       @unique
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  targetGroup    String?      @db.Text
+  needs          String?      @db.Text
+  product        String?      @db.Text
+  businessGoals  String?      @db.Text
+  competitors    String?      @db.Text
+  revenueStreams String?      @db.Text
+  costFactors    String?      @db.Text
+  channels       String?      @db.Text
+  updatedAt      DateTime     @updatedAt
 }

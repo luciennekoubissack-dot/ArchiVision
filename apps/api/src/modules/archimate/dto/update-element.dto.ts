@@ -1,5 +1,5 @@
 import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
-import { TypeElement } from '@prisma/client';
+import { CategorieExigence, TypeElement } from '@prisma/client';
 
 export class UpdateElementDto {
   @IsEnum(TypeElement)
@@ -15,6 +15,10 @@ export class UpdateElementDto {
   @IsOptional()
   @MaxLength(2000)
   description?: string;
+
+  @IsEnum(CategorieExigence)
+  @IsOptional()
+  categorieExigence?: CategorieExigence;
 
   @IsUUID()
   @IsOptional()

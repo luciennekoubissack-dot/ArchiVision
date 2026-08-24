@@ -402,6 +402,11 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  /**
+   * Notation UML « interface fournie / requise » : un disque plein (lollipop)
+   * du côté source, un arc ouvert (socket) du côté cible — au lieu d'une
+   * flèche pleine — voir apps/web/src/assets/diagramme-de-composant.png.
+   */
   private buildRelation(echange: ApplicationEchange): Konva.Group | null {
     const from = this.positionsById.get(echange.sourceId);
     const to = this.positionsById.get(echange.targetId);
@@ -409,17 +414,42 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
 
     const start = this.borderPoint(from, to);
     const end = this.borderPoint(to, from);
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const INTERFACE_R = 5;
+
+    const lollipopPos = { x: start.x + ux * INTERFACE_R, y: start.y + uy * INTERFACE_R };
+    const socketPos = { x: end.x - ux * INTERFACE_R * 2, y: end.y - uy * INTERFACE_R * 2 };
+    const angle = Math.atan2(dy, dx);
+
     const group = new Konva.Group();
     group.add(
-      new Konva.Arrow({
-        points: [start.x, start.y, end.x, end.y],
+      new Konva.Line({
+        points: [lollipopPos.x, lollipopPos.y, socketPos.x, socketPos.y],
         stroke: '#1F3BB3',
-        fill: '#1F3BB3',
         strokeWidth: 1.4,
-        pointerLength: 8,
-        pointerWidth: 7,
       }),
     );
+    group.add(
+      new Konva.Circle({ x: lollipopPos.x, y: lollipopPos.y, radius: INTERFACE_R, fill: '#1F3BB3' }),
+    );
+    group.add(
+      new Konva.Shape({
+        x: socketPos.x,
+        y: socketPos.y,
+        stroke: '#1F3BB3',
+        strokeWidth: 1.4,
+        sceneFunc: (ctx, shape) => {
+          ctx.beginPath();
+          ctx.arc(0, 0, INTERFACE_R, angle - Math.PI / 2, angle + Math.PI / 2, false);
+          ctx.strokeShape(shape);
+        },
+      }),
+    );
+
     const label = [echange.description, echange.protocole].filter(Boolean).join(' · ');
     if (label) {
       const midX = (start.x + end.x) / 2;
