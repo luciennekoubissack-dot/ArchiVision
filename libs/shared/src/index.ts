@@ -7,3 +7,4 @@ export * from './decorators/roles.decorator';
 export * from './decorators/superadmin-route.decorator';
 export * from './filters/http-exception.filter';
 export * from './utils/require-organisation-id';
+export * from './utils/require-jwt-secret';
