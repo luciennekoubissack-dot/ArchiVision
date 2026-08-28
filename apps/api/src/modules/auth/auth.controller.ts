@@ -1,10 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
-import { CurrentUser, AuthUser, Public } from '@archivision/shared';
+import { CurrentUser, AuthUser, Public, clearAuthCookies, setAuthCookies } from '@archivision/shared';
 
 // 5 tentatives / minute / IP : marge confortable pour un usage légitime
 // (fautes de frappe incluses) tout en freinant un brute force sur le mot de passe.
@@ -27,16 +28,27 @@ export class AuthController {
   @Public()
   @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.CREATED)
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.register(dto);
+    setAuthCookies(res, result.accessToken);
+    return result;
   }
 
   @Post('login')
   @Public()
   @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.email, dto.password);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto.email, dto.password);
+    setAuthCookies(res, result.accessToken);
+    return result;
+  }
+
+  @Post('logout')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  logout(@Res({ passthrough: true }) res: Response) {
+    clearAuthCookies(res);
   }
 
   @Get('me')

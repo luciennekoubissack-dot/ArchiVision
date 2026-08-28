@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import bcrypt from 'bcrypt';
+import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { PrismaService } from '@archivision/infrastructure';
 import { JwtAuthGuard } from '@archivision/shared';
@@ -57,6 +58,7 @@ describe('AuthController (HTTP)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
     );
@@ -177,6 +179,52 @@ describe('AuthController (HTTP)', () => {
         .post('/auth/login')
         .send({ email: mockUser.email, password: 'Admin123!' })
         .expect(200);
+    });
+  });
+
+  describe('Cookies de session (migration hors localStorage)', () => {
+    it('pose les cookies access_token (httpOnly) et XSRF-TOKEN (lisible) à la connexion', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: mockUser.email, password: 'Admin123!' })
+        .expect(200);
+
+      const setCookie = response.headers['set-cookie'] as unknown as string[];
+      const accessTokenCookie = setCookie.find((c) => c.startsWith('access_token='));
+      const csrfCookie = setCookie.find((c) => c.startsWith('XSRF-TOKEN='));
+
+      expect(accessTokenCookie).toContain('HttpOnly');
+      expect(csrfCookie).toBeDefined();
+      expect(csrfCookie).not.toContain('HttpOnly');
+    });
+
+    it("authentifie une requête via le cookie access_token, sans en-tête Authorization", async () => {
+      const { passwordHash: _unused, ...profile } = mockUser;
+      prismaMock.user.findUnique.mockResolvedValue(profile);
+
+      const token = jwtService.sign({
+        sub: mockUser.id,
+        email: mockUser.email,
+        organisationId: mockUser.organisationId,
+        role: mockUser.role,
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Cookie', [`access_token=${token}`])
+        .expect(200);
+
+      expect(response.body).toMatchObject({ id: profile.id, email: profile.email });
+    });
+
+    it('POST /auth/logout efface les cookies de session', async () => {
+      const response = await request(app.getHttpServer()).post('/auth/logout').expect(204);
+
+      const setCookie = response.headers['set-cookie'] as unknown as string[];
+      const accessTokenCookie = setCookie.find((c) => c.startsWith('access_token='));
+      expect(accessTokenCookie).toMatch(/Expires=Thu, 01 Jan 1970/);
     });
   });
 

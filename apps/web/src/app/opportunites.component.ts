@@ -251,7 +251,7 @@ const ICONS: Record<string, string> = {
       .chip { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.7rem; border: 1px solid var(--color-border); border-radius: 999px; font-size: 0.9rem; }
       .chip-remove { border: none; background: none; cursor: pointer; font-size: 1rem; line-height: 1; color: var(--color-text-muted); }
       .chip-remove:hover { color: var(--color-danger); }
-      .chart-container { height: 260px; }
+      .chart-container { position: relative; height: 260px; }
     `,
   ],
 })
@@ -519,7 +519,14 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.viewReady || !this.scoresChartRef || this.solutions.length === 0) return;
     this.chart?.destroy();
 
-    this.chart = new Chart(this.scoresChartRef.nativeElement, {
+    // responsive:true fait entrer ce canevas dans une boucle de redimensionnement
+    // infinie sur cet onglet précis (fige le navigateur) ; on fixe donc la taille
+    // une fois à la création plutôt que de la laisser se recalculer en continu.
+    const canvas = this.scoresChartRef.nativeElement;
+    canvas.width = canvas.parentElement?.clientWidth || 600;
+    canvas.height = 260;
+
+    this.chart = new Chart(canvas, {
       type: 'bar',
       data: {
         labels: this.solutions.map((s) => s.nom),
@@ -533,9 +540,9 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
         ],
       },
       options: {
-        responsive: true,
+        responsive: false,
         maintainAspectRatio: false,
-        scales: { y: { beginAtZero: true, max: 5 } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
         plugins: { legend: { display: false } },
       },
     });

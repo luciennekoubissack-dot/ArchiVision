@@ -541,3 +541,467 @@ l'API existaient déjà pour les deux sens de la relation
   « → Portail RH · Synchronisation des comptes · REST » ; clic sur
   Retirer → lien supprimé, compteur repassé à 0 des deux côtés. Données
   de test nettoyées après vérification.
+
+## 2026-08-25 : retrait du champ criticité sur Application
+
+Sur demande explicite de l'utilisateur, suppression complète du champ
+`criticite` (enum `Criticite` : HAUTE/MOYENNE/BASSE) porté par
+`Application` depuis toutes les couches du produit :
+
+- **Schéma** : colonne `criticite` et enum `Criticite` supprimés
+  (migration `remove_application_criticite`).
+- **Backend** : `criticite` retiré des DTOs create/update d'application
+  et de `ApplicationItemDto` (assistant d'inscription).
+  `urbanisation-view.service.ts` (diagramme des zones d'urbanisation)
+  coloriait chaque puce d'application selon sa criticité (rouge/orange/
+  vert) : remplacé par une couleur neutre unique, `CRITICITE_COLOR`
+  supprimé.
+- **Frontend** : colonne et badge « Criticité » retirés du Portefeuille
+  (`applications.component.ts`), sélecteurs retirés des formulaires de
+  création/édition et de la fiche détail ; le diagramme de composants
+  Konva (`applications-canevas.component.ts`) affichait une pastille de
+  couleur par criticité sur chaque boîte, retirée. Le graphique "Applications
+  par criticité" du tableau de bord n'avait plus de sens sans la donnée
+  sous-jacente : carte retirée entièrement (pas de métrique de
+  remplacement inventée). Sélecteur de criticité retiré de l'étape 6 de
+  l'assistant d'inscription.
+- Effet de bord repéré en cours de route : `this.applications` dans
+  `dashboard.component.ts` n'était plus lu que par le graphique
+  supprimé : champ mort retiré aussi, plutôt que laissé traîner.
+
+### Vérifié
+
+- `tsc --noEmit` backend et frontend, build frontend (dev + production) :
+  aucune erreur.
+- Suite backend complète : 277/277 (278 moins le test qui vérifiait la
+  distinction de couleur par criticité, devenu sans objet).
+- Balayage final (`grep -r "riticit"` sur `apps/api/src`, `apps/web/src`,
+  `apps/api/prisma`) : aucune occurrence restante.
+- Navigateur : Portefeuille sans colonne Criticité, fiche détail sans
+  le champ, diagramme de composants Konva rendu sans erreur (canvas
+  présent), tableau de bord sans le graphique retiré, requêtes réseau
+  fraîches toutes en 200.
+
+## 2026-08-25 : nouveau diagramme d'architecture applicative (module Architecture Système)
+
+Sur demande explicite de l'utilisateur, ajout d'un diagramme distinct du
+« diagramme de composants » déjà existant (qui ne couvrait que les
+applications et leurs échanges) : le nouveau diagramme d'architecture
+applicative élargit le vocabulaire à 7 types d'éléments (utilisateur
+interne, utilisateur externe, composant applicatif, base de données,
+système externe, infrastructure, sécurité) et 4 types de flux (API,
+données, authentification, réseau), avec génération, création,
+modification et suppression complètes. Recherche menée avant conception
+(conventions de diagrammes d'architecture applicative : rectangles pour
+les services, cylindres pour les bases de données, traits pleins/
+pointillés selon la nature du flux, regroupement en couches colorées) et
+inspiration du gabarit fourni par l'utilisateur
+(`diagramme-d'architecture-applicative.png`, style « couches colorées »
+façon outil de recommandation).
+
+- **Modèle de données** : `ArchiApplicativeElement` / `ArchiApplicativeFlux`,
+  volontairement indépendants du portefeuille `Application` existant
+  (même précaution que `TechDeploiement` : deux diagrammes ne doivent pas
+  se disputer les mêmes coordonnées `positionX/Y`).
+- **Backend** : nouveau module `architecture-applicative` (DTOs, service,
+  contrôleur, `ArchitectureApplicativeViewService` pour le SVG généré),
+  suivant exactement le pattern déjà en place pour BPMN/ArchiMate/
+  Urbanisation. Le générateur SVG regroupe les éléments en 5 bandes
+  colorées (Utilisateurs / Composants applicatifs / Données / Systèmes
+  externes / Infrastructure & sécurité), dessine les bases de données en
+  cylindre plutôt qu'en rectangle, style chaque flux selon sa nature
+  (couleur + pointillés pour l'authentification), et génère une légende
+  couleurs + types de flux en bas du diagramme.
+- **Frontend** : nouvel onglet « Architecture applicative » dans
+  Architecture Système, avec deux sous-onglets : Éditeur (canevas Konva
+  interactif : glisser-déposer depuis une palette de 7 types, liaison par
+  points d'ancrage pour créer un flux, modification/suppression au survol,
+  mêmes glyphes que le SVG généré) et Diagramme généré (bouton Générer/
+  Effacer/Exporter, identique au patron déjà utilisé pour le diagramme
+  ArchiMate).
+
+### 🔴 Bug réel trouvé et corrigé : nouvelle route absente du proxy dev
+
+- `apps/web/proxy.conf.json` liste explicitement chaque préfixe de route à
+  transférer vers l'API (`/applications`, `/bpmn-processus`, etc.) : la
+  nouvelle route `/architecture-applicative` n'y figurait pas, donc le
+  serveur de dev Angular renvoyait 404 sur toute requête vers ce module
+  au lieu de la relayer vers l'API sur le port 3000, bien que l'API
+  elle-même répondait correctement en accès direct. Repéré en testant la
+  création réelle d'un élément dans le navigateur (le formulaire restait
+  ouvert sans erreur visible). Entrée ajoutée au fichier de proxy ; un
+  redémarrage du serveur de dev Angular est nécessaire pour qu'il soit
+  pris en compte (la configuration du proxy n'est lue qu'au démarrage).
+
+### Vérifié
+
+- `tsc --noEmit` backend et frontend, build frontend dev + production :
+  aucune erreur, aucun avertissement de budget (338,66 Ko initial,
+  inchangé, le nouveau canevas est chargé paresseusement avec le reste
+  du module Architecture Système).
+- Suite backend complète : 292/292 (15 nouveaux tests pour le module).
+- En conditions réelles dans le navigateur : création d'un élément de
+  chacun des 7 types via glisser-déposer, 6 flux créés entre eux,
+  diagramme généré affichant le bon décompte (7 éléments, 6 flux), les 5
+  bandes colorées, le cylindre de la base de données, et la légende
+  complète (types d'éléments + types de flux). Données de test nettoyées
+  après vérification (éléments et flux à zéro en fin de session).
+
+---
+
+## 2026-08-25 : unification du design des listes sur le patron « Architecture Système »
+
+Demande explicite : toutes les sections affichant une liste doivent
+reprendre la même présentation que les listes du module Architecture
+Système (tableau `<table class="table">` avec en-tête, lignes zébrées par
+la bordure du bas, colonne d'actions à droite avec icônes rondes), au
+lieu du patron `<ul class="list"><li class="list-item">` en cartes
+utilisé jusque-là dans le reste de l'application.
+
+### Fichiers convertis
+
+- `gouvernance.component.ts` : listes Politiques et Demandes de
+  changement.
+- `donnees.component.ts` : liste Relations (les Entités, qui imbriquent
+  un tableau d'attributs et un formulaire d'ajout par carte, sont
+  conservées telles quelles : ce n'est pas une liste plate mais un
+  éditeur imbriqué).
+- `evaluation.component.ts` : liste Commentaires du rapport d'évaluation.
+- `mise-en-oeuvre.component.ts` : liste Solutions retenues, y compris le
+  champ de commentaire de suivi (zone de texte libre), placé dans une
+  cellule dédiée plutôt que traité comme un cas à part.
+- `bpmn.component.ts` et `bpmn-vues.component.ts` : sélecteur de
+  processus (par catégorie pilotage/métier/support), lignes de tableau
+  cliquables avec surbrillance de la ligne sélectionnée à la place de la
+  bordure de carte.
+- `ecarts.component.ts` : même sélecteur de processus converti ; les deux
+  colonnes de comparaison AS-IS/TO-BE, qui ne sont pas une liste CRUD
+  mais une vue de diff côte à côte, sont conservées telles quelles.
+- `roadmap.component.ts` : liste Projets.
+- `organisation.component.ts` : les deux listes Parties prenantes
+  (popover de consultation et popover de gestion) ; le tableau Membres
+  utilisait déjà ce patron et n'a pas changé.
+
+### Exclusions délibérées (non touchées)
+
+- `technologie.component.ts` : cartes de composants avec sous-liste de
+  déploiements imbriquée.
+- `register.component.ts` et `wizard.component.ts` : listes « chips » de
+  construction pas à pas dans un assistant multi-étapes, pas des listes
+  d'entités.
+- Les colonnes de comparaison AS-IS/TO-BE d'`ecarts.component.ts`.
+
+### Vérifié
+
+- Build frontend développement : aucune erreur de compilation.
+- Dans le navigateur (données réelles du jeu K&B Groupe) : chaque liste
+  convertie affiche correctement ses colonnes et son contenu ; le clic
+  sur une ligne du sélecteur de processus (Vision et Analyse des écarts)
+  déclenche bien la sélection et l'affichage du panneau de détail,
+  identique au comportement précédent avec `<li>` ; les popovers Parties
+  prenantes (consultation et gestion, avec bouton Retirer) s'ouvrent et
+  affichent les données correctement.
+
+---
+
+## 2026-08-26 : 🔴 Bug réel trouvé et corrigé : gel du navigateur sur l'onglet Matrice d'évaluation
+
+Signalé par l'utilisateur : l'application se figeait systématiquement en
+ouvrant l'onglet « Matrice d'évaluation » du module Opportunités &
+solutions. Reproduit à l'identique dans un navigateur de test : l'onglet
+devenait totalement non réactif (plus aucune commande, y compris la
+lecture du DOM, ne répondait) dès l'ouverture de cet onglet, sans erreur
+visible dans la console avant le gel.
+
+### Diagnostic
+
+Isolé par bissection successive du template (désactivation temporaire de
+sections avec `*ngIf="false"`) : le graphique « Comparaison des notes
+moyennes » (`opportunites.component.ts`, canevas Chart.js créé par
+`renderChart()`) est seul responsable. Le graphique se construit
+correctement dans un premier temps (confirmé par des traces de
+diagnostic), mais l'option `responsive: true` de Chart.js, combinée à la
+façon dont ce canevas particulier est inséré dans le DOM (au sein d'un
+`*ngIf` sur l'onglet, créé après un `setTimeout`), déclenche une boucle
+de recalcul de taille qui ne se stabilise jamais et bloque le fil
+d'exécution du navigateur. Le graphique équivalent d'`evaluation.
+component.ts` (onglet Rapport d'évaluation), construit avec le même
+patron mais sans `responsive: true` posant problème dans son propre
+contexte, ne présente pas ce défaut : preuve que le bug est spécifique à
+ce composant et non un problème général de Chart.js dans l'application.
+
+### Correctif
+
+`opportunites.component.ts`, méthode `renderChart()` : taille du canevas
+fixée une seule fois à la création (largeur du conteneur, hauteur
+260px) via les attributs `width`/`height` du `<canvas>`, puis
+`responsive: false` dans les options Chart.js. Le graphique ne se
+redimensionne plus automatiquement au redimensionnement de la fenêtre,
+ce qui est un compromis acceptable au vu du gain (le module redevient
+utilisable) ; aucun autre graphique de l'application n'a ce problème,
+aucun autre changement n'était donc nécessaire.
+
+### Vérifié
+
+- Build frontend développement : aucune erreur.
+- Reproduit le gel dans un navigateur de test avant correctif (page
+  totalement non réactive) puis confirmé sa disparition après correctif,
+  à la fois avec un jeu de données dégénéré (2 solutions sans aucune
+  note) et avec un jeu réel (1 critère ajouté, notes 2 et 5 saisies puis
+  enregistrées, graphique redessiné sans incident). Données de test
+  supprimées après vérification (critère et notes remis à zéro).
+
+---
+
+## 2026-08-26 (suite) : diagramme de composants généré + hiérarchie visuelle des sous-onglets
+
+Deux demandes de l'utilisateur, illustrées par une capture d'écran du
+module Architecture Système : (1) l'onglet « Diagramme de composants »
+n'avait ni structure Éditeur/Diagramme généré ni diagramme généré du
+tout, contrairement à « Diagramme d'architecture applicative » ; (2) sur
+toutes les pages à deux niveaux d'onglets, le second niveau (sous-onglets)
+avait exactement le même design que le premier, rendant la hiérarchie peu
+lisible.
+
+### Diagramme de composants généré (fonctionnalité manquante)
+
+Aucun générateur SVG statique n'existait pour le diagramme de composants
+UML (Application + ApplicationEchange) : seul l'éditeur interactif
+(`applications-canevas.component.ts`) permettait de le visualiser, sans
+pendant « Générer/Effacer/Exporter » ni sous-onglets, contrairement à
+tous les autres diagrammes de l'application.
+
+- `urbanisation-view.service.ts` : nouvelle méthode `generateComponents()`
+  reprenant exactement la notation visuelle de l'éditeur (boîte
+  «component» à bandeau bleu marine, liste de services à puces,
+  relations UML lollipop/socket) et les mêmes constantes de tailles
+  (BOX_W=190, HEADER_H=30…) pour que diagramme généré et éditeur restent
+  visuellement identiques. Position enregistrée réutilisée si présente,
+  sinon repli en cascade avec passage à la ligne (MAX_ROW_WIDTH=1000),
+  même patron que `bpmn-view.service.ts`.
+- `urbanisation.controller.ts` : route `GET /applications/generate-vue`
+  (placée avant `GET /applications/:id` pour ne pas être capturée par le
+  paramètre `:id`).
+- `urbanisation.service.ts` (frontend) : `generateComponentsView()`.
+- `applications.component.ts` : l'onglet « Diagramme de composants »
+  gagne désormais les mêmes sous-onglets Éditeur/Diagramme généré que
+  « Diagramme d'architecture applicative », avec les mêmes actions
+  Générer/Effacer/Exporter SVG/Exporter PNG.
+- 4 nouveaux tests dans `urbanisation-view.service.spec.ts` (rendu avec
+  services, positions enregistrées respectées, échange avec extrémité
+  absente ignoré, état vide).
+
+### Hiérarchie visuelle des onglets à deux niveaux
+
+`styles.scss` : les sous-onglets (`.sub-tabs`, utilisés ici et dans
+`architecture-metier.component.ts`) perdent la carte blanche flottante
+avec ombre portée au profit d'un fond uni gris clair sans ombre, des
+pastilles plus petites, et une couleur d'accent (bleu primaire) au lieu
+du noir pour l'état actif, le premier niveau reste inchangé (carte
+blanche, noir). Un seul point de correction global suffit : ces sous-
+onglets n'avaient aucun style propre au-delà d'une marge, ils héritaient
+entièrement du style des onglets principaux.
+
+### Vérifié
+
+- Suite backend `urbanisation` : 39/39.
+- Build frontend développement : aucune erreur.
+- `GET /applications/generate-vue` testé en direct (curl) : 6
+  applications, 6 échanges, SVG contenant bien le bandeau «component»,
+  les services à puces et les libellés d'échange.
+- Dans le navigateur : l'onglet Diagramme de composants affiche
+  désormais Éditeur (canevas interactif, inchangé) et Diagramme généré
+  (génération, résumé, rendu SVG identique à l'éditeur) ; le nouveau
+  style des sous-onglets est bien présent dans la feuille de style
+  chargée par le navigateur (fond gris uni, pas d'ombre, confirmé par
+  inspection directe des règles CSS correspondantes) et ne casse pas les
+  sous-onglets déjà existants (Architecture applicative, Architecture
+  métier › Diagramme ArchiMate).
+
+---
+
+## 2026-08-26 (suite 2) : nouvel audit complet
+
+Nouveau passage d'audit demandé explicitement par l'utilisateur, un peu
+plus d'une semaine et beaucoup de fonctionnalités après le précédent
+(audit initial du 2026-08-18, traité en partie le 2026-08-24 : suite 3
+pour la performance, suite 4 pour la sécurité). Depuis, la base de code
+a nettement grossi : refonte de la notation ArchiMate, extension du
+vocabulaire BPMN, nouveau module Architecture applicative complet
+(modèle, service, générateur SVG, éditeur Konva), nouveau générateur de
+diagramme de composants, unification du design des listes sur une
+dizaine de fichiers, et un correctif de gel navigateur. Ce passage
+revérifie les points encore ouverts de l'audit initial et audite ce qui
+a été ajouté depuis.
+
+### Points forts confirmés ou nouveaux
+
+- **Discipline d'échappement XSS maintenue malgré une surface bien plus
+  grande.** L'audit initial notait que `[innerHTML]` + `bypassSecurityTrustHtml`
+  n'était utilisé que pour une table statique d'icônes. Ce n'est plus le
+  cas : 6 écrans rendent désormais du SVG généré côté serveur contenant
+  du texte utilisateur (noms d'applications, de services, d'éléments,
+  libellés de flux/échanges...) via ce même mécanisme. Vérifié ligne par
+  ligne : les 5 générateurs SVG backend
+  ([archimate-view.service.ts](../apps/api/src/modules/archimate/archimate-view.service.ts),
+  [service-view.service.ts](../apps/api/src/modules/service/service-view.service.ts),
+  [bpmn-view.service.ts](../apps/api/src/modules/bpmn/bpmn-view.service.ts),
+  [architecture-applicative-view.service.ts](../apps/api/src/modules/architecture-applicative/architecture-applicative-view.service.ts),
+  [urbanisation-view.service.ts](../apps/api/src/modules/urbanisation/urbanisation-view.service.ts))
+  font systématiquement passer chaque champ utilisateur par `escape()` ou
+  `wrap()` (qui échappe en interne) avant de l'insérer dans un `<text>` :
+  aucun point d'injection trouvé sur l'ensemble des générateurs. Bon
+  signe, mais ça déplace le curseur de risque du point 4 ci-dessous : un
+  seul oubli d'`escape()` dans un futur générateur deviendrait un vol de
+  token JWT exploitable (le token reste en `localStorage`, voir plus
+  bas), pas juste un défaut d'affichage.
+- Isolation multi-tenant toujours cohérente sur le nouveau module
+  Architecture applicative : chaque méthode de
+  [architecture-applicative.service.ts](../apps/api/src/modules/architecture-applicative/architecture-applicative.service.ts)
+  filtre ou vérifie `organisationId`, y compris pour les flux (vérifie
+  que source *et* cible appartiennent à l'organisation avant de créer un
+  lien, même patron que `createEchange` côté urbanisation).
+- RBAC (`@Roles(ADMINISTRATEUR, ARCHITECTE)`) posé sur toutes les routes
+  de mutation du nouveau module, DTOs entièrement validés
+  (`@IsUUID`, `@MaxLength`, `@IsEnum`...).
+- Aucune nouvelle route `@Public()` introduite depuis l'audit initial :
+  toujours les 4 mêmes (`/auth/login`, `/auth/register`, `/health`,
+  `/uploads/logo`), pas d'élargissement de la surface non authentifiée.
+- Le filtre d'exceptions global a été revérifié en conditions réelles
+  cette semaine, pas seulement en test : pendant la panne PostgreSQL du
+  2026-08-26 (Docker Desktop arrêté), les réponses 500 renvoyées au
+  client étaient bien génériques (`"Erreur interne du serveur"`), sans
+  jamais laisser fuiter le `PrismaClientKnownRequestError` ni le chemin
+  de fichier présents dans les logs serveur.
+- Lazy-loading toujours respecté : le bundle initial de production reste
+  à 338,95 Ko malgré tous les modules ajoutés depuis (aucun des
+  nouveaux écrans n'a été laissé en chargement eager par erreur).
+- Suite de tests backend : 296/296 (contre 278 à l'audit précédent, donc
+  18 tests nets ajoutés avec les nouvelles fonctionnalités), `tsc --noEmit`
+  propre côté API et web.
+
+### 🔴 Sécurité : toujours ouvert
+
+1. **Token JWT en `localStorage`** : toujours vrai
+   ([auth.service.ts](../apps/web/src/app/auth.service.ts)). Le
+   raisonnement "risque faible aujourd'hui" de l'audit initial est à
+   nuancer : voir le point ci-dessus sur la surface `[innerHTML]` qui
+   s'est nettement élargie. Toujours pas urgent au sens strict (aucune
+   faille XSS actuelle trouvée), mais l'écart entre "pas urgent" et
+   "devient risqué au prochain oubli" s'est réduit. À planifier plus
+   sérieusement plutôt qu'à repousser indéfiniment.
+2. **Mot de passe PostgreSQL par défaut** dans
+   [docker-compose.yml](../docker-compose.yml)
+   (`POSTGRES_PASSWORD: postgres`, en dur, sans variable d'env),
+   toujours non traité malgré le durcissement du `JWT_SECRET` en suite 4.
+   Incohérent d'avoir sécurisé un secret et pas l'autre dans le même
+   fichier.
+
+### 🟠 Performance : un point traité, un toujours ouvert
+
+- Compression HTTP et lazy-loading (suite 3) : toujours en place, non
+  régressés.
+- **Listes non paginées** : toujours aucun `skip`/`take` sur l'ensemble
+  des `findMany` du backend, y compris les modules ajoutés depuis
+  (vérifié par recherche exhaustive). Le volume de données réel actuel
+  ne le rend pas urgent, mais le nombre de modules concernés a augmenté.
+
+### 🟡 Qualité de code
+
+1. `apps/web/src/app` est passé de ~55 à **77 fichiers** à plat depuis
+   l'audit initial, le problème identifié alors ne s'est pas résorbé,
+   il s'est aggravé avec chaque nouveau module.
+2. Angular 17 inchangé, l'écart avec la dernière version stable s'est
+   mécaniquement creusé d'une semaine supplémentaire.
+3. **Nouveau** : `npx jest` termine avec l'avertissement « A worker
+   process has failed to exit gracefully... Active timers can also
+   cause this ». Les 296 tests passent malgré tout, mais un timer ou une
+   connexion non fermée proprement dans un test (ou son setup) mériterait
+   un passage avec `--detectOpenHandles` pour identifier la source avant
+   que ça ne ralentisse durablement la CI.
+
+### ⚪ UX utilisateur : partiellement vérifié depuis
+
+Contrairement à l'audit initial (jugement uniquement sur le code),
+plusieurs parcours réels ont été vérifiés en navigateur au fil des
+sessions récentes (création/édition/suppression sur la plupart des
+modules, génération des 5 diagrammes, responsive mobile sur les écrans
+les plus récents). Restent non vérifiés : accessibilité (lecteurs
+d'écran, navigation clavier complète), et le comportement du menu
+mobile (`☰`) n'a pas pu être confirmé visuellement en fin de session
+précédente faute d'un environnement de test qui compose réellement les
+frames, à confirmer manuellement.
+
+### Plan d'action priorisé (état au 2026-08-26)
+
+| Priorité | Action | Statut |
+|---|---|---|
+| 🔴 | Retirer `@Public()` de `/uploads/logo`, sortir/sanitiser le SVG | **fait** (SVG retiré des types acceptés, suite 4) |
+| 🔴 | Supprimer le fallback `'secretKey'`, échec au boot si absent | **fait** (`requireJwtSecret()`, suite 4) |
+| 🔴 | `@nestjs/throttler` sur `/auth/*` et `/uploads/*` | **fait** (suite 4) |
+| 🔴 | Migrer le token vers cookie `httpOnly` + CSRF | à planifier (priorité légèrement relevée) |
+| 🔴 | Mot de passe PostgreSQL par défaut dans `docker-compose.yml` | à faire |
+| 🟠 | `app.use(compression())` | **fait** (suite 3) |
+| 🟠 | Lazy-load des routes lourdes | **fait** (suite 3) |
+| 🟠 | Pagination des `findMany` | à faire, ampleur inchangée |
+| 🟡 | Réorganiser `apps/web/src/app` en dossiers par feature | à faire, plus urgent qu'avant (77 fichiers) |
+| 🟡 | Mise à jour Angular | à budgétiser |
+| 🟡 | Diagnostiquer le worker Jest qui ne se termine pas proprement | à faire |
+| ⚪ | Audit accessibilité complet | à faire |
+| ⚪ | Confirmer visuellement l'ouverture du menu mobile ☰ | à faire |
+
+### Vérifié
+
+- Suite backend complète : 296/296.
+- `tsc --noEmit` backend (`tsconfig.app.json`) et frontend : aucune
+  erreur.
+- Build production frontend : 338,95 Ko initial, aucun avertissement de
+  budget.
+- Recherche exhaustive de nouvelles routes `@Public()` : aucune.
+- Recherche exhaustive de `skip`/`take` dans les services backend :
+  aucun résultat, confirmant l'absence de pagination.
+- Recherche exhaustive des `<text>` dans les 5 générateurs SVG :
+  chaque champ utilisateur passe par `escape()` ou `wrap()`.
+- Panne PostgreSQL réelle du jour (voir échange précédent) utilisée
+  comme test grandeur nature du filtre d'exceptions : confirmé qu'aucun
+  détail Prisma ne fuit au client en conditions réelles de panne.
+
+---
+
+## 2026-08-26 (suite 3) : traitement des points ouverts, priorisés par sévérité
+
+Sur demande de l'utilisateur ("règle tous ces points"). Angular abandonné
+("on reste sur la version actuelle") ; pagination et réorganisation des
+dossiers frontend repoussées (projet à clôturer, pas le moment pour des
+refactors larges) ; les deux points 🔴 traités.
+
+- **Mot de passe PostgreSQL par défaut** : même traitement que
+  `JWT_SECRET` (suite 4) : `docker-compose.yml` exige désormais
+  `POSTGRES_PASSWORD` au démarrage. Secret réel tourné en place
+  (`ALTER USER`, sans perte de données) et `.env` régénéré, puisque les
+  deux secrets locaux étaient encore littéralement les placeholders de
+  `.env.example`.
+- **Token JWT en `localStorage`** : migré vers un cookie `access_token`
+  httpOnly posé à la connexion
+  ([auth-cookies.ts](../libs/shared/src/utils/auth-cookies.ts)),
+  invisible en JS. L'en-tête `Authorization: Bearer` reste accepté en
+  parallèle ([jwt.strategy.ts](../apps/api/src/modules/auth/jwt.strategy.ts))
+  pour les clients non-navigateur (scripts, tests), le frontend Angular
+  ne stockant plus le token nulle part. Protection CSRF en double
+  soumission ajoutée ([csrf.guard.ts](../libs/shared/src/guards/csrf.guard.ts)) :
+  cookie `XSRF-TOKEN` lisible + en-tête `X-XSRF-TOKEN` renvoyé
+  automatiquement par Angular (`withXsrfConfiguration()`), vérifiés par
+  un garde global sur toute mutation authentifiée par cookie. Nouvelle
+  route `POST /auth/logout` (efface les deux cookies côté serveur).
+
+### Vérifié
+
+- Suite backend complète : 305/305 (9 tests ajoutés, aucun cassé).
+- `tsc --noEmit` backend, build frontend : aucune erreur.
+- En navigateur, session vidée au préalable : connexion →
+  `document.cookie` ne montre que `XSRF-TOKEN`, `localStorage` sans
+  trace de JWT. Création (`POST` → 201) et suppression (`DELETE` → 204)
+  réelles acceptées par le garde CSRF. Déconnexion → cookies et
+  `localStorage` vidés, `/dashboard` redirige vers la connexion
+  (session invalidée côté serveur). Reconnexion finale pour laisser la
+  session dans un état normal.

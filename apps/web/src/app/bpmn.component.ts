@@ -55,28 +55,30 @@ const ICONS: Record<string, string> = {
           <section class="card processus-groupe" *ngIf="processusParType(t).length > 0">
             <h4>{{ typeProcessusLabel(t) }}</h4>
             <p class="muted hint">{{ typeProcessusHint(t) }}</p>
-            <ul class="list">
-              <li
-                class="list-item"
-                *ngFor="let p of processusParType(t)"
-                [class.selected]="selected?.id === p.id"
-                (click)="select(p)"
-              >
-                <div class="processus-info">
-                  <strong>{{ p.nom }}</strong>
-                  <p class="muted" *ngIf="p.description">{{ p.description }}</p>
-                  <span class="badge badge-neutral">{{ p._count?.elements || 0 }} élément(s)</span>
-                </div>
-                <div class="list-item-actions">
-                  <button type="button" class="icon-btn" title="Modifier" (click)="openEdit(p, $event)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
-                  </button>
-                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeProcessus(p, $event)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
-                  </button>
-                </div>
-              </li>
-            </ul>
+            <div class="table-scroll">
+              <table class="table">
+                <thead><tr><th>Nom</th><th>Description</th><th>Éléments</th><th></th></tr></thead>
+                <tbody>
+                  <tr
+                    *ngFor="let p of processusParType(t)"
+                    [class.selected]="selected?.id === p.id"
+                    (click)="select(p)"
+                  >
+                    <td>{{ p.nom }}</td>
+                    <td>{{ p.description || '—' }}</td>
+                    <td><span class="badge badge-neutral">{{ p._count?.elements || 0 }}</span></td>
+                    <td class="row-actions">
+                      <button type="button" class="icon-btn" title="Modifier" (click)="openEdit(p, $event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
+                      </button>
+                      <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeProcessus(p, $event)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
         </ng-container>
       </div>
@@ -152,16 +154,14 @@ const ICONS: Record<string, string> = {
       .processus-groupe h4 { margin-bottom: 0.15rem; }
       .processus-groupe .hint { margin-top: 0; font-size: 0.85rem; }
       .layout { display: flex; flex-direction: column; gap: 1.25rem; }
-      .processus-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; align-items: start; }
+      .processus-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; align-items: start; }
       .processus-groupe { min-width: 0; }
-      .list { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.6rem; margin-top: 1rem; }
-      .list-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.85rem; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; min-width: 0; }
-      .list-item-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
-      .processus-info { flex: 1; min-width: 0; }
-      .processus-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .processus-info p.muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .processus-list .list-item.selected { border-color: var(--color-primary); background: var(--color-primary-light); }
-      .processus-detail .list-item { cursor: default; }
+      .table-scroll { overflow-x: auto; margin-top: 1rem; }
+      .table { width: 100%; min-width: 280px; border-collapse: collapse; }
+      .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
+      .table tbody tr { cursor: pointer; }
+      .table tbody tr.selected { background: var(--color-primary-light); }
+      .row-actions { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
       .processus-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
       .processus-detail-head h3 { margin: 0.3rem 0 0.2rem; }
       .processus-detail-head .btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.4rem; }

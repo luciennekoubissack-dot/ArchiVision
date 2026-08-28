@@ -4,7 +4,8 @@
       "Bash(npm test *)",
       "Bash(grep -n \"^\\)//\" \".kiro/specs/archivision-frontend/requirements.md\")",
       "Bash(grep -n \"Collaborateur\\).//\\\\|\\)//\" \".kiro/specs/archivision-frontend/requirements.md\")",
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "Bash(docker compose *)"
     ]
   }
 }

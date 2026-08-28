@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '@archivision/infrastructure';
-import { Criticite, TypeZone } from '@prisma/client';
+import { TypeZone } from '@prisma/client';
 import { UrbanisationService } from './urbanisation.service';
 
 describe('UrbanisationService', () => {
@@ -13,7 +13,6 @@ describe('UrbanisationService', () => {
     id: 'app-001',
     nom: 'CRM',
     description: null,
-    criticite: Criticite.HAUTE,
     organisationId: ORG_ID,
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
@@ -82,12 +81,11 @@ describe('UrbanisationService', () => {
 
       const result = await service.createApplication(ORG_ID, {
         nom: mockApplication.nom,
-        criticite: mockApplication.criticite,
       });
 
       expect(result).toEqual(mockApplication);
       expect(prismaMock.application.create).toHaveBeenCalledWith({
-        data: { nom: mockApplication.nom, criticite: mockApplication.criticite, organisationId: ORG_ID },
+        data: { nom: mockApplication.nom, organisationId: ORG_ID },
       });
     });
 

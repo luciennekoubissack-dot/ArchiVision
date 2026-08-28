@@ -51,25 +51,33 @@ const ICONS: Record<string, string> = {
 
     <section class="card">
       <div class="empty-state" *ngIf="projets.length === 0">Aucun projet planifié.</div>
-      <ul class="list" *ngIf="projets.length > 0">
-        <li class="list-item" *ngFor="let p of projets">
-          <div>
-            <strong>{{ p.nom }}</strong>
-            <span class="badge" [class]="prioriteBadge(p.priorite)">{{ prioriteLabel(p.priorite) }}</span>
-            <p class="muted" *ngIf="p.description">{{ p.description }}</p>
-            <p class="muted" *ngIf="p.coutEstime">Coût estimé : {{ p.coutEstime }}</p>
-            <p class="muted" *ngIf="p.dateDebut || p.dateFin">
-              {{ p.dateDebut ? (p.dateDebut | date: 'dd/MM/yyyy') : '?' }} → {{ p.dateFin ? (p.dateFin | date: 'dd/MM/yyyy') : '?' }}
-            </p>
-          </div>
-          <div class="actions">
-            <select [value]="p.statut" (change)="changeStatut(p, $any($event.target).value)">
-              <option *ngFor="let s of statuts" [value]="s">{{ statutLabel(s) }}</option>
-            </select>
-            <button class="btn btn-danger" (click)="removeProjet(p)">Supprimer</button>
-          </div>
-        </li>
-      </ul>
+      <div class="table-scroll" *ngIf="projets.length > 0">
+        <table class="table">
+          <thead><tr><th>Nom</th><th>Priorité</th><th>Description</th><th>Coût estimé</th><th>Période</th><th>Statut</th><th></th></tr></thead>
+          <tbody>
+            <tr *ngFor="let p of projets">
+              <td>{{ p.nom }}</td>
+              <td><span class="badge" [class]="prioriteBadge(p.priorite)">{{ prioriteLabel(p.priorite) }}</span></td>
+              <td>{{ p.description || '—' }}</td>
+              <td>{{ p.coutEstime || '—' }}</td>
+              <td>
+                <ng-container *ngIf="p.dateDebut || p.dateFin; else noPeriode">
+                  {{ p.dateDebut ? (p.dateDebut | date: 'dd/MM/yyyy') : '?' }} → {{ p.dateFin ? (p.dateFin | date: 'dd/MM/yyyy') : '?' }}
+                </ng-container>
+                <ng-template #noPeriode>—</ng-template>
+              </td>
+              <td>
+                <select [value]="p.statut" (change)="changeStatut(p, $any($event.target).value)">
+                  <option *ngFor="let s of statuts" [value]="s">{{ statutLabel(s) }}</option>
+                </select>
+              </td>
+              <td class="row-actions">
+                <button class="btn btn-danger" (click)="removeProjet(p)">Supprimer</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <!-- ── Popover : ajouter un projet ───────────────────────────────────── -->
@@ -108,10 +116,11 @@ const ICONS: Record<string, string> = {
       .grid-3 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
       .card { margin-bottom: 1.25rem; }
       .muted { color: var(--color-text-muted); margin-top: 0.25rem; font-size: 0.9rem; }
-      .list { list-style: none; display: grid; gap: 0.75rem; }
-      .list-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 12px; }
-      .actions { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; }
-      .actions select { padding: 0.4rem 0.6rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+      .table-scroll { overflow-x: auto; }
+      .table { width: 100%; min-width: 860px; border-collapse: collapse; }
+      .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
+      .table select { padding: 0.4rem 0.6rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+      .row-actions { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
 
       .timeline { display: grid; gap: 0.75rem; }
       .timeline-row { display: grid; grid-template-columns: 160px 1fr; align-items: center; gap: 0.75rem; }

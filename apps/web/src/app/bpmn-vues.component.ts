@@ -36,17 +36,20 @@ const ICONS: Record<string, string> = {
         <ng-container *ngFor="let t of typesProcessus">
           <section class="card processus-groupe" *ngIf="processusParType(t).length > 0">
             <h4>{{ typeProcessusLabel(t) }}</h4>
-            <ul class="list">
-              <li
-                class="list-item"
-                *ngFor="let p of processusParType(t)"
-                [class.selected]="selected?.id === p.id"
-                (click)="select(p)"
-              >
-                <strong>{{ p.nom }}</strong>
-                <span class="badge badge-neutral">{{ p._count?.elements || 0 }} étape(s)</span>
-              </li>
-            </ul>
+            <div class="table-scroll">
+              <table class="table">
+                <tbody>
+                  <tr
+                    *ngFor="let p of processusParType(t)"
+                    [class.selected]="selected?.id === p.id"
+                    (click)="select(p)"
+                  >
+                    <td>{{ p.nom }}</td>
+                    <td><span class="badge badge-neutral">{{ p._count?.elements || 0 }} étape(s)</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
         </ng-container>
       </div>
@@ -82,9 +85,11 @@ const ICONS: Record<string, string> = {
       .layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.25rem; align-items: start; }
       .processus-list { display: grid; gap: 1rem; }
       .processus-groupe h4 { margin: 0 0 0.6rem; font-size: 0.85rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-      .list { list-style: none; display: grid; gap: 0.5rem; margin: 0; padding: 0; }
-      .list-item { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.7rem 0.85rem; border: 1px solid var(--color-border); border-radius: 10px; cursor: pointer; }
-      .list-item.selected { border-color: var(--color-primary); background: var(--color-primary-light); }
+      .table-scroll { overflow-x: auto; }
+      .table { width: 100%; border-collapse: collapse; }
+      .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
+      .table tbody tr { cursor: pointer; }
+      .table tbody tr.selected { background: var(--color-primary-light); }
       .actions { display: flex; gap: 0.5rem; }
       .summary { color: var(--color-text-muted); margin-top: -0.5rem; }
       .svg-container { overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; margin-top: 1rem; }

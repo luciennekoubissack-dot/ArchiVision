@@ -1,5 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
-import { Criticite } from '@prisma/client';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateApplicationDto {
   @IsString()
@@ -11,10 +10,6 @@ export class CreateApplicationDto {
   @IsOptional()
   @MaxLength(2000)
   description?: string;
-
-  @IsEnum(Criticite)
-  @IsOptional()
-  criticite?: Criticite;
 
   @IsNumber()
   @IsOptional()

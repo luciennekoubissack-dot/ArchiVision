@@ -98,14 +98,24 @@ const ICONS: Record<string, string> = {
 
       <section class="card">
         <div class="empty-state" *ngIf="relations.length === 0">Aucune relation.</div>
-        <ul class="list" *ngIf="relations.length > 0">
-          <li class="list-item" *ngFor="let r of relations">
-            <div>
-              <strong>{{ r.source.nom }}</strong> ({{ cardinaliteLabel(r.cardinalite) }}) <strong>{{ r.target.nom }}</strong>
-            </div>
-            <button class="btn btn-danger" (click)="removeRelation(r)">Supprimer</button>
-          </li>
-        </ul>
+        <div class="table-scroll" *ngIf="relations.length > 0">
+          <table class="table">
+            <thead><tr><th>Source</th><th>Cardinalité</th><th>Cible</th><th>Libellé</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let r of relations">
+                <td>{{ r.source.nom }}</td>
+                <td>{{ cardinaliteLabel(r.cardinalite) }}</td>
+                <td>{{ r.target.nom }}</td>
+                <td>{{ r.label || '—' }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeRelation(r)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
 
@@ -212,6 +222,9 @@ const ICONS: Record<string, string> = {
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
       .entity-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; gap: 1rem; }
       .row-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+      .table-scroll { overflow-x: auto; }
+      .table { width: 100%; min-width: 500px; border-collapse: collapse; }
+      .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
       .muted { color: var(--color-text-muted); margin-top: 0.25rem; font-size: 0.9rem; }
       .attr-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
       .attr-table th { text-align: left; padding: 0.5rem 0.6rem; font-size: 0.8rem; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }

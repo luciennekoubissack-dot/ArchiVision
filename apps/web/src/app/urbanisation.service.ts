@@ -2,14 +2,12 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-export type Criticite = 'HAUTE' | 'MOYENNE' | 'BASSE';
 export type TypeZone = 'ZONE' | 'QUARTIER' | 'ILOT';
 
 export interface Application {
   id: string;
   nom: string;
   description?: string | null;
-  criticite: Criticite;
   positionX?: number | null;
   positionY?: number | null;
   createdAt: string;
@@ -65,6 +63,12 @@ export interface UrbanisationView {
   applicationCount: number;
 }
 
+export interface ComponentsView {
+  svg: string;
+  applicationCount: number;
+  echangeCount: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class UrbanisationService {
   constructor(private http: HttpClient) {}
@@ -82,7 +86,6 @@ export class UrbanisationService {
   createApplication(payload: {
     nom: string;
     description?: string;
-    criticite?: Criticite;
     positionX?: number;
     positionY?: number;
   }): Observable<Application> {
@@ -91,13 +94,17 @@ export class UrbanisationService {
 
   updateApplication(
     id: string,
-    payload: { nom?: string; description?: string; criticite?: Criticite; positionX?: number; positionY?: number },
+    payload: { nom?: string; description?: string; positionX?: number; positionY?: number },
   ): Observable<Application> {
     return this.http.patch<Application>(`/applications/${id}`, payload);
   }
 
   deleteApplication(id: string): Observable<void> {
     return this.http.delete<void>(`/applications/${id}`);
+  }
+
+  generateComponentsView(): Observable<ComponentsView> {
+    return this.http.get<ComponentsView>('/applications/generate-vue');
   }
 
   // ── Zones d'urbanisation ──────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import Konva from 'konva';
 import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
-import { Application, ApplicationEchange, Criticite, UrbanisationService } from './urbanisation.service';
+import { Application, ApplicationEchange, UrbanisationService } from './urbanisation.service';
 import { ToastService } from './toast.service';
 import { ConfirmDialogService } from './confirm-dialog.service';
 
@@ -13,12 +13,6 @@ const SERVICE_ROW_H = 18;
 const PADDING = 8;
 const GAP_X = 40;
 const ROW_Y = 60;
-
-const CRITICITE_COLOR: Record<Criticite, string> = {
-  HAUTE: '#dc2626',
-  MOYENNE: '#d97706',
-  BASSE: '#16a34a',
-};
 
 interface Pos {
   x: number;
@@ -226,12 +220,10 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
 
   private buildBox(app: Application, pos: Pos): Konva.Group {
     const h = pos.h;
-    const color = CRITICITE_COLOR[app.criticite];
     const group = new Konva.Group({ x: pos.x, y: pos.y, draggable: true });
     group.setAttr('nodeKey', app.id);
 
     group.add(new Konva.Rect({ width: BOX_W, height: HEADER_H, fill: '#1E283D', cornerRadius: [6, 6, 0, 0] }));
-    group.add(new Konva.Rect({ width: 4, height: HEADER_H, fill: color, cornerRadius: [6, 0, 0, 0] }));
     group.add(
       new Konva.Text({
         x: 6,

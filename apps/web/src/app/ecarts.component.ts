@@ -44,16 +44,19 @@ interface GapElement extends BpmnElement {
         <div class="processus-groupe" *ngFor="let t of typesProcessus">
           <ng-container *ngIf="processusParType(t).length > 0">
             <h4>{{ typeProcessusLabel(t) }}</h4>
-            <ul class="list">
-              <li
-                class="list-item"
-                *ngFor="let p of processusParType(t)"
-                [class.selected]="selected?.id === p.id"
-                (click)="select(p)"
-              >
-                <strong>{{ p.nom }}</strong>
-              </li>
-            </ul>
+            <div class="table-scroll">
+              <table class="table">
+                <tbody>
+                  <tr
+                    *ngFor="let p of processusParType(t)"
+                    [class.selected]="selected?.id === p.id"
+                    (click)="select(p)"
+                  >
+                    <td>{{ p.nom }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </ng-container>
         </div>
       </section>
@@ -118,9 +121,12 @@ interface GapElement extends BpmnElement {
       .processus-groupe h4 { margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
       .list { list-style: none; display: grid; gap: 0.5rem; }
       .list-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.7rem 0.85rem; border: 1px solid var(--color-border); border-radius: 10px; }
-      .processus-list .list-item { cursor: pointer; }
-      .processus-list .list-item.selected { border-color: var(--color-primary); background: var(--color-primary-light); }
       .ecart-detail .list-item { cursor: default; }
+      .processus-list .table-scroll { overflow-x: auto; }
+      .processus-list .table { width: 100%; border-collapse: collapse; }
+      .processus-list .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
+      .processus-list .table tbody tr { cursor: pointer; }
+      .processus-list .table tbody tr.selected { background: var(--color-primary-light); }
 
       .summary { display: flex; gap: 1rem; margin: 1rem 0 1.5rem; }
       .stat { flex: 1; text-align: center; padding: 1rem; border-radius: var(--radius-lg); background: var(--color-surface); }

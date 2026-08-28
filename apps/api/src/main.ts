@@ -4,6 +4,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { HttpExceptionFilter } from '@archivision/shared';
 import { AppModule } from './app.module';
 import { UPLOADS_DIR } from './modules/uploads/uploads.config';
@@ -15,6 +16,7 @@ async function bootstrap() {
 
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.use(compression());
+  app.use(cookieParser());
   app.useStaticAssets(UPLOADS_DIR, { prefix: '/uploads/' });
 
   app.useGlobalPipes(

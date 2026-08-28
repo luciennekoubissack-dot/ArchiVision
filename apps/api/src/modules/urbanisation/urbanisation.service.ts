@@ -107,7 +107,7 @@ export class UrbanisationService {
         applications: {
           include: {
             application: {
-              select: { id: true, nom: true, criticite: true },
+              select: { id: true, nom: true },
             },
           },
         },

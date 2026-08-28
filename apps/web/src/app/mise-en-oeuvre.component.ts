@@ -32,40 +32,42 @@ const AVANCEMENTS: AvancementSolution[] = ['NON_DEMARRE', 'EN_COURS', 'TERMINE',
       <div class="empty-state" *ngIf="solutions.length === 0">
         Aucune solution retenue pour l'instant .
       </div>
-      <ul class="list" *ngIf="solutions.length > 0">
-        <li class="list-item" *ngFor="let s of solutions">
-          <div class="list-item-head">
-            <div>
-              <strong>{{ s.nom }}</strong>
-              <span class="badge" [class]="avancementBadge(s.avancement)">{{ avancementLabel(s.avancement) }}</span>
-            </div>
-            <select [value]="s.avancement" (change)="changeAvancement(s, $any($event.target).value)">
-              <option *ngFor="let a of avancements" [value]="a">{{ avancementLabel(a) }}</option>
-            </select>
-          </div>
-          <p class="muted" *ngIf="s.planMiseOeuvre">Plan : {{ s.planMiseOeuvre }}</p>
-          <label class="field suivi-field">
-            Commentaire de suivi
-            <textarea
-              [value]="s.commentaireSuivi || ''"
-              (input)="s.commentaireSuivi = $any($event.target).value"
-              (blur)="saveCommentaire(s)"
-              placeholder="Avancement, blocages, prochaines étapes…"
-            ></textarea>
-          </label>
-        </li>
-      </ul>
+      <div class="table-scroll" *ngIf="solutions.length > 0">
+        <table class="table">
+          <thead><tr><th>Nom</th><th>Plan</th><th>Avancement</th><th>Commentaire de suivi</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let s of solutions">
+              <td>{{ s.nom }}</td>
+              <td>{{ s.planMiseOeuvre || '—' }}</td>
+              <td>
+                <span class="badge" [class]="avancementBadge(s.avancement)">{{ avancementLabel(s.avancement) }}</span>
+                <select [value]="s.avancement" (change)="changeAvancement(s, $any($event.target).value)">
+                  <option *ngFor="let a of avancements" [value]="a">{{ avancementLabel(a) }}</option>
+                </select>
+              </td>
+              <td>
+                <textarea
+                  [value]="s.commentaireSuivi || ''"
+                  (input)="s.commentaireSuivi = $any($event.target).value"
+                  (blur)="saveCommentaire(s)"
+                  placeholder="Avancement, blocages, prochaines étapes…"
+                ></textarea>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   `,
   styles: [
     `
       .muted { color: var(--color-text-muted); margin-top: 0.35rem; font-size: 0.9rem; }
-      .list { list-style: none; display: grid; gap: 0.75rem; }
-      .list-item { padding: 1rem; border: 1px solid var(--color-border); border-radius: 12px; }
-      .list-item-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
-      .list-item-head .badge { margin-left: 0.5rem; }
-      .list-item-head select { padding: 0.4rem 0.6rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
-      .suivi-field { margin-top: 0.75rem; }
+      .table-scroll { overflow-x: auto; }
+      .table { width: 100%; min-width: 720px; border-collapse: collapse; }
+      .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+      .table .badge { display: block; margin-bottom: 0.35rem; width: fit-content; }
+      .table select { padding: 0.35rem 0.5rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+      .table textarea { width: 100%; min-width: 220px; min-height: 3.2rem; padding: 0.5rem 0.6rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; resize: vertical; }
     `,
   ],
 })

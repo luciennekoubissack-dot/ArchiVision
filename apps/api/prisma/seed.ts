@@ -167,7 +167,6 @@ async function main() {
       id: APP_ID,
       nom: 'SIRH',
       description: 'Système d\'Information RH',
-      criticite: 'HAUTE',
       organisationId: org.id,
     },
   });

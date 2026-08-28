@@ -76,12 +76,18 @@ const ICONS: Record<string, string> = {
 
       <section class="card" *ngIf="commentaires.length > 0">
         <h3>Commentaires</h3>
-        <ul class="list">
-          <li class="list-item" *ngFor="let c of commentaires">
-            <strong>{{ c.repondant }}</strong> ({{ c.score }}/5)
-            <p class="muted">{{ c.commentaire }}</p>
-          </li>
-        </ul>
+        <div class="table-scroll">
+          <table class="table">
+            <thead><tr><th>Répondant</th><th>Score</th><th>Commentaire</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let c of commentaires">
+                <td>{{ c.repondant }}</td>
+                <td>{{ c.score }} / 5</td>
+                <td>{{ c.commentaire }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   `,

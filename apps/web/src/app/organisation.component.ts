@@ -211,11 +211,17 @@ const ICONS: Record<string, string> = {
           </div>
         </div>
         <div class="empty-state" *ngIf="partiesPrenantes.length === 0">Aucune partie prenante renseignée.</div>
-        <ul class="list" *ngIf="partiesPrenantes.length > 0">
-          <li class="list-item" *ngFor="let p of partiesPrenantes">
-            <div><strong>{{ p.nom }}</strong><span class="badge badge-neutral" *ngIf="p.role"> {{ p.role }}</span></div>
-          </li>
-        </ul>
+        <div class="table-scroll" *ngIf="partiesPrenantes.length > 0">
+          <table class="table">
+            <thead><tr><th>Nom</th><th>Rôle</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let p of partiesPrenantes">
+                <td>{{ p.nom }}</td>
+                <td>{{ p.role || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -234,12 +240,18 @@ const ICONS: Record<string, string> = {
           <button type="submit" class="btn btn-outline">Ajouter</button>
         </form>
         <div class="empty-state" *ngIf="partiesPrenantes.length === 0">Aucune partie prenante renseignée.</div>
-        <ul class="list" *ngIf="partiesPrenantes.length > 0">
-          <li class="list-item" *ngFor="let p of partiesPrenantes">
-            <div><strong>{{ p.nom }}</strong><span class="badge badge-neutral" *ngIf="p.role">{{ p.role }}</span></div>
-            <button class="btn btn-ghost" (click)="removePartiePrenante(p)">Retirer</button>
-          </li>
-        </ul>
+        <div class="table-scroll" *ngIf="partiesPrenantes.length > 0">
+          <table class="table">
+            <thead><tr><th>Nom</th><th>Rôle</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let p of partiesPrenantes">
+                <td>{{ p.nom }}</td>
+                <td>{{ p.role || '—' }}</td>
+                <td class="row-actions"><button class="btn btn-ghost" (click)="removePartiePrenante(p)">Retirer</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -507,9 +519,6 @@ const ICONS: Record<string, string> = {
       .muted { color: var(--color-text-muted); font-size: 0.88rem; }
       .inline-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
       .inline-form input { padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
-      .list { list-style: none; display: grid; gap: 0.5rem; }
-      .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 10px; }
-      .list-item .badge { margin-left: 0.5rem; }
 
       .page-header .tabs { margin-bottom: 0; }
 

@@ -50,7 +50,6 @@ export interface DataEntityItem {
 export interface ApplicationItem {
   nom: string;
   description?: string;
-  criticite?: 'HAUTE' | 'MOYENNE' | 'BASSE';
 }
 
 export interface TechComponentItem {
@@ -94,7 +93,11 @@ export interface RegisterResponse {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly storageKey = 'archivision_token';
+  // Le token d'accès n'est plus stocké ici : le backend le pose en cookie
+  // httpOnly (voir auth.controller.ts côté API), donc invisible et involable
+  // par du JS injecté (XSS). Seules les infos d'affichage non sensibles
+  // (nom, email, rôle) restent en localStorage pour éviter un aller-retour
+  // réseau à chaque rechargement de page.
   private readonly userKey = 'archivision_user';
 
   readonly currentUser = signal<CurrentUser | null>(this.readStoredUser());
@@ -121,13 +124,9 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem(this.storageKey);
     localStorage.removeItem(this.userKey);
     this.currentUser.set(null);
-  }
-
-  getToken(): string | null {
-    return localStorage.getItem(this.storageKey);
+    this.http.post('/auth/logout', {}).subscribe({ error: () => {} });
   }
 
   hasRole(...roles: RoleUtilisateur[]): boolean {
@@ -145,7 +144,6 @@ export class AuthService {
   }
 
   private storeSession(response: AuthResponse): void {
-    localStorage.setItem(this.storageKey, response.accessToken);
     localStorage.setItem(this.userKey, JSON.stringify(response.user));
     this.currentUser.set(response.user);
   }

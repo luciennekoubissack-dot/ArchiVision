@@ -68,12 +68,6 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
   { value: 'MIDDLEWARE', label: 'Middleware' },
 ];
 
-const CRITICITES: { value: NonNullable<ApplicationItem['criticite']>; label: string }[] = [
-  { value: 'HAUTE', label: 'Haute' },
-  { value: 'MOYENNE', label: 'Moyenne' },
-  { value: 'BASSE', label: 'Basse' },
-];
-
 @Component({
   selector: 'app-register',
   standalone: true,
@@ -303,14 +297,11 @@ const CRITICITES: { value: NonNullable<ApplicationItem['criticite']>; label: str
             <p class="muted">Quelles applications utilisez-vous déjà ?</p>
             <form class="inline-form" (submit)="addApplication($event)">
               <input type="text" placeholder="Nom de l'application" [value]="newApplication.nom" (input)="newApplication.nom = $any($event.target).value" required />
-              <select [value]="newApplication.criticite" (change)="newApplication.criticite = $any($event.target).value">
-                <option *ngFor="let c of criticites" [value]="c.value">{{ c.label }}</option>
-              </select>
               <button type="submit" class="btn btn-outline">Ajouter</button>
             </form>
             <ul class="list" *ngIf="applications.length">
               <li class="list-item" *ngFor="let a of applications; let i = index">
-                <div><strong>{{ a.nom }}</strong><span class="badge badge-neutral">{{ a.criticite }}</span></div>
+                <div><strong>{{ a.nom }}</strong></div>
                 <button type="button" class="btn btn-ghost" (click)="applications.splice(i, 1)">Retirer</button>
               </li>
             </ul>
@@ -540,7 +531,6 @@ export class RegisterComponent {
   current: WizardStep = STEPS[0];
   postesConventionnels = POSTES_CONVENTIONNELS;
   techTypes = TECH_TYPES;
-  criticites = CRITICITES;
 
   loading = false;
   error = '';
@@ -585,7 +575,7 @@ export class RegisterComponent {
 
   // Étape 6
   applications: ApplicationItem[] = [];
-  newApplication: ApplicationItem = { nom: '', criticite: 'MOYENNE' };
+  newApplication: ApplicationItem = { nom: '' };
 
   // Étape 7
   techComponents: TechComponentItem[] = [];
@@ -712,7 +702,7 @@ export class RegisterComponent {
     event.preventDefault();
     if (!this.newApplication.nom.trim()) return;
     this.applications = [...this.applications, { ...this.newApplication }];
-    this.newApplication = { nom: '', criticite: 'MOYENNE' };
+    this.newApplication = { nom: '' };
   }
 
   addTechComponent(event: Event): void {

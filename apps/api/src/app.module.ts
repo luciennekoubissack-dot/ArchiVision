@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@archivision/infrastructure';
-import { JwtAuthGuard, SuperAdminGuard } from '@archivision/shared';
+import { CsrfGuard, JwtAuthGuard, SuperAdminGuard } from '@archivision/shared';
 import { OrganisationModule } from './organisation/organisation.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ArchimateModule } from './modules/archimate/archimate.module';
@@ -23,6 +23,7 @@ import { OpportunitesModule } from './modules/opportunites/opportunites.module';
 import { GouvernanceModule } from './modules/gouvernance/gouvernance.module';
 import { EvaluationModule } from './modules/evaluation/evaluation.module';
 import { VisionCanvasModule } from './modules/vision-canvas/vision-canvas.module';
+import { ArchitectureApplicativeModule } from './modules/architecture-applicative/architecture-applicative.module';
 
 @Module({
   imports: [
@@ -50,12 +51,15 @@ import { VisionCanvasModule } from './modules/vision-canvas/vision-canvas.module
     GouvernanceModule,
     EvaluationModule,
     VisionCanvasModule,
+    ArchitectureApplicativeModule,
     HealthModule,
   ],
   providers: [
     // Ordre important : ThrottlerGuard rejette les requêtes en excès avant
     // tout travail d'auth ; JwtAuthGuard peuple ensuite request.user avant
-    // que SuperAdminGuard ne le lise pour bloquer les fuites cross-tenant.
+    // que CsrfGuard ne vérifie les requêtes de mutation authentifiées par
+    // cookie, et que SuperAdminGuard ne lise le rôle pour bloquer les fuites
+    // cross-tenant.
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -63,6 +67,10 @@ import { VisionCanvasModule } from './modules/vision-canvas/vision-canvas.module
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
     {
       provide: APP_GUARD,

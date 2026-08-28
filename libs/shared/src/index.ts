@@ -1,3 +1,4 @@
+export * from './guards/csrf.guard';
 export * from './guards/jwt-auth.guard';
 export * from './guards/roles.guard';
 export * from './guards/superadmin.guard';
@@ -8,3 +9,4 @@ export * from './decorators/superadmin-route.decorator';
 export * from './filters/http-exception.filter';
 export * from './utils/require-organisation-id';
 export * from './utils/require-jwt-secret';
+export * from './utils/auth-cookies';

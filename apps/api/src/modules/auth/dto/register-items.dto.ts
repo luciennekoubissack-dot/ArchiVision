@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import { Criticite, TypeElement, TypeTechComponent } from '@prisma/client';
+import { TypeElement, TypeTechComponent } from '@prisma/client';
 
 /// Éléments optionnels que l'assistant d'inscription peut pré-remplir pour une
 /// organisation (étapes 2 à 7). Formes reprises des DTO de création de chaque
@@ -90,10 +90,6 @@ export class ApplicationItemDto {
   @IsOptional()
   @MaxLength(2000)
   description?: string;
-
-  @IsEnum(Criticite)
-  @IsOptional()
-  criticite?: Criticite;
 }
 
 export class TechComponentItemDto {

@@ -352,3 +352,25 @@ body {
   color: var(--color-white);
   background: var(--color-black);
 }
+
+/* Sous-onglets (deuxième niveau, ex. Éditeur / Diagramme généré à l'intérieur d'un onglet
+   principal) : volontairement plus discrets que les onglets principaux ci-dessus — fond
+   uni au lieu d'une carte flottante avec ombre, pastilles plus petites, couleur d'accent
+   au lieu du noir — pour que la hiérarchie entre les deux niveaux se lise d'un coup d'œil. */
+.sub-tabs {
+  background: var(--color-surface);
+  border-color: transparent;
+  box-shadow: none;
+  padding: 0.25rem;
+}
+.sub-tabs .tab {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+}
+.sub-tabs .tab:hover:not(.active) {
+  background: var(--color-white);
+}
+.sub-tabs .tab.active {
+  color: var(--color-white);
+  background: var(--color-primary);
+}

@@ -65,12 +65,22 @@ const ICONS: Record<string, string> = {
       </div>
       <section class="card">
         <div class="empty-state" *ngIf="politiques.length === 0">Aucune politique de gouvernance définie.</div>
-        <ul class="list" *ngIf="politiques.length > 0">
-          <li class="list-item" *ngFor="let p of politiques">
-            <div><strong>{{ p.nom }}</strong><p class="muted" *ngIf="p.description">{{ p.description }}</p></div>
-            <button class="btn btn-ghost" (click)="removePolitique(p)">Supprimer</button>
-          </li>
-        </ul>
+        <div class="table-scroll" *ngIf="politiques.length > 0">
+          <table class="table">
+            <thead><tr><th>Nom</th><th>Description</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let p of politiques">
+                <td>{{ p.nom }}</td>
+                <td>{{ p.description || '—' }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removePolitique(p)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
 
@@ -140,21 +150,26 @@ const ICONS: Record<string, string> = {
       </div>
       <section class="card">
         <div class="empty-state" *ngIf="changements.length === 0">Aucune demande de changement.</div>
-        <ul class="list" *ngIf="changements.length > 0">
-          <li class="list-item" *ngFor="let c of changements">
-            <div>
-              <strong>{{ c.titre }}</strong>
-              <span class="badge" [class]="statutChangementBadge(c.statut)">{{ statutChangementLabel(c.statut) }}</span>
-              <p class="muted" *ngIf="c.description">{{ c.description }}</p>
-            </div>
-            <div class="actions">
-              <select [value]="c.statut" (change)="changeStatutChangement(c, $any($event.target).value)">
-                <option *ngFor="let st of statutsChangement" [value]="st">{{ statutChangementLabel(st) }}</option>
-              </select>
-              <button class="btn btn-danger" (click)="removeChangement(c)">Supprimer</button>
-            </div>
-          </li>
-        </ul>
+        <div class="table-scroll" *ngIf="changements.length > 0">
+          <table class="table">
+            <thead><tr><th>Titre</th><th>Description</th><th>Statut</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let c of changements">
+                <td>{{ c.titre }}</td>
+                <td>{{ c.description || '—' }}</td>
+                <td><span class="badge" [class]="statutChangementBadge(c.statut)">{{ statutChangementLabel(c.statut) }}</span></td>
+                <td class="row-actions">
+                  <select [value]="c.statut" (change)="changeStatutChangement(c, $any($event.target).value)">
+                    <option *ngFor="let st of statutsChangement" [value]="st">{{ statutChangementLabel(st) }}</option>
+                  </select>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeChangement(c)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
 
@@ -216,6 +231,7 @@ const ICONS: Record<string, string> = {
       .table { width: 100%; min-width: 560px; border-collapse: collapse; }
       .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
       .table select { padding: 0.35rem 0.5rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+      .row-actions { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; }
       .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
       .stat { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 1.5rem 1rem; }
       .stat-value { font-size: 2rem; font-weight: 800; }

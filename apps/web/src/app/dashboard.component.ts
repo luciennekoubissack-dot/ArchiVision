@@ -4,7 +4,7 @@ import { Chart, registerables } from 'chart.js';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ArchimateService, ElementArchimate, TypeElement } from './archimate.service';
-import { Application, Criticite, UrbanisationService } from './urbanisation.service';
+import { UrbanisationService } from './urbanisation.service';
 import { MembresService } from './membres.service';
 import { AuthService } from './auth.service';
 import { Organisation, OrganisationService } from './organisation.service';
@@ -21,12 +21,6 @@ const TYPE_LABEL: Record<TypeElement, string> = {
   PROCESSUS_METIER: 'Processus',
   SERVICE_METIER: 'Services métier',
   OBJET_METIER: 'Objets métier',
-};
-
-const CRITICITE_LABEL: Record<Criticite, string> = {
-  HAUTE: 'Haute',
-  MOYENNE: 'Moyenne',
-  BASSE: 'Basse',
 };
 
 interface Kpi {
@@ -100,16 +94,6 @@ const KPIS: Kpi[] = [
         </div>
         <div class="chart-wrap" [style.display]="counts.elements > 0 ? 'block' : 'none'">
           <canvas #elementsChart></canvas>
-        </div>
-      </section>
-
-      <section class="card chart-card card-hover">
-        <h3>Applications par criticité</h3>
-        <div class="empty-state" *ngIf="loaded && counts.applications === 0">
-          Aucune application pour l'instant .
-        </div>
-        <div class="chart-wrap" [style.display]="counts.applications > 0 ? 'block' : 'none'">
-          <canvas #criticiteChart></canvas>
         </div>
       </section>
     </section>
@@ -198,17 +182,14 @@ const KPIS: Kpi[] = [
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('elementsChart') elementsChartRef?: ElementRef<HTMLCanvasElement>;
-  @ViewChild('criticiteChart') criticiteChartRef?: ElementRef<HTMLCanvasElement>;
 
   kpis = KPIS;
   counts = { capacites: 0, elements: 0, applications: 0, zones: 0, membres: null as number | null };
   loaded = false;
   organisation?: Organisation;
   private elements: ElementArchimate[] = [];
-  private applications: Application[] = [];
   private viewReady = false;
   private elementsChart?: Chart;
-  private criticiteChart?: Chart;
 
   constructor(
     private archimateService: ArchimateService,
@@ -259,7 +240,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       membres: membres$,
     }).subscribe(({ capacites, elements, applications, zones, membres }) => {
       this.elements = elements;
-      this.applications = applications;
       this.counts = {
         capacites: capacites.length,
         elements: elements.length,
@@ -282,17 +262,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.elementsChart?.destroy();
-    this.criticiteChart?.destroy();
   }
 
   private renderCharts(): void {
-    // Les canvas sont toujours dans le DOM (visibilité pilotée par [style.display]),
-    // donc les ViewChild sont déjà résolus quand les données arrivent en asynchrone —
-    // contrairement à un *ngIf sur le canvas, qui retarderait leur disponibilité
+    // Le canvas est toujours dans le DOM (visibilité pilotée par [style.display]),
+    // donc le ViewChild est déjà résolu quand les données arrivent en asynchrone —
+    // contrairement à un *ngIf sur le canvas, qui retarderait sa disponibilité
     // d'un cycle de détection de changements.
     if (!this.viewReady) return;
     this.renderElementsChart();
-    this.renderCriticiteChart();
   }
 
   private renderElementsChart(): void {
@@ -320,39 +298,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { position: 'bottom', labels: { padding: 14, usePointStyle: true } } },
-      },
-    });
-  }
-
-  private renderCriticiteChart(): void {
-    if (!this.criticiteChartRef || this.applications.length === 0) return;
-    this.criticiteChart?.destroy();
-
-    const order: Criticite[] = ['HAUTE', 'MOYENNE', 'BASSE'];
-    const counts = new Map<Criticite, number>();
-    for (const app of this.applications) {
-      counts.set(app.criticite, (counts.get(app.criticite) ?? 0) + 1);
-    }
-    const colors: Record<Criticite, string> = { HAUTE: '#dc2626', MOYENNE: '#d98a1f', BASSE: '#1f9d55' };
-
-    this.criticiteChart = new Chart(this.criticiteChartRef.nativeElement, {
-      type: 'bar',
-      data: {
-        labels: order.map((c) => CRITICITE_LABEL[c]),
-        datasets: [
-          {
-            data: order.map((c) => counts.get(c) ?? 0),
-            backgroundColor: order.map((c) => colors[c]),
-            borderRadius: 8,
-            maxBarThickness: 56,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
       },
     });
   }

@@ -43,6 +43,11 @@ export class UrbanisationController {
     return this.service.findAllApplications(requireOrganisationId(user));
   }
 
+  @Get('applications/generate-vue')
+  generateComponentsVue(@CurrentUser() user: AuthUser) {
+    return this.viewService.generateComponents(requireOrganisationId(user));
+  }
+
   @Get('applications/:id')
   findOneApplication(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.findOneApplication(id, requireOrganisationId(user));

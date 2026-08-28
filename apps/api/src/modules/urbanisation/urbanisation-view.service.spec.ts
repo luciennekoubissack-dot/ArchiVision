@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '@archivision/infrastructure';
-import { Criticite, TypeZone } from '@prisma/client';
+import { TypeZone } from '@prisma/client';
 import { UrbanisationViewService } from './urbanisation-view.service';
 
 describe('UrbanisationViewService', () => {
@@ -8,9 +8,11 @@ describe('UrbanisationViewService', () => {
 
   const prismaMock = {
     zoneUrbanisation: { findMany: jest.fn() },
+    application: { findMany: jest.fn() },
+    applicationEchange: { findMany: jest.fn() },
   };
 
-  const application = { id: 'app-001', nom: 'SIRH', criticite: Criticite.HAUTE };
+  const application = { id: 'app-001', nom: 'SIRH' };
 
   const ilot = {
     id: 'zone-002',
@@ -49,24 +51,9 @@ describe('UrbanisationViewService', () => {
     expect(result.svg).toContain('SIRH');
   });
 
-  it('colore une application HAUTE criticité différemment de BASSE', async () => {
-    const appBasse = { id: 'app-002', nom: 'Site vitrine', criticite: Criticite.BASSE };
-    const ilotAvecDeux = {
-      ...ilot,
-      applications: [{ application }, { application: appBasse }],
-      enfants: [],
-    };
-    prismaMock.zoneUrbanisation.findMany.mockResolvedValue([{ ...zone, enfants: [ilotAvecDeux] }]);
-
-    const result = await service.generate('org-001');
-
-    expect(result.svg).toContain('#F28B82'); // HAUTE
-    expect(result.svg).toContain('#A5D6A7'); // BASSE
-  });
-
   it("n'affiche que les 4 premières applications d'un îlot et indique le reste", async () => {
     const apps = Array.from({ length: 6 }, (_, i) => ({
-      application: { id: `app-${i}`, nom: `App ${i}`, criticite: Criticite.MOYENNE },
+      application: { id: `app-${i}`, nom: `App ${i}` },
     }));
     const ilotCharge = { ...ilot, applications: apps, enfants: [] };
     prismaMock.zoneUrbanisation.findMany.mockResolvedValue([{ ...zone, enfants: [ilotCharge] }]);
@@ -97,5 +84,62 @@ describe('UrbanisationViewService', () => {
         where: { organisationId: 'org-001', parentId: null },
       }),
     );
+  });
+
+  describe('generateComponents', () => {
+    it('génère un SVG avec les applications et leurs services', async () => {
+      prismaMock.application.findMany.mockResolvedValue([
+        { id: 'app-1', nom: 'SIRH', positionX: null, positionY: null, services: [{ id: 's1', nom: 'Paie' }] },
+        { id: 'app-2', nom: 'CRM', positionX: null, positionY: null, services: [] },
+      ]);
+      prismaMock.applicationEchange.findMany.mockResolvedValue([
+        { id: 'e1', sourceId: 'app-1', targetId: 'app-2', description: 'Synchro', protocole: 'REST' },
+      ]);
+
+      const result = await service.generateComponents('org-001');
+
+      expect(result.applicationCount).toBe(2);
+      expect(result.echangeCount).toBe(1);
+      expect(result.svg).toContain('SIRH');
+      expect(result.svg).toContain('CRM');
+      expect(result.svg).toContain('Paie');
+      expect(result.svg).toContain('Aucun service');
+      expect(result.svg).toContain('Synchro · REST');
+    });
+
+    it('respecte les positions enregistrées quand elles existent', async () => {
+      prismaMock.application.findMany.mockResolvedValue([
+        { id: 'app-1', nom: 'SIRH', positionX: 250, positionY: 300, services: [] },
+      ]);
+      prismaMock.applicationEchange.findMany.mockResolvedValue([]);
+
+      const result = await service.generateComponents('org-001');
+
+      expect(result.svg).toContain('x="250"');
+      expect(result.svg).toContain('y="300"');
+    });
+
+    it('ignore un échange dont une extrémité est absente de la liste des applications', async () => {
+      prismaMock.application.findMany.mockResolvedValue([
+        { id: 'app-1', nom: 'SIRH', positionX: null, positionY: null, services: [] },
+      ]);
+      prismaMock.applicationEchange.findMany.mockResolvedValue([
+        { id: 'e1', sourceId: 'app-1', targetId: 'app-inconnue', description: null, protocole: null },
+      ]);
+
+      const result = await service.generateComponents('org-001');
+
+      expect(result.echangeCount).toBe(0);
+    });
+
+    it('renvoie un SVG « état vide » sans erreur quand il n\'y a aucune application', async () => {
+      prismaMock.application.findMany.mockResolvedValue([]);
+      prismaMock.applicationEchange.findMany.mockResolvedValue([]);
+
+      const result = await service.generateComponents('org-001');
+
+      expect(result.applicationCount).toBe(0);
+      expect(result.svg).toContain('Aucune application');
+    });
   });
 });

@@ -94,6 +94,7 @@ model Organisation {
   demandesChangement    DemandeChangement[]
   enqueteReponses       EnqueteReponse[]
   visionCanvas          VisionCanvas?
+  archiApplicativeElements ArchiApplicativeElement[]
 }
 
 // ─── Service d'entreprise (département, hiérarchique) ─────────────────────────
@@ -350,6 +351,71 @@ model ApplicationZone {
   zone          ZoneUrbanisation @relation(fields: [zoneId], references: [id], onDelete: Cascade)
 
   @@id([applicationId, zoneId])
+}
+
+// ─── Architecture applicative (module Architecture Système) ──────────────────
+
+/// Type d'élément du diagramme d'architecture applicative — au-delà des
+/// applications du portefeuille (déjà couvertes par le diagramme de
+/// composants), ce diagramme couvre aussi les utilisateurs, systèmes tiers,
+/// l'infrastructure et les mécanismes de sécurité qui gravitent autour.
+enum TypeElementArchiApplicative {
+  APPLICATION
+  UTILISATEUR_INTERNE
+  UTILISATEUR_EXTERNE
+  SYSTEME_EXTERNE
+  BASE_DE_DONNEES
+  INFRASTRUCTURE
+  SECURITE
+}
+
+/// Nature du flux entre deux éléments — pilote le style de trait (plein/
+/// pointillé) et sa couleur dans le diagramme généré, à la manière des
+/// notations d'architecture logicielle courantes (API vs donnée vs auth).
+enum TypeFluxArchiApplicative {
+  API
+  DONNEES
+  AUTHENTIFICATION
+  RESEAU
+}
+
+/// Élément du diagramme d'architecture applicative (module Architecture
+/// Système, onglet dédié). Volontairement indépendant du portefeuille
+/// `Application` pour ne pas faire interférer deux diagrammes sur les mêmes
+/// coordonnées (même précaution que `TechDeploiement` vis-à-vis du diagramme
+/// de composants, cf. docs/audit.md).
+model ArchiApplicativeElement {
+  id             String                      @id @default(uuid())
+  nom            String
+  type           TypeElementArchiApplicative
+  description    String?
+  positionX      Float?                      @map("position_x")
+  positionY      Float?                      @map("position_y")
+  organisationId String
+  organisation   Organisation                @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  fluxSource ArchiApplicativeFlux[] @relation("ArchiFluxSource")
+  fluxTarget ArchiApplicativeFlux[] @relation("ArchiFluxTarget")
+
+  @@index([organisationId])
+}
+
+/// Flux (interconnexion) entre deux éléments du diagramme d'architecture
+/// applicative.
+model ArchiApplicativeFlux {
+  id        String                   @id @default(uuid())
+  sourceId  String
+  source    ArchiApplicativeElement  @relation("ArchiFluxSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId  String
+  target    ArchiApplicativeElement  @relation("ArchiFluxTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  type      TypeFluxArchiApplicative @default(DONNEES)
+  label     String?
+  createdAt DateTime                 @default(now())
+
+  @@index([sourceId])
+  @@index([targetId])
 }
 
 // ─── Vision & parties prenantes (étape 1 de l'assistant TOGAF ADM) ────────────

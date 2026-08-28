@@ -9,7 +9,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      # Pas de valeur par défaut : voir JWT_SECRET plus bas pour la même raison.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit être défini (export POSTGRES_PASSWORD=... avant docker compose up)}
       POSTGRES_DB: archivision
     ports:
       - '5433:5432'
@@ -27,7 +28,7 @@ services:
       dockerfile: Dockerfile.api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/archivision?schema=public
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/archivision?schema=public
       # Pas de valeur par défaut : l'API refuse de démarrer si JWT_SECRET
       # n'est pas exporté avant `docker compose up` (voir requireJwtSecret()).
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET doit être défini (export JWT_SECRET=... avant docker compose up)}
