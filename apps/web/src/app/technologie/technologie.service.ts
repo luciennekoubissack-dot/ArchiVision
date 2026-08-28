@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { Paginated } from '../shared/pagination.interface';
 
 export type TypeTechComponent = 'SERVEUR' | 'RESEAU' | 'CLOUD' | 'BASE_DE_DONNEES' | 'MIDDLEWARE';
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
@@ -26,8 +27,13 @@ export interface TechComponent {
 export class TechnologieService {
   constructor(private http: HttpClient) {}
 
+  /** Utilisé par le canevas interactif : a besoin de tous les composants pour se dessiner. */
   list(): Observable<TechComponent[]> {
     return this.http.get<TechComponent[]>('/tech-components');
+  }
+
+  listPaginated(page: number, pageSize: number): Observable<Paginated<TechComponent>> {
+    return this.http.get<Paginated<TechComponent>>('/tech-components', { params: { page, pageSize } });
   }
 
   create(payload: {

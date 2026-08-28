@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { Paginated } from '../shared/pagination.interface';
 
 export type TypeZone = 'ZONE' | 'QUARTIER' | 'ILOT';
 
@@ -75,8 +76,13 @@ export class UrbanisationService {
 
   // ── Applications ──────────────────────────────────────────────────────────
 
+  /** Utilisé par le canevas interactif et le formulaire d'affectation (Zones) : a besoin de toutes les applications. */
   listApplications(): Observable<Application[]> {
     return this.http.get<Application[]>('/applications');
+  }
+
+  listApplicationsPaginated(page: number, pageSize: number): Observable<Paginated<Application>> {
+    return this.http.get<Paginated<Application>>('/applications', { params: { page, pageSize } });
   }
 
   getApplication(id: string): Observable<Application> {

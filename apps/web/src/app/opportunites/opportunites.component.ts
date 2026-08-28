@@ -7,6 +7,8 @@ import { CreateSolutionPayload, ScoreItem, Solution, SolutionService, StatutSolu
 import { CritereEvaluation, CritereEvaluationService } from './critere-evaluation.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
+import { PaginationComponent } from '../shared/pagination.component';
+import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
 Chart.register(...registerables);
 
@@ -36,7 +38,7 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-opportunites',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, PaginationComponent],
   template: `
     <p class="muted step-question">Quelles solutions candidates peuvent combler les écarts identifiés, et comment se comparent-elles ?</p>
 
@@ -48,7 +50,7 @@ const ICONS: Record<string, string> = {
     <!-- ── Solutions ─────────────────────────────────────────────────────── -->
     <section *ngIf="tab === 'solutions'">
       <div class="page-header">
-        <h3>Solutions ({{ solutions.length }})</h3>
+        <h3>Solutions ({{ solutionsTotal }})</h3>
         <button type="button" class="btn btn-primary" *ngIf="canWrite" (click)="openCreate()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
           Ajouter une solution
@@ -83,6 +85,7 @@ const ICONS: Record<string, string> = {
             </tbody>
           </table>
         </div>
+        <app-pagination [page]="solutionsPage" [total]="solutionsTotal" [pageSize]="solutionsPageSize" (pageChange)="onSolutionsPageChange($event)" />
       </section>
     </section>
 
@@ -175,7 +178,7 @@ const ICONS: Record<string, string> = {
         </ul>
       </section>
 
-      <section class="card" *ngIf="solutions.length > 0 && criteres.length > 0">
+      <section class="card" *ngIf="solutionsAll.length > 0 && criteres.length > 0">
         <h3>Matrice</h3>
         <div class="table-scroll">
           <table class="table">
@@ -188,7 +191,7 @@ const ICONS: Record<string, string> = {
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let solution of solutions">
+              <tr *ngFor="let solution of solutionsAll">
                 <td>{{ solution.nom }}</td>
                 <td *ngFor="let critere of criteres">
                   <select
@@ -212,7 +215,7 @@ const ICONS: Record<string, string> = {
         </div>
       </section>
 
-      <section class="card" *ngIf="solutions.length > 0">
+      <section class="card" *ngIf="solutionsAll.length > 0">
         <h3>Comparaison des notes moyennes</h3>
         <div class="chart-container"><canvas #scoresChart></canvas></div>
       </section>
@@ -263,6 +266,11 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
   scores = SCORES;
 
   solutions: Solution[] = [];
+  solutionsPage = 1;
+  solutionsTotal = 0;
+  solutionsPageSize = DEFAULT_PAGE_SIZE;
+  /** Toutes les solutions, sans pagination : lignes de la matrice et graphique de comparaison. */
+  solutionsAll: Solution[] = [];
   criteres: CritereEvaluation[] = [];
   matrixValues: Record<string, Record<string, number>> = {};
   savingRow: Record<string, boolean> = {};
@@ -302,14 +310,34 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (criteres) => (this.criteres = criteres),
       error: () => this.toast.error('Impossible de charger les critères.'),
     });
+    this.loadSolutions();
+    this.loadSolutionsAll();
+  }
+
+  private loadSolutions(): void {
+    this.solutionService.listPaginated(this.solutionsPage, this.solutionsPageSize).subscribe({
+      next: (result) => {
+        this.solutions = result.items;
+        this.solutionsTotal = result.total;
+      },
+      error: () => this.toast.error('Impossible de charger les solutions.'),
+    });
+  }
+
+  private loadSolutionsAll(): void {
     this.solutionService.list().subscribe({
       next: (solutions) => {
-        this.solutions = solutions;
+        this.solutionsAll = solutions;
         solutions.forEach((s) => this.initMatrixRow(s));
         this.renderChart();
       },
       error: () => this.toast.error('Impossible de charger les solutions.'),
     });
+  }
+
+  onSolutionsPageChange(page: number): void {
+    this.solutionsPage = page;
+    this.loadSolutions();
   }
 
   ngAfterViewInit(): void {
@@ -360,13 +388,12 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.creating = true;
     const payload: CreateSolutionPayload = { ...this.newSolution };
     this.solutionService.create(payload).subscribe({
-      next: (solution) => {
-        this.solutions = [...this.solutions, solution];
-        this.initMatrixRow(solution);
+      next: () => {
         this.creating = false;
         this.closeCreate();
         this.toast.success('Solution créée.');
-        this.renderChart();
+        this.loadSolutions();
+        this.loadSolutionsAll();
       },
       error: () => {
         this.creating = false;
@@ -404,11 +431,12 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.saving = true;
     const payload: UpdateSolutionPayload = this.editDraft;
     this.solutionService.update(this.editTarget.id, payload).subscribe({
-      next: (updated) => {
-        this.solutions = this.solutions.map((s) => (s.id === updated.id ? updated : s));
+      next: () => {
         this.saving = false;
         this.closeEdit();
         this.toast.success('Solution modifiée.');
+        this.loadSolutions();
+        this.loadSolutionsAll();
       },
       error: () => {
         this.saving = false;
@@ -422,10 +450,10 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!confirmed) return;
     this.solutionService.delete(solution.id).subscribe({
       next: () => {
-        this.solutions = this.solutions.filter((s) => s.id !== solution.id);
         delete this.matrixValues[solution.id];
         this.toast.success('Solution supprimée.');
-        this.renderChart();
+        this.loadSolutions();
+        this.loadSolutionsAll();
       },
       error: () => this.toast.error('Impossible de supprimer cette solution.'),
     });
@@ -499,12 +527,11 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.savingRow[solution.id] = true;
     this.solutionService.updateScores(solution.id, items).subscribe({
-      next: (updated) => {
-        this.solutions = this.solutions.map((s) => (s.id === updated.id ? updated : s));
-        this.initMatrixRow(updated);
+      next: () => {
         this.savingRow[solution.id] = false;
         this.toast.success('Notes enregistrées.');
-        this.renderChart();
+        this.loadSolutions();
+        this.loadSolutionsAll();
       },
       error: () => {
         this.savingRow[solution.id] = false;
@@ -516,7 +543,7 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Graphique ────────────────────────────────────────────────────────────
 
   private renderChart(): void {
-    if (!this.viewReady || !this.scoresChartRef || this.solutions.length === 0) return;
+    if (!this.viewReady || !this.scoresChartRef || this.solutionsAll.length === 0) return;
     this.chart?.destroy();
 
     // responsive:true fait entrer ce canevas dans une boucle de redimensionnement
@@ -529,10 +556,10 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chart = new Chart(canvas, {
       type: 'bar',
       data: {
-        labels: this.solutions.map((s) => s.nom),
+        labels: this.solutionsAll.map((s) => s.nom),
         datasets: [
           {
-            data: this.solutions.map((s) => this.noteMoyenne(s) ?? 0),
+            data: this.solutionsAll.map((s) => this.noteMoyenne(s) ?? 0),
             backgroundColor: '#3b5bdb',
             borderRadius: 8,
             maxBarThickness: 56,

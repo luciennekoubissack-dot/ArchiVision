@@ -5,6 +5,8 @@ import { DataEntity, DataRelation, DonneesService, TypeCardinalite } from './don
 import { DonneesCanevasComponent } from './donnees-canevas.component';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
+import { PaginationComponent } from '../shared/pagination.component';
+import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
 type Tab = 'entites' | 'relations' | 'diagramme';
 
@@ -27,7 +29,7 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-donnees',
   standalone: true,
-  imports: [CommonModule, DonneesCanevasComponent],
+  imports: [CommonModule, DonneesCanevasComponent, PaginationComponent],
   template: `
     <p class="muted step-question">Quelles informations sont nécessaires au fonctionnement de l'entreprise ? Où sont-elles stockées et qui en est responsable ?</p>
 
@@ -39,7 +41,7 @@ const ICONS: Record<string, string> = {
 
     <section *ngIf="tab === 'entites'">
       <div class="page-header">
-        <h3>Entités ({{ entities.length }})</h3>
+        <h3>Entités ({{ entitiesTotal }})</h3>
         <button type="button" class="btn btn-primary" (click)="openCreateEntity()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
           Ajouter une entité
@@ -85,11 +87,12 @@ const ICONS: Record<string, string> = {
       </section>
 
       <div class="empty-state" *ngIf="entities.length === 0">Aucune entité de données définie.</div>
+      <app-pagination [page]="entitiesPage" [total]="entitiesTotal" [pageSize]="entitiesPageSize" (pageChange)="onEntitiesPageChange($event)" />
     </section>
 
     <section *ngIf="tab === 'relations'">
       <div class="page-header">
-        <h3>Relations ({{ relations.length }})</h3>
+        <h3>Relations ({{ relationsTotal }})</h3>
         <button type="button" class="btn btn-primary" (click)="openCreateRelation()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
           Ajouter une relation
@@ -116,6 +119,7 @@ const ICONS: Record<string, string> = {
             </tbody>
           </table>
         </div>
+        <app-pagination [page]="relationsPage" [total]="relationsTotal" [pageSize]="relationsPageSize" (pageChange)="onRelationsPageChange($event)" />
       </section>
     </section>
 
@@ -193,14 +197,14 @@ const ICONS: Record<string, string> = {
             Source
             <select [value]="newRelation.sourceId" (change)="newRelation.sourceId = $any($event.target).value">
               <option value="" disabled>Choisir une entité</option>
-              <option *ngFor="let e of entities" [value]="e.id">{{ e.nom }}</option>
+              <option *ngFor="let e of entitiesAll" [value]="e.id">{{ e.nom }}</option>
             </select>
           </label>
           <label class="field">
             Cible
             <select [value]="newRelation.targetId" (change)="newRelation.targetId = $any($event.target).value">
               <option value="" disabled>Choisir une entité</option>
-              <option *ngFor="let e of entities" [value]="e.id">{{ e.nom }}</option>
+              <option *ngFor="let e of entitiesAll" [value]="e.id">{{ e.nom }}</option>
             </select>
           </label>
         </div>
@@ -242,6 +246,11 @@ export class DonneesComponent implements OnInit {
   cardinalites = CARDINALITES;
 
   entities: DataEntity[] = [];
+  entitiesPage = 1;
+  entitiesTotal = 0;
+  entitiesPageSize = DEFAULT_PAGE_SIZE;
+  /** Toutes les entités, sans pagination : source des menus déroulants Source/Cible du formulaire Relations. */
+  entitiesAll: DataEntity[] = [];
   newEntity: { nom: string; description?: string; proprietaire?: string } = { nom: '' };
   creatingEntity = false;
   createEntityPopover = false;
@@ -253,6 +262,9 @@ export class DonneesComponent implements OnInit {
   newAttr: { nom: string; type: string } = { nom: '', type: '' };
 
   relations: DataRelation[] = [];
+  relationsPage = 1;
+  relationsTotal = 0;
+  relationsPageSize = DEFAULT_PAGE_SIZE;
   newRelation: { sourceId: string; targetId: string; cardinalite: TypeCardinalite } = {
     sourceId: '',
     targetId: '',
@@ -270,6 +282,7 @@ export class DonneesComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadEntities();
+    this.loadEntitiesAll();
     this.loadRelations();
   }
 
@@ -340,10 +353,25 @@ export class DonneesComponent implements OnInit {
   }
 
   loadEntities(): void {
-    this.donneesService.list().subscribe({
-      next: (entities) => (this.entities = entities),
+    this.donneesService.listPaginated(this.entitiesPage, this.entitiesPageSize).subscribe({
+      next: (result) => {
+        this.entities = result.items;
+        this.entitiesTotal = result.total;
+      },
       error: () => this.toast.error('Impossible de charger les entités.'),
     });
+  }
+
+  loadEntitiesAll(): void {
+    this.donneesService.list().subscribe({
+      next: (entities) => (this.entitiesAll = entities),
+      error: () => this.toast.error('Impossible de charger les entités.'),
+    });
+  }
+
+  onEntitiesPageChange(page: number): void {
+    this.entitiesPage = page;
+    this.loadEntities();
   }
 
   createEntity(event: Event): void {
@@ -354,6 +382,7 @@ export class DonneesComponent implements OnInit {
         this.creatingEntity = false;
         this.closeCreateEntity();
         this.loadEntities();
+        this.loadEntitiesAll();
         this.toast.success('Entité créée.');
       },
       error: () => {
@@ -369,6 +398,7 @@ export class DonneesComponent implements OnInit {
     this.donneesService.delete(entity.id).subscribe({
       next: () => {
         this.loadEntities();
+        this.loadEntitiesAll();
         this.loadRelations();
         this.toast.success('Entité supprimée.');
       },
@@ -383,6 +413,7 @@ export class DonneesComponent implements OnInit {
       next: () => {
         this.newAttr = { nom: '', type: '' };
         this.loadEntities();
+        this.loadEntitiesAll();
         this.toast.success('Attribut ajouté.');
       },
       error: () => this.toast.error("Impossible d'ajouter cet attribut."),
@@ -393,6 +424,7 @@ export class DonneesComponent implements OnInit {
     this.donneesService.removeAttribute(attributeId).subscribe({
       next: () => {
         this.loadEntities();
+        this.loadEntitiesAll();
         this.toast.success('Attribut retiré.');
       },
       error: () => this.toast.error("Impossible de retirer cet attribut."),
@@ -400,10 +432,18 @@ export class DonneesComponent implements OnInit {
   }
 
   loadRelations(): void {
-    this.donneesService.listRelations().subscribe({
-      next: (relations) => (this.relations = relations),
+    this.donneesService.listRelationsPaginated(this.relationsPage, this.relationsPageSize).subscribe({
+      next: (result) => {
+        this.relations = result.items;
+        this.relationsTotal = result.total;
+      },
       error: () => this.toast.error('Impossible de charger les relations.'),
     });
+  }
+
+  onRelationsPageChange(page: number): void {
+    this.relationsPage = page;
+    this.loadRelations();
   }
 
   createRelation(event: Event): void {

@@ -6,6 +6,8 @@ import { Application, UrbanisationService } from '../urbanisation/urbanisation.s
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { TechnologieCanevasComponent } from './technologie-canevas.component';
+import { PaginationComponent } from '../shared/pagination.component';
+import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
 type Tab = 'composants' | 'diagramme';
 
@@ -26,7 +28,7 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-technologie',
   standalone: true,
-  imports: [CommonModule, TechnologieCanevasComponent],
+  imports: [CommonModule, TechnologieCanevasComponent, PaginationComponent],
   template: `
     <p class="muted step-question">Sur quelle infrastructure (serveurs, réseaux, cloud, bases de données) tournent les applications, et pourquoi ces choix ?</p>
 
@@ -39,7 +41,7 @@ const ICONS: Record<string, string> = {
 
     <ng-container *ngIf="tab === 'composants'">
     <div class="page-header">
-      <h3>Composants ({{ components.length }})</h3>
+      <h3>Composants ({{ componentsTotal }})</h3>
       <button type="button" class="btn btn-primary" (click)="openCreate()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
         Ajouter un composant
@@ -74,6 +76,7 @@ const ICONS: Record<string, string> = {
     </section>
 
     <div class="empty-state" *ngIf="components.length === 0">Aucun composant technique défini.</div>
+    <app-pagination [page]="componentsPage" [total]="componentsTotal" [pageSize]="componentsPageSize" (pageChange)="onComponentsPageChange($event)" />
     </ng-container>
 
     <!-- ── Popover : ajouter un composant ────────────────────────────────── -->
@@ -119,6 +122,9 @@ export class TechnologieComponent implements OnInit {
   tab: Tab = 'composants';
   types = TYPES;
   components: TechComponent[] = [];
+  componentsPage = 1;
+  componentsTotal = 0;
+  componentsPageSize = DEFAULT_PAGE_SIZE;
   applications: Application[] = [];
   deployTarget: Record<string, string> = {};
 
@@ -160,10 +166,18 @@ export class TechnologieComponent implements OnInit {
   }
 
   loadComponents(): void {
-    this.technologieService.list().subscribe({
-      next: (components) => (this.components = components),
+    this.technologieService.listPaginated(this.componentsPage, this.componentsPageSize).subscribe({
+      next: (result) => {
+        this.components = result.items;
+        this.componentsTotal = result.total;
+      },
       error: () => this.toast.error('Impossible de charger les composants techniques.'),
     });
+  }
+
+  onComponentsPageChange(page: number): void {
+    this.componentsPage = page;
+    this.loadComponents();
   }
 
   createComponent(event: Event): void {

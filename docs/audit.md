@@ -1139,56 +1139,90 @@ qui hérite de `PaginationQueryDto` et ajoute son propre champ, pas de
 deux `@Query()` séparés sur la même route. Repéré avant d'écrire le
 code fautif en vérifiant par avance les contrôleurs à modifier.
 
-### Frontend : 4 écrans branchés, vérifiés avec de vraies données
+### Frontend : 17 écrans branchés avec un vrai pager
 
-Admin > Organisations, Admin > Utilisateurs, Organisation > Membres,
-Architecture métier > Relations disposent maintenant d'un vrai pager
-(`app-pagination`, réutilisable) relié au backend. Vérifié en
-navigateur sur les données réelles de K&B Groupe : Membres affiche
-6/6 sans pager (comportement correct, le pager s'auto-masque sous
-`pageSize`) ; Relations ArchiMate affiche 22 relations sur 2 pages,
-navigation Suivant/Précédent testée dans les deux sens, désactivation
-correcte des boutons en première et dernière page.
+Un composant réutilisable (`app-pagination`) est maintenant relié au
+backend sur 17 tableaux/listes à travers l'application : Admin >
+Organisations, Admin > Utilisateurs, Organisation > Membres,
+Organisation > Objectifs, Organisation > Parties prenantes,
+Architecture métier > Capacités, Éléments et Relations, Gouvernance >
+Politiques et Demandes de changement, Évaluation > Réponses, Migration
+Planning > Projets, Opportunités > Solutions, Architecture des données
+> Entités et Relations, Architecture Système > Applications
+(Portefeuille), Architecture technologique > Composants.
 
-Pour Membres et Relations, la liste servait aussi à autre chose
-(formulaire de retrait d'un membre, canevas interactif ArchiMate) : la
-méthode de service d'origine, non paginée, a été conservée telle
-quelle pour cet autre usage, et une méthode `...Paginated()` distincte
-a été ajoutée pour le tableau. C'est le patron à reproduire pour la
-suite plutôt que de faire muter la méthode existante.
+Le premier passage (4 écrans : Admin Organisations/Utilisateurs,
+Membres, Relations ArchiMate) avait été fait le 2026-08-26 sous
+contrainte de temps, en laissant les 13 autres comme dette documentée
+avec la liste des conflits d'usage double identifiés. En reprenant ce
+travail, la plupart de ces conflits se sont révélés traitables avec le
+même patron déjà validé plutôt que bloquants :
+
+- **Cas le plus fréquent (11 écrans)** : la liste sert de tableau ET
+  de source pour autre chose ailleurs dans l'app (menu déroulant,
+  canevas interactif, export Excel, graphique, frise chronologique,
+  matrice de conformité/évaluation). Résolu en gardant la méthode de
+  service d'origine (non paginée) intacte pour cet autre usage, et en
+  ajoutant une méthode `...Paginated()` distincte pour le tableau.
+  Exemples : `capacitesAll`/`elementsAll` pour les menus déroulants du
+  formulaire Relations d'Architecture métier ; `solutionsAll` pour les
+  lignes de la Matrice et le graphique de comparaison dans
+  Opportunités ; `politiquesAll` pour les en-têtes de colonnes de la
+  matrice de conformité ; `reponsesAll` pour la note moyenne et le
+  graphique d'Évaluation ; `projetsAll` pour la frise chronologique de
+  Roadmap.
+- **Faux conflit découvert en cours de route (4 écrans)** : Données
+  (Entités/Relations), Applications (Portefeuille) et Technologie
+  (Composants) avaient été classés comme bloqués par leur canevas
+  interactif Konva, mais en lisant le code, le canevas de chacun
+  (`donnees-canevas`, `applications-canevas`,
+  `technologie-canevas.component.ts`) appelle en réalité le service
+  directement et indépendamment du composant parent — il ne partage
+  aucun état avec le tableau du composant parent. Paginer le tableau du
+  parent n'affecte donc pas le canevas : aucun découpage de méthode
+  n'était nécessaire, seulement l'ajout de `listPaginated()`.
+
+Vérifié en navigateur sur les données réelles de K&B Groupe : Éléments
+ArchiMate affiche 43 éléments sur 3 pages ; le menu déroulant
+Source/Cible du formulaire Relations liste bien les 43 éléments (pas
+seulement les 20 de la page affichée) ; la matrice de conformité
+affiche la bonne colonne même avec une seule politique en base ; le
+graphique de comparaison des notes moyennes s'affiche sans erreur avec
+2 solutions ; Relations ArchiMate (22 au total) et Membres (6, sans
+pager car sous `pageSize`) déjà vérifiés le 2026-08-26 restent
+corrects après les changements ultérieurs.
 
 ### Dette technique assumée, pas oubliée
 
-🟡 8 écrans identifiés comme candidats restants (Objectifs, Parties
-prenantes, Politiques, Demandes de changement, et les onglets Capacités
-/ Éléments d'Architecture métier, entre autres) ont chacun un usage
-double confirmé qui empêche un branchement mécanique :
+🟡 3 cas restent délibérément sans pagination, pour des raisons de
+forme d'interface plutôt que de simple découpage de méthode :
 
-- Export Excel qui a besoin du jeu de données complet : Objectifs,
-  Parties prenantes, rapport de gouvernance.
-- Source de menu déroulant : Capacités (choix dans le formulaire
-  Éléments), Éléments (choix source/cible dans le formulaire
-  Relations).
-- Agrégat ou graphique calculé sur l'ensemble : note moyenne
-  d'Évaluation, graphique de la Matrice dans Opportunités.
-- En-têtes de colonnes d'une matrice : Critères, Politiques.
-- Frise chronologique qui a besoin de toute la plage de dates :
-  Roadmap.
-
-Le backend de ces endpoints n'a délibérément pas été touché : ajouter
-la pagination y suit le même patron que Membres/Relations (nouvelle
-méthode dédiée au tableau, méthode existante conservée pour l'export,
-le menu ou l'agrégat), mais ce découpage n'a pas encore été fait faute
-de temps dans cette session. Reporté en connaissance de cause, pas par
-oubli.
+- **Opportunités > Critères d'évaluation** : présentés comme une liste
+  de puces (chips), pas un tableau ; sert aussi d'en-têtes de colonnes
+  de la matrice. Le nombre de critères est structurellement petit
+  (une poignée par organisation) et l'UI en puces ne se prête pas à un
+  pager classique.
+- **Vision > Processus BPMN** : la liste est scindée en 3 tableaux
+  simultanés par catégorie (Pilotage / Métier / Support), affichés côte
+  à côte. Paginer le tableau à plat brouillerait ce découpage (une page
+  couperait arbitrairement une catégorie au milieu). Un vrai pager
+  correct demanderait 3 paginations indépendantes (une par catégorie,
+  combinant filtre de type + pagination comme pour les Éléments
+  ArchiMate) : une restructuration à part entière, pas encore faite.
+- **Urbanisation > Zones (hiérarchie Zone > Quartier > Îlot)** :
+  structure arborescente, pas une liste à plat ; un pager n'a pas de
+  sens tant que l'arbre entier n'est pas chargé pour se reconstruire.
 
 ### Vérifié
 
-- Suite backend complète : 311/311 (305 avant cette session + 6
-  nouveaux tests : `pagination.spec.ts` et un cas ajouté à
-  `politique.service.spec.ts`), aucune régression.
-- `tsc --noEmit` backend et frontend : aucune erreur.
+- Suite backend complète : 311/311, aucune régression (inchangée
+  depuis le premier passage : ce second passage n'a modifié que du
+  code frontend, aucun endpoint n'a eu besoin d'un changement backend
+  supplémentaire, la capacité de pagination était déjà en place
+  partout).
+- `tsc --noEmit` backend et frontend : aucune erreur, après chaque
+  écran branché.
 - Build frontend (`ng build --configuration development`) : aucune
   erreur, tailles de bundle stables.
-- Navigateur : les 4 écrans branchés testés avec les données réelles
-  de K&B Groupe (détail ci-dessus).
+- Navigateur : session réelle sur les données K&B Groupe, écrans
+  vérifiés en détail ci-dessus, aucune erreur console nouvelle.

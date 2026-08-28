@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { Paginated } from '../shared/pagination.interface';
 
 export type StatutSolution = 'PROPOSEE' | 'RETENUE' | 'REJETEE';
 export type AvancementSolution = 'NON_DEMARRE' | 'EN_COURS' | 'TERMINE' | 'BLOQUE';
@@ -45,8 +46,13 @@ export interface ScoreItem {
 export class SolutionService {
   constructor(private http: HttpClient) {}
 
+  /** Utilisé comme lignes de la matrice d'évaluation, comme graphique de comparaison et par la matrice de conformité (Gouvernance) : a besoin de toutes les solutions. */
   list(): Observable<Solution[]> {
     return this.http.get<Solution[]>('/solutions');
+  }
+
+  listPaginated(page: number, pageSize: number): Observable<Paginated<Solution>> {
+    return this.http.get<Paginated<Solution>>('/solutions', { params: { page, pageSize } });
   }
 
   create(payload: CreateSolutionPayload): Observable<Solution> {

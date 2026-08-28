@@ -4,6 +4,8 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { PrioriteProjet, Projet, RoadmapService, StatutProjet } from './roadmap.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
+import { PaginationComponent } from '../shared/pagination.component';
+import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
 const PRIORITE_LABEL: Record<PrioriteProjet, string> = { HAUTE: 'Haute', MOYENNE: 'Moyenne', BASSE: 'Basse' };
 const PRIORITE_BADGE: Record<PrioriteProjet, string> = { HAUTE: 'badge-danger', MOYENNE: 'badge-warning', BASSE: 'badge-success' };
@@ -20,12 +22,12 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-roadmap',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, PaginationComponent],
   template: `
     <p class="muted step-question">Quels projets faut-il lancer pour combler l'écart entre l'existant et la cible, avec quelles priorités, quels coûts et quels délais ?</p>
 
     <div class="page-header">
-      <h3>Projets ({{ projets.length }})</h3>
+      <h3>Projets ({{ projetsTotal }})</h3>
       <button type="button" class="btn btn-primary" (click)="openCreate()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
         Ajouter un projet
@@ -78,6 +80,7 @@ const ICONS: Record<string, string> = {
           </tbody>
         </table>
       </div>
+      <app-pagination [page]="projetsPage" [total]="projetsTotal" [pageSize]="projetsPageSize" (pageChange)="onProjetsPageChange($event)" />
     </section>
 
     <!-- ── Popover : ajouter un projet ───────────────────────────────────── -->
@@ -137,6 +140,11 @@ export class RoadmapComponent implements OnInit {
   priorites = PRIORITES;
   statuts = STATUTS;
   projets: Projet[] = [];
+  projetsPage = 1;
+  projetsTotal = 0;
+  projetsPageSize = DEFAULT_PAGE_SIZE;
+  /** Tous les projets, sans pagination : plage de dates de la frise chronologique. */
+  projetsAll: Projet[] = [];
 
   newProjet: {
     nom: string;
@@ -184,7 +192,7 @@ export class RoadmapComponent implements OnInit {
   }
 
   get projetsAvecDates(): Projet[] {
-    return this.projets.filter((p) => p.dateDebut && p.dateFin);
+    return this.projetsAll.filter((p) => p.dateDebut && p.dateFin);
   }
 
   barPosition(p: Projet): { left: number; width: number } {
@@ -200,10 +208,22 @@ export class RoadmapComponent implements OnInit {
   }
 
   load(): void {
-    this.roadmapService.list().subscribe({
-      next: (projets) => (this.projets = projets),
+    this.roadmapService.listPaginated(this.projetsPage, this.projetsPageSize).subscribe({
+      next: (result) => {
+        this.projets = result.items;
+        this.projetsTotal = result.total;
+      },
       error: () => this.toast.error('Impossible de charger les projets.'),
     });
+    this.roadmapService.list().subscribe({
+      next: (projets) => (this.projetsAll = projets),
+      error: () => this.toast.error('Impossible de charger les projets.'),
+    });
+  }
+
+  onProjetsPageChange(page: number): void {
+    this.projetsPage = page;
+    this.load();
   }
 
   createProjet(event: Event): void {
@@ -225,7 +245,11 @@ export class RoadmapComponent implements OnInit {
 
   changeStatut(p: Projet, statut: StatutProjet): void {
     this.roadmapService.update(p.id, { statut }).subscribe({
-      next: (updated) => (p.statut = updated.statut),
+      next: (updated) => {
+        p.statut = updated.statut;
+        const all = this.projetsAll.find((x) => x.id === p.id);
+        if (all) all.statut = updated.statut;
+      },
       error: () => this.toast.error('Impossible de modifier le statut.'),
     });
   }

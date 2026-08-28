@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { Paginated } from '../shared/pagination.interface';
 
 export type TypeCardinalite = 'UN_A_UN' | 'UN_A_PLUSIEURS' | 'PLUSIEURS_A_PLUSIEURS';
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
@@ -38,8 +39,13 @@ export interface DataRelation {
 export class DonneesService {
   constructor(private http: HttpClient) {}
 
+  /** Utilisé par le canevas interactif : a besoin de toutes les entités pour se dessiner. */
   list(): Observable<DataEntity[]> {
     return this.http.get<DataEntity[]>('/data-entities');
+  }
+
+  listPaginated(page: number, pageSize: number): Observable<Paginated<DataEntity>> {
+    return this.http.get<Paginated<DataEntity>>('/data-entities', { params: { page, pageSize } });
   }
 
   create(
@@ -67,8 +73,13 @@ export class DonneesService {
     return this.http.delete<void>(`/data-entities/attributs/${attributeId}`);
   }
 
+  /** Utilisé par le canevas interactif : a besoin de toutes les relations pour se dessiner. */
   listRelations(): Observable<DataRelation[]> {
     return this.http.get<DataRelation[]>('/data-entities/relations');
+  }
+
+  listRelationsPaginated(page: number, pageSize: number): Observable<Paginated<DataRelation>> {
+    return this.http.get<Paginated<DataRelation>>('/data-entities/relations', { params: { page, pageSize } });
   }
 
   createRelation(payload: {

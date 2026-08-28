@@ -8,6 +8,8 @@ import { ArchiApplicativeView, ArchitectureApplicativeService } from './architec
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { downloadPng, downloadSvg } from '../shared/download.util';
+import { PaginationComponent } from '../shared/pagination.component';
+import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
 type Tab = 'portefeuille' | 'diagramme' | 'archi-applicative';
 type SubTab = 'editeur' | 'diagramme';
@@ -27,7 +29,7 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-applications',
   standalone: true,
-  imports: [CommonModule, ApplicationsCanevasComponent, ArchitectureApplicativeCanevasComponent],
+  imports: [CommonModule, ApplicationsCanevasComponent, ArchitectureApplicativeCanevasComponent, PaginationComponent],
   template: `
     <p class="muted step-question">Quelles applications supportent les processus métier ?</p>
 
@@ -105,7 +107,7 @@ const ICONS: Record<string, string> = {
 
     <section *ngIf="tab === 'portefeuille'">
       <div class="page-header">
-        <h3>Applications ({{ applications.length }})</h3>
+        <h3>Applications ({{ applicationsTotal }})</h3>
         <button type="button" class="btn btn-primary" (click)="openCreate()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
           Ajouter une application
@@ -139,6 +141,7 @@ const ICONS: Record<string, string> = {
             </tbody>
           </table>
         </div>
+        <app-pagination [page]="applicationsPage" [total]="applicationsTotal" [pageSize]="applicationsPageSize" (pageChange)="onApplicationsPageChange($event)" />
       </section>
     </section>
 
@@ -267,6 +270,9 @@ export class ApplicationsComponent implements OnInit {
   archiSummary = '';
   archiLoading = false;
   applications: Application[] = [];
+  applicationsPage = 1;
+  applicationsTotal = 0;
+  applicationsPageSize = DEFAULT_PAGE_SIZE;
   newApp: { nom: string; description?: string } = { nom: '' };
   creating = false;
   createPopover = false;
@@ -335,21 +341,29 @@ export class ApplicationsComponent implements OnInit {
   }
 
   load(): void {
-    this.urbanisationService.listApplications().subscribe({
-      next: (apps) => (this.applications = apps),
+    this.urbanisationService.listApplicationsPaginated(this.applicationsPage, this.applicationsPageSize).subscribe({
+      next: (result) => {
+        this.applications = result.items;
+        this.applicationsTotal = result.total;
+      },
       error: () => this.toast.error('Impossible de charger les applications.'),
     });
+  }
+
+  onApplicationsPageChange(page: number): void {
+    this.applicationsPage = page;
+    this.load();
   }
 
   create(event: Event): void {
     event.preventDefault();
     this.creating = true;
     this.urbanisationService.createApplication(this.newApp).subscribe({
-      next: (app) => {
-        this.applications = [...this.applications, app];
+      next: () => {
         this.creating = false;
         this.closeCreate();
         this.toast.success('Application créée.');
+        this.load();
       },
       error: () => {
         this.creating = false;
@@ -363,8 +377,8 @@ export class ApplicationsComponent implements OnInit {
     if (!confirmed) return;
     this.urbanisationService.deleteApplication(app.id).subscribe({
       next: () => {
-        this.applications = this.applications.filter((a) => a.id !== app.id);
         this.toast.success('Application supprimée.');
+        this.load();
       },
       error: () => this.toast.error('Impossible de supprimer cette application.'),
     });
@@ -436,11 +450,11 @@ export class ApplicationsComponent implements OnInit {
     if (!this.editTarget || !this.editDraft || !this.editDraft.nom.trim()) return;
     this.saving = true;
     this.urbanisationService.updateApplication(this.editTarget.id, this.editDraft).subscribe({
-      next: (updated) => {
-        this.applications = this.applications.map((a) => (a.id === updated.id ? { ...a, ...updated } : a));
+      next: () => {
         this.saving = false;
         this.closeEdit();
         this.toast.success('Application modifiée.');
+        this.load();
       },
       error: () => {
         this.saving = false;
