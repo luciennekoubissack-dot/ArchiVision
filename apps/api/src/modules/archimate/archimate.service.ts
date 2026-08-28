@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
 import { TypeElement } from '@prisma/client';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateCapaciteDto } from './dto/create-capacite.dto';
 import { UpdateCapaciteDto } from './dto/update-capacite.dto';
 import { CreateElementDto } from './dto/create-element.dto';
@@ -19,12 +20,12 @@ export class ArchimateService {
     return this.prisma.capaciteMetier.create({ data: { ...dto, organisationId } });
   }
 
-  findAllCapacites(organisationId: string) {
-    return this.prisma.capaciteMetier.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-      include: { _count: { select: { elements: true } } },
-    });
+  findAllCapacites(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.capaciteMetier,
+      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { _count: { select: { elements: true } } } },
+      pagination,
+    );
   }
 
   async findOneCapacite(id: string, organisationId: string) {
@@ -70,20 +71,19 @@ export class ArchimateService {
     });
   }
 
-  findAllElements(organisationId: string, type?: TypeElement) {
-    return this.prisma.elementArchimate.findMany({
-      where: {
-        organisationId,
-        ...(type && { type }),
-      },
-      orderBy: { nom: 'asc' },
-      include: {
-        capacite: { select: { id: true, nom: true } },
-        _count: {
-          select: { relationsSource: true, relationsTarget: true },
+  findAllElements(organisationId: string, type?: TypeElement, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.elementArchimate,
+      {
+        where: { organisationId, ...(type && { type }) },
+        orderBy: { nom: 'asc' },
+        include: {
+          capacite: { select: { id: true, nom: true } },
+          _count: { select: { relationsSource: true, relationsTarget: true } },
         },
       },
-    });
+      pagination,
+    );
   }
 
   async findOneElement(id: string, organisationId: string) {
@@ -173,15 +173,19 @@ export class ArchimateService {
     });
   }
 
-  findAllRelations(organisationId: string) {
-    return this.prisma.relationArchimate.findMany({
-      where: { source: { organisationId } },
-      include: {
-        source: { select: { id: true, nom: true, type: true } },
-        target: { select: { id: true, nom: true, type: true } },
+  findAllRelations(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.relationArchimate,
+      {
+        where: { source: { organisationId } },
+        include: {
+          source: { select: { id: true, nom: true, type: true } },
+          target: { select: { id: true, nom: true, type: true } },
+        },
+        orderBy: { createdAt: 'desc' },
       },
-      orderBy: { createdAt: 'desc' },
-    });
+      pagination,
+    );
   }
 
   async removeRelation(id: string, organisationId: string) {

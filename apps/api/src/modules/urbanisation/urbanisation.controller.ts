@@ -20,7 +20,7 @@ import { UpdateZoneDto } from './dto/update-zone.dto';
 import { AffecterApplicationDto } from './dto/affecter-application.dto';
 import { CreateEchangeDto } from './dto/create-echange.dto';
 import { CreateApplicationServiceDto } from './dto/create-application-service.dto';
-import { AuthUser, CurrentUser, requireOrganisationId } from '@archivision/shared';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId } from '@archivision/shared';
 
 @Controller()
 export class UrbanisationController {
@@ -39,8 +39,8 @@ export class UrbanisationController {
   }
 
   @Get('applications')
-  findAllApplications(@CurrentUser() user: AuthUser) {
-    return this.service.findAllApplications(requireOrganisationId(user));
+  findAllApplications(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.service.findAllApplications(requireOrganisationId(user), pagination);
   }
 
   @Get('applications/generate-vue')

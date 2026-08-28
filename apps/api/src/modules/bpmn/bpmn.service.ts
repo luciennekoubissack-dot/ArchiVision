@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateBpmnProcessusDto } from './dto/create-bpmn-processus.dto';
 import { UpdateBpmnProcessusDto } from './dto/update-bpmn-processus.dto';
 import { CreateBpmnElementDto } from './dto/create-bpmn-element.dto';
@@ -16,12 +17,12 @@ export class BpmnService {
     return this.prisma.bpmnProcessus.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.bpmnProcessus.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-      include: { _count: { select: { elements: true } } },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.bpmnProcessus,
+      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { _count: { select: { elements: true } } } },
+      pagination,
+    );
   }
 
   async findOne(id: string, organisationId: string) {

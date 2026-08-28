@@ -1005,3 +1005,190 @@ refactors larges) ; les deux points 🔴 traités.
   `localStorage` vidés, `/dashboard` redirige vers la connexion
   (session invalidée côté serveur). Reconnexion finale pour laisser la
   session dans un état normal.
+
+---
+
+## 2026-08-28 : audit de clôture
+
+Aucun code n'a changé depuis la suite 3 (2026-08-26) : ce passage
+revérifie que rien n'a régressé plutôt que de refaire un audit complet
+depuis zéro (déjà fait le 2026-08-26, cf. entrée "nouvel audit complet").
+
+### État de sécurité
+
+- 🔴 Token JWT en `localStorage` : **traité** (cookie httpOnly + CSRF,
+  suite 3).
+- 🔴 Mot de passe PostgreSQL par défaut : **traité** (suite 3).
+- 🔴 Upload logo public, secret JWT par défaut, absence de
+  rate-limiting : **traités** (suite 4, 2026-08-24).
+- Il ne reste aucun point 🔴 ouvert dans ce journal.
+
+### Dette technique assumée, pas oubliée
+
+- 🟠 Pagination des listes backend : toujours absente. Repoussée
+  délibérément le 2026-08-26 (clôture du projet le jour même, pas le
+  moment pour un changement de contrat d'API touchant tous les
+  services et tous les écrans consommateurs).
+- 🟡 `apps/web/src/app` à plat (77 fichiers) et Angular 17 (l'utilisateur
+  a choisi explicitement de ne pas migrer) : inchangés, laissés tels
+  quels par décision assumée plutôt que par oubli.
+
+### Vérifié
+
+- Suite backend complète : 305/305, inchangé depuis suite 3.
+- `tsc --noEmit` backend, build production frontend : aucune erreur,
+  aucun avertissement de budget.
+- Session réelle en navigateur : connexion, tableau de bord avec
+  données réelles, déconnexion/reconnexion fonctionnelles.
+
+### Conclusion de ce cycle d'audit
+
+Sur les 5 points 🔴 sécurité identifiés le 2026-08-18, les 5 sont
+traités. Les points restants (pagination, organisation des dossiers,
+version d'Angular) sont des choix de dette technique assumés plutôt que
+des angles morts non identifiés : la distinction compte pour la suite
+du projet : ils ne sont pas "non vus", ils sont "vus et reportés", avec
+la raison de chaque report tracée dans ce journal.
+
+---
+
+## 2026-08-28 (suite) : réorganisation de `apps/web/src/app` en dossiers par fonctionnalité
+
+Traitement du point 🟡 laissé ouvert. Les 77 fichiers à plat sont
+répartis en 23 dossiers par fonctionnalité, sur le même principe que
+`apps/api/src/modules/` : `core` (bootstrap, shell, routes), `auth`,
+`shared` (toast, confirm-dialog, utils), `public` (pages avant
+connexion), `admin`, `dashboard`, `assistant`, puis un dossier par
+étape de l'ADM TOGAF (`organisation`, `vision`, `architecture-metier`,
+`donnees`, `urbanisation`, `architecture-systeme`, `technologie`,
+`ecarts`, `opportunites`, `roadmap`, `mise-en-oeuvre`, `gouvernance`,
+`evaluation`), plus `canevas`, `vues`, `parametres`.
+
+Exécuté par script plutôt qu'à la main (déplacement des 77 fichiers +
+réécriture automatique des chemins d'import relatifs à partir d'une
+table de correspondance fichier → dossier), pour éliminer le risque
+d'erreur humaine sur un changement aussi mécanique et répétitif.
+`main.ts` mis à jour pour les deux imports qui pointaient dans
+`app/` depuis l'extérieur.
+
+### Vérifié
+
+- `tsc --noEmit` (app et spec) : aucune erreur du premier coup, avant
+  toute correction manuelle.
+- Build développement : mêmes tailles de bundle qu'avant (aucune
+  fonctionnalité perdue ou dupliquée dans le découpage en chunks).
+- Suite backend complète (non concernée par ce changement) : 305/305,
+  inchangé.
+- Serveur de dev redémarré à froid (pas de rechargement à chaud, pour
+  éliminer tout état de watcher obsolète) : session persistée par le
+  cookie httpOnly, tableau de bord avec données réelles. Onglet
+  navigateur neuf testé sur les routes qui traversent le plus de
+  dossiers (`/architecture-systeme` → importe `urbanisation`,
+  `/assistant` → importe 6 composants d'autres dossiers, `/canevas` →
+  importe 4 services d'autres dossiers, `/architecture-metier` →
+  importe `bpmn-vues` depuis `vision`) : aucune erreur console, contenu
+  réel affiché correctement partout.
+- Repéré au passage, sans lien avec ce changement : un rechargement
+  complet de page (pas une navigation interne à l'app) sur
+  `/admin/dashboard` renvoie le JSON 404 de l'API au lieu de la coquille
+  Angular, parce que `/admin` figure aussi comme préfixe de route API
+  dans `proxy.conf.json` (routes `/admin/organisations`, `/admin/stats`
+  du contrôleur admin backend) et capture la requête avant qu'elle
+  n'atteigne le routeur Angular. Préexistant, non déclenché par la
+  navigation normale dans l'application (clic sur un lien plutôt que
+  rechargement complet), donc non corrigé dans cette passe : à noter
+  pour une prochaine session.
+
+---
+
+## 2026-08-28 : pagination des listes, backend et frontend
+
+Traitement du second point 🟠 laissé ouvert (reporté le 2026-08-26).
+Contrairement à la réorganisation des dossiers, ce changement touche un
+contrat d'API consommé par des dizaines d'écrans, dont plusieurs
+utilisent la même liste pour deux usages différents (tableau paginé
+d'un côté, canevas interactif, export Excel, graphique agrégé ou source
+de menu déroulant de l'autre). Une pagination appliquée sans discernement
+aurait cassé silencieusement ces autres usages. Le travail a donc été
+fait en deux temps nettement séparés : la capacité backend partout où
+c'est sûr, puis le branchement frontend seulement là où c'est sûr.
+
+### Backend : capacité de pagination, opt-in et rétrocompatible
+
+Nouveau dans `libs/shared` : `PaginationQueryDto` (`page`, `pageSize`,
+validés et bornés à 200) et `paginateFindMany()`, qui enveloppe un
+appel Prisma `findMany` + `count`. Le contrat choisi : le paramètre
+`pagination` est optionnel sur chaque méthode de service concernée.
+Absent, la méthode renvoie exactement le tableau complet d'avant
+(aucun changement de comportement pour les appelants existants).
+Présent, elle renvoie `{ items, total, page, pageSize }`.
+
+Appliqué à 16 services / une vingtaine d'endpoints : `admin`
+(organisations, utilisateurs), `archimate` (éléments), `bpmn`
+(processus), `donnees` (entités, relations), `evaluation` (réponses
+d'enquête), `gouvernance` (politiques, changements, conformité),
+`objectif`, `opportunites` (solutions, critères), `parties-prenantes`,
+`roadmap`, `technologie`, `urbanisation` (applications), `membres`.
+
+Un cas particulier a nécessité une DTO combinée plutôt qu'un
+`@Query()` supplémentaire : `ValidationPipe({ whitelist: true,
+forbidNonWhitelisted: true })` rejette tout paramètre de requête non
+déclaré sur le DTO validé, donc un endpoint qui a déjà un filtre
+(`?type=...`, `?statut=...`) en plus de la pagination a besoin d'un DTO
+qui hérite de `PaginationQueryDto` et ajoute son propre champ, pas de
+deux `@Query()` séparés sur la même route. Repéré avant d'écrire le
+code fautif en vérifiant par avance les contrôleurs à modifier.
+
+### Frontend : 4 écrans branchés, vérifiés avec de vraies données
+
+Admin > Organisations, Admin > Utilisateurs, Organisation > Membres,
+Architecture métier > Relations disposent maintenant d'un vrai pager
+(`app-pagination`, réutilisable) relié au backend. Vérifié en
+navigateur sur les données réelles de K&B Groupe : Membres affiche
+6/6 sans pager (comportement correct, le pager s'auto-masque sous
+`pageSize`) ; Relations ArchiMate affiche 22 relations sur 2 pages,
+navigation Suivant/Précédent testée dans les deux sens, désactivation
+correcte des boutons en première et dernière page.
+
+Pour Membres et Relations, la liste servait aussi à autre chose
+(formulaire de retrait d'un membre, canevas interactif ArchiMate) : la
+méthode de service d'origine, non paginée, a été conservée telle
+quelle pour cet autre usage, et une méthode `...Paginated()` distincte
+a été ajoutée pour le tableau. C'est le patron à reproduire pour la
+suite plutôt que de faire muter la méthode existante.
+
+### Dette technique assumée, pas oubliée
+
+🟡 8 écrans identifiés comme candidats restants (Objectifs, Parties
+prenantes, Politiques, Demandes de changement, et les onglets Capacités
+/ Éléments d'Architecture métier, entre autres) ont chacun un usage
+double confirmé qui empêche un branchement mécanique :
+
+- Export Excel qui a besoin du jeu de données complet : Objectifs,
+  Parties prenantes, rapport de gouvernance.
+- Source de menu déroulant : Capacités (choix dans le formulaire
+  Éléments), Éléments (choix source/cible dans le formulaire
+  Relations).
+- Agrégat ou graphique calculé sur l'ensemble : note moyenne
+  d'Évaluation, graphique de la Matrice dans Opportunités.
+- En-têtes de colonnes d'une matrice : Critères, Politiques.
+- Frise chronologique qui a besoin de toute la plage de dates :
+  Roadmap.
+
+Le backend de ces endpoints n'a délibérément pas été touché : ajouter
+la pagination y suit le même patron que Membres/Relations (nouvelle
+méthode dédiée au tableau, méthode existante conservée pour l'export,
+le menu ou l'agrégat), mais ce découpage n'a pas encore été fait faute
+de temps dans cette session. Reporté en connaissance de cause, pas par
+oubli.
+
+### Vérifié
+
+- Suite backend complète : 311/311 (305 avant cette session + 6
+  nouveaux tests : `pagination.spec.ts` et un cas ajouté à
+  `politique.service.spec.ts`), aucune régression.
+- `tsc --noEmit` backend et frontend : aucune erreur.
+- Build frontend (`ng build --configuration development`) : aucune
+  erreur, tailles de bundle stables.
+- Navigateur : les 4 écrans branchés testés avec les données réelles
+  de K&B Groupe (détail ci-dessus).

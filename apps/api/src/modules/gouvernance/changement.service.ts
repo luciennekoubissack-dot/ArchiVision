@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateChangementDto } from './dto/create-changement.dto';
 import { UpdateChangementDto } from './dto/update-changement.dto';
 
@@ -11,11 +12,8 @@ export class ChangementService {
     return this.prisma.demandeChangement.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.demandeChangement.findMany({
-      where: { organisationId },
-      orderBy: { createdAt: 'desc' },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(this.prisma.demandeChangement, { where: { organisationId }, orderBy: { createdAt: 'desc' } }, pagination);
   }
 
   async update(id: string, organisationId: string, dto: UpdateChangementDto) {

@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
 import { RoleUtilisateur } from '@prisma/client';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import bcrypt from 'bcrypt';
 import { CreateMembreDto } from './dto/create-membre.dto';
 import { UpdateMembreDto } from './dto/update-membre.dto';
@@ -20,12 +21,12 @@ const membreSelect = {
 export class MembresService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(organisationId: string) {
-    return this.prisma.user.findMany({
-      where: { organisationId },
-      select: membreSelect,
-      orderBy: { nom: 'asc' },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.user,
+      { where: { organisationId }, select: membreSelect, orderBy: { nom: 'asc' } },
+      pagination,
+    );
   }
 
   async create(organisationId: string, dto: CreateMembreDto) {

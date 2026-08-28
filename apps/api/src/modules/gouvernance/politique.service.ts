@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreatePolitiqueDto } from './dto/create-politique.dto';
 import { UpdatePolitiqueDto } from './dto/update-politique.dto';
 
@@ -11,11 +12,8 @@ export class PolitiqueService {
     return this.prisma.politiqueGouvernance.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.politiqueGouvernance.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(this.prisma.politiqueGouvernance, { where: { organisationId }, orderBy: { nom: 'asc' } }, pagination);
   }
 
   async update(id: string, organisationId: string, dto: UpdatePolitiqueDto) {

@@ -1,7 +1,8 @@
 import { Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { RoleUtilisateur, StatutOrganisation } from '@prisma/client';
-import { Roles, RolesGuard, SuperAdminRoute } from '@archivision/shared';
+import { RoleUtilisateur } from '@prisma/client';
+import { PaginationQueryDto, Roles, RolesGuard, SuperAdminRoute } from '@archivision/shared';
 import { AdminService } from './admin.service';
+import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 
 @Controller('admin')
 @UseGuards(RolesGuard)
@@ -11,8 +12,8 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('organisations')
-  listOrganisations(@Query('statut') statut?: StatutOrganisation) {
-    return this.adminService.listOrganisations(statut);
+  listOrganisations(@Query() query: ListOrganisationsQueryDto) {
+    return this.adminService.listOrganisations(query.statut, query);
   }
 
   @Get('organisations/:id')
@@ -39,8 +40,8 @@ export class AdminController {
   }
 
   @Get('utilisateurs')
-  listUtilisateurs() {
-    return this.adminService.listUtilisateurs();
+  listUtilisateurs(@Query() pagination: PaginationQueryDto) {
+    return this.adminService.listUtilisateurs(pagination);
   }
 
   @Get('stats')

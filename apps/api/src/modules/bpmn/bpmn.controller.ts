@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import { BpmnService } from './bpmn.service';
 import { BpmnViewService } from './bpmn-view.service';
@@ -17,8 +17,8 @@ export class BpmnController {
   ) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.bpmnService.findAll(requireOrganisationId(user));
+  findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.bpmnService.findAll(requireOrganisationId(user), pagination);
   }
 
   @Get(':id')

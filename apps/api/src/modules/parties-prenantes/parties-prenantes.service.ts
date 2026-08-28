@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreatePartiePrenanteDto } from './dto/create-partie-prenante.dto';
 
 @Injectable()
@@ -10,11 +11,8 @@ export class PartiesPrenantesService {
     return this.prisma.partiePrenante.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.partiePrenante.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(this.prisma.partiePrenante, { where: { organisationId }, orderBy: { nom: 'asc' } }, pagination);
   }
 
   async remove(id: string, organisationId: string) {

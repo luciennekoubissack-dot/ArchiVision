@@ -10,3 +10,5 @@ export * from './filters/http-exception.filter';
 export * from './utils/require-organisation-id';
 export * from './utils/require-jwt-secret';
 export * from './utils/auth-cookies';
+export * from './utils/pagination';
+export * from './dto/pagination-query.dto';

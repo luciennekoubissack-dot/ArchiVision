@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateTechComponentDto } from './dto/create-tech-component.dto';
 import { UpdateTechComponentDto } from './dto/update-tech-component.dto';
 import { DeployerApplicationDto } from './dto/deployer-application.dto';
@@ -12,12 +13,12 @@ export class TechnologieService {
     return this.prisma.techComponent.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.techComponent.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-      include: { deploiements: { include: { application: true } } },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.techComponent,
+      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { deploiements: { include: { application: true } } } },
+      pagination,
+    );
   }
 
   async findOne(id: string, organisationId: string) {

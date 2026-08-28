@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateProjetDto } from './dto/create-projet.dto';
 import { UpdateProjetDto } from './dto/update-projet.dto';
 
@@ -18,11 +19,12 @@ export class RoadmapService {
     });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.projet.findMany({
-      where: { organisationId },
-      orderBy: [{ priorite: 'asc' }, { dateDebut: 'asc' }],
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.projet,
+      { where: { organisationId }, orderBy: [{ priorite: 'asc' }, { dateDebut: 'asc' }] },
+      pagination,
+    );
   }
 
   async findOne(id: string, organisationId: string) {

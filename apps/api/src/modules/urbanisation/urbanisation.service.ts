@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
 import { TypeZone } from '@prisma/client';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { CreateZoneDto } from './dto/create-zone.dto';
@@ -19,15 +20,19 @@ export class UrbanisationService {
     return this.prisma.application.create({ data: { ...dto, organisationId } });
   }
 
-  findAllApplications(organisationId: string) {
-    return this.prisma.application.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-      include: {
-        services: true,
-        _count: { select: { zones: true, services: true, echangesSource: true, echangesTarget: true } },
+  findAllApplications(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.application,
+      {
+        where: { organisationId },
+        orderBy: { nom: 'asc' },
+        include: {
+          services: true,
+          _count: { select: { zones: true, services: true, echangesSource: true, echangesTarget: true } },
+        },
       },
-    });
+      pagination,
+    );
   }
 
   async findOneApplication(id: string, organisationId: string) {

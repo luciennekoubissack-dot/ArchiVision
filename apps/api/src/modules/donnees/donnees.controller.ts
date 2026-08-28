@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import { DonneesService } from './donnees.service';
 import { CreateDataEntityDto } from './dto/create-data-entity.dto';
@@ -12,13 +12,13 @@ export class DonneesController {
   constructor(private readonly donneesService: DonneesService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.donneesService.findAll(requireOrganisationId(user));
+  findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.donneesService.findAll(requireOrganisationId(user), pagination);
   }
 
   @Get('relations')
-  findAllRelations(@CurrentUser() user: AuthUser) {
-    return this.donneesService.findAllRelations(requireOrganisationId(user));
+  findAllRelations(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.donneesService.findAllRelations(requireOrganisationId(user), pagination);
   }
 
   @Get(':id')

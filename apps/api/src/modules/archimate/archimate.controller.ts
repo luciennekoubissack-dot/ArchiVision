@@ -13,7 +13,6 @@ import {
 import { ArchimateService } from './archimate.service';
 import { ArchimateViewService } from './archimate-view.service';
 import { ArchimateLayoutService } from './archimate-layout.service';
-import { TypeElement } from '@prisma/client';
 import { CreateCapaciteDto } from './dto/create-capacite.dto';
 import { UpdateCapaciteDto } from './dto/update-capacite.dto';
 import { CreateElementDto } from './dto/create-element.dto';
@@ -21,7 +20,8 @@ import { UpdateElementDto } from './dto/update-element.dto';
 import { CreateRelationDto } from './dto/create-relation.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { UpdatePositionsBatchDto } from './dto/update-positions-batch.dto';
-import { AuthUser, CurrentUser, requireOrganisationId } from '@archivision/shared';
+import { ListElementsQueryDto } from './dto/list-elements-query.dto';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId } from '@archivision/shared';
 
 @Controller()
 export class ArchimateController {
@@ -41,8 +41,8 @@ export class ArchimateController {
   }
 
   @Get('capacites-metier')
-  findAllCapacites(@CurrentUser() user: AuthUser) {
-    return this.service.findAllCapacites(requireOrganisationId(user));
+  findAllCapacites(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.service.findAllCapacites(requireOrganisationId(user), pagination);
   }
 
   @Get('capacites-metier/:id')
@@ -71,8 +71,8 @@ export class ArchimateController {
   }
 
   @Get('elements-archimate')
-  findAllElements(@CurrentUser() user: AuthUser, @Query('type') type?: TypeElement) {
-    return this.service.findAllElements(requireOrganisationId(user), type);
+  findAllElements(@CurrentUser() user: AuthUser, @Query() query: ListElementsQueryDto) {
+    return this.service.findAllElements(requireOrganisationId(user), query.type, query);
   }
 
   @Get('elements-archimate/generate-vue')
@@ -123,8 +123,8 @@ export class ArchimateController {
   }
 
   @Get('relations-archimate')
-  findAllRelations(@CurrentUser() user: AuthUser) {
-    return this.service.findAllRelations(requireOrganisationId(user));
+  findAllRelations(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.service.findAllRelations(requireOrganisationId(user), pagination);
   }
 
   @Delete('relations-archimate/:id')

@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { MembresService } from './membres.service';
 import { CreateMembreDto } from './dto/create-membre.dto';
 import { UpdateMembreDto } from './dto/update-membre.dto';
-import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 
 @Controller('membres')
@@ -12,8 +12,8 @@ export class MembresController {
   constructor(private readonly membresService: MembresService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.membresService.findAll(requireOrganisationId(user));
+  findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.membresService.findAll(requireOrganisationId(user), pagination);
   }
 
   @Post()

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateSolutionDto } from './dto/create-solution.dto';
 import { UpdateSolutionDto } from './dto/update-solution.dto';
 import { ScoreItemDto } from './dto/update-scores.dto';
@@ -12,12 +13,12 @@ export class SolutionService {
     return this.prisma.solution.create({ data: { ...dto, organisationId }, include: { scores: true } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.solution.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-      include: { scores: true },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.solution,
+      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { scores: true } },
+      pagination,
+    );
   }
 
   async findOne(id: string, organisationId: string) {

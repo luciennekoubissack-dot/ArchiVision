@@ -1,16 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { ConformiteItemDto } from './dto/update-conformites.dto';
 
 @Injectable()
 export class ConformiteService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(organisationId: string) {
-    return this.prisma.conformiteSolution.findMany({
-      where: { solution: { organisationId } },
-      include: { solution: { select: { id: true, nom: true } }, politique: { select: { id: true, nom: true } } },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.conformiteSolution,
+      {
+        where: { solution: { organisationId } },
+        include: { solution: { select: { id: true, nom: true } }, politique: { select: { id: true, nom: true } } },
+      },
+      pagination,
+    );
   }
 
   async findBySolution(solutionId: string, organisationId: string) {

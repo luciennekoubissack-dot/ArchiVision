@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateCritereEvaluationDto } from './dto/create-critere-evaluation.dto';
 
 @Injectable()
@@ -10,11 +11,8 @@ export class CritereEvaluationService {
     return this.prisma.critereEvaluation.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.critereEvaluation.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(this.prisma.critereEvaluation, { where: { organisationId }, orderBy: { nom: 'asc' } }, pagination);
   }
 
   async remove(id: string, organisationId: string) {

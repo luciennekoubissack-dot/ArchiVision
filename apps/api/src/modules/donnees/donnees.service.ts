@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateDataEntityDto } from './dto/create-data-entity.dto';
 import { UpdateDataEntityDto } from './dto/update-data-entity.dto';
 import { CreateDataAttributeDto } from './dto/create-data-attribute.dto';
@@ -15,12 +16,12 @@ export class DonneesService {
     return this.prisma.dataEntity.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.dataEntity.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-      include: { attributs: true, _count: { select: { attributs: true } } },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.dataEntity,
+      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { attributs: true, _count: { select: { attributs: true } } } },
+      pagination,
+    );
   }
 
   async findOne(id: string, organisationId: string) {
@@ -64,11 +65,12 @@ export class DonneesService {
 
   // ── Relations ────────────────────────────────────────────────────────────
 
-  findAllRelations(organisationId: string) {
-    return this.prisma.dataRelation.findMany({
-      where: { source: { organisationId } },
-      include: { source: true, target: true },
-    });
+  findAllRelations(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.dataRelation,
+      { where: { source: { organisationId } }, include: { source: true, target: true } },
+      pagination,
+    );
   }
 
   async createRelation(organisationId: string, dto: CreateDataRelationDto) {

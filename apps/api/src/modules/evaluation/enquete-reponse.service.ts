@@ -1,16 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { EnqueteReponseItemDto } from './dto/import-enquete.dto';
 
 @Injectable()
 export class EnqueteReponseService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(organisationId: string) {
-    return this.prisma.enqueteReponse.findMany({
-      where: { organisationId },
-      orderBy: { createdAt: 'desc' },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(this.prisma.enqueteReponse, { where: { organisationId }, orderBy: { createdAt: 'desc' } }, pagination);
   }
 
   async importReponses(organisationId: string, items: EnqueteReponseItemDto[]) {

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
-import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import { ConformiteService } from './conformite.service';
 import { UpdateConformitesDto } from './dto/update-conformites.dto';
@@ -9,8 +9,8 @@ export class ConformiteController {
   constructor(private readonly service: ConformiteService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.service.findAll(requireOrganisationId(user));
+  findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.service.findAll(requireOrganisationId(user), pagination);
   }
 
   @Get(':solutionId')

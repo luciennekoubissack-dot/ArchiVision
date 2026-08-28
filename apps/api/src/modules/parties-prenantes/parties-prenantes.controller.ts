@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
-import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import { PartiesPrenantesService } from './parties-prenantes.service';
 import { CreatePartiePrenanteDto } from './dto/create-partie-prenante.dto';
@@ -9,8 +9,8 @@ export class PartiesPrenantesController {
   constructor(private readonly service: PartiesPrenantesService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.service.findAll(requireOrganisationId(user));
+  findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.service.findAll(requireOrganisationId(user), pagination);
   }
 
   @Post()

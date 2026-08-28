@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 import { CreateObjectifDto } from './dto/create-objectif.dto';
 import { UpdateObjectifDto } from './dto/update-objectif.dto';
 
@@ -11,11 +12,8 @@ export class ObjectifService {
     return this.prisma.objectif.create({ data: { ...dto, organisationId } });
   }
 
-  findAll(organisationId: string) {
-    return this.prisma.objectif.findMany({
-      where: { organisationId },
-      orderBy: { nom: 'asc' },
-    });
+  findAll(organisationId: string, pagination?: PaginationQueryDto) {
+    return paginateFindMany(this.prisma.objectif, { where: { organisationId }, orderBy: { nom: 'asc' } }, pagination);
   }
 
   async findOne(id: string, organisationId: string) {

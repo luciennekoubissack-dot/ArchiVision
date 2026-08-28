@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { AuthUser, CurrentUser, PaginationQueryDto, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import { SolutionService } from './solution.service';
 import { CreateSolutionDto } from './dto/create-solution.dto';
@@ -11,8 +11,8 @@ export class SolutionController {
   constructor(private readonly service: SolutionService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.service.findAll(requireOrganisationId(user));
+  findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
+    return this.service.findAll(requireOrganisationId(user), pagination);
   }
 
   @Get(':id')

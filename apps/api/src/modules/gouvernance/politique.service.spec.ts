@@ -43,10 +43,26 @@ describe('PolitiqueService', () => {
     });
   });
 
-  it('liste les politiques d\'une organisation', async () => {
+  it('liste les politiques d\'une organisation (sans pagination : tableau complet)', async () => {
     prismaMock.politiqueGouvernance.findMany.mockResolvedValue([mockPolitique]);
     const result = await service.findAll(ORG_ID);
     expect(result).toEqual([mockPolitique]);
+  });
+
+  it('avec pagination fournie, renvoie { items, total, page, pageSize } et applique skip/take', async () => {
+    prismaMock.politiqueGouvernance.findMany.mockResolvedValue([mockPolitique]);
+    prismaMock.politiqueGouvernance.count.mockResolvedValue(1);
+
+    const result = await service.findAll(ORG_ID, { page: 1, pageSize: 20 });
+
+    expect(result).toEqual({ items: [mockPolitique], total: 1, page: 1, pageSize: 20 });
+    expect(prismaMock.politiqueGouvernance.findMany).toHaveBeenCalledWith({
+      where: { organisationId: ORG_ID },
+      orderBy: { nom: 'asc' },
+      skip: 0,
+      take: 20,
+    });
+    expect(prismaMock.politiqueGouvernance.count).toHaveBeenCalledWith({ where: { organisationId: ORG_ID } });
   });
 
   it('met à jour une politique existante', async () => {

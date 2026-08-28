@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
 import { RoleUtilisateur, StatutOrganisation } from '@prisma/client';
+import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
 
 export interface SimulatedEmail {
   to: string;
@@ -12,22 +13,26 @@ export interface SimulatedEmail {
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
-  listOrganisations(statut?: StatutOrganisation) {
-    return this.prisma.organisation.findMany({
-      where: statut ? { statut } : {},
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        nom: true,
-        secteur: true,
-        taille: true,
-        pays: true,
-        statut: true,
-        createdAt: true,
-        validatedAt: true,
-        _count: { select: { users: true } },
+  listOrganisations(statut?: StatutOrganisation, pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.organisation,
+      {
+        where: statut ? { statut } : {},
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          nom: true,
+          secteur: true,
+          taille: true,
+          pays: true,
+          statut: true,
+          createdAt: true,
+          validatedAt: true,
+          _count: { select: { users: true } },
+        },
       },
-    });
+      pagination,
+    );
   }
 
   async getOrganisation(id: string) {
@@ -71,19 +76,23 @@ export class AdminService {
     await this.prisma.organisation.delete({ where: { id } });
   }
 
-  listUtilisateurs() {
-    return this.prisma.user.findMany({
-      where: { role: { not: RoleUtilisateur.SUPERADMIN } },
-      select: {
-        id: true,
-        nom: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        organisation: { select: { id: true, nom: true } },
+  listUtilisateurs(pagination?: PaginationQueryDto) {
+    return paginateFindMany(
+      this.prisma.user,
+      {
+        where: { role: { not: RoleUtilisateur.SUPERADMIN } },
+        select: {
+          id: true,
+          nom: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          organisation: { select: { id: true, nom: true } },
+        },
+        orderBy: { createdAt: 'desc' },
       },
-      orderBy: { createdAt: 'desc' },
-    });
+      pagination,
+    );
   }
 
   async stats() {
