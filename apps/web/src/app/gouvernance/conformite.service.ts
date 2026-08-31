@@ -1,31 +1,35 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { ApiConfiguration } from '../api-client/api-configuration';
+import { ConformiteEntity } from '../api-client/models/conformite-entity';
+import { ConformiteBySolutionEntity } from '../api-client/models/conformite-by-solution-entity';
+import { ConformiteItemDto } from '../api-client/models/conformite-item-dto';
+import { conformiteControllerFindAll } from '../api-client/fn/conformites-solutions/conformite-controller-find-all';
+import { conformiteControllerUpdate } from '../api-client/fn/conformites-solutions/conformite-controller-update';
 
 export type StatutConformite = 'CONFORME' | 'NON_CONFORME' | 'A_EVALUER';
 
-export interface ConformiteSolution {
-  id: string;
-  politiqueId: string;
-  statut: StatutConformite;
-  commentaire?: string | null;
-}
+export type ConformiteSolution = ConformiteBySolutionEntity;
+export type ConformiteItem = ConformiteItemDto;
 
-export interface ConformiteItem {
-  politiqueId: string;
-  statut: StatutConformite;
-  commentaire?: string;
-}
-
+/**
+ * Enveloppe fine autour du client généré depuis le contrat OpenAPI
+ * (`../api-client`), pour garder les mêmes noms de méthode qu'avant partout
+ * ailleurs dans l'app.
+ */
 @Injectable({ providedIn: 'root' })
 export class ConformiteService {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private config: ApiConfiguration) {}
 
-  listAll(): Observable<(ConformiteSolution & { solution: { id: string; nom: string } })[]> {
-    return this.http.get<(ConformiteSolution & { solution: { id: string; nom: string } })[]>('/conformites-solutions');
+  listAll(): Observable<ConformiteEntity[]> {
+    return conformiteControllerFindAll(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 
   updateConformites(solutionId: string, items: ConformiteItem[]): Observable<ConformiteSolution[]> {
-    return this.http.patch<ConformiteSolution[]>(`/conformites-solutions/${solutionId}`, { items });
+    return conformiteControllerUpdate(this.http, this.config.rootUrl, { solutionId, body: { items } }).pipe(
+      map((r) => r.body),
+    );
   }
 }

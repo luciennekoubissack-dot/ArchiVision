@@ -66,6 +66,12 @@ describe('ChangementController (HTTP)', () => {
     expect(response.body).toEqual([mockChangement]);
   });
 
+  it('un Architecte peut consulter les statistiques (200)', async () => {
+    prismaMock.demandeChangement.count.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    const response = await request(app.getHttpServer()).get('/demandes-changement/stats').expect(200);
+    expect(response.body).toEqual({ total: 5, enCours: 2 });
+  });
+
   it('un Architecte peut créer une demande de changement (201)', async () => {
     prismaMock.demandeChangement.create.mockResolvedValue(mockChangement);
     const response = await request(app.getHttpServer())

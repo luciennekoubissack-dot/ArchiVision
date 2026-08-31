@@ -1,6 +1,26 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { ApiConfiguration } from '../api-client/api-configuration';
+import { BpmnFlowEntity } from '../api-client/models/bpmn-flow-entity';
+import { BpmnViewResultEntity } from '../api-client/models/bpmn-view-result-entity';
+import { CreateBpmnElementDto } from '../api-client/models/create-bpmn-element-dto';
+import { UpdateBpmnElementDto } from '../api-client/models/update-bpmn-element-dto';
+import { CreateBpmnFlowDto } from '../api-client/models/create-bpmn-flow-dto';
+import { CreateBpmnProcessusDto } from '../api-client/models/create-bpmn-processus-dto';
+import { UpdateBpmnProcessusDto } from '../api-client/models/update-bpmn-processus-dto';
+import { bpmnControllerFindAll } from '../api-client/fn/bpmn-processus/bpmn-controller-find-all';
+import { bpmnControllerFindOne } from '../api-client/fn/bpmn-processus/bpmn-controller-find-one';
+import { bpmnControllerGenerateVue } from '../api-client/fn/bpmn-processus/bpmn-controller-generate-vue';
+import { bpmnControllerCreate } from '../api-client/fn/bpmn-processus/bpmn-controller-create';
+import { bpmnControllerUpdate } from '../api-client/fn/bpmn-processus/bpmn-controller-update';
+import { bpmnControllerRemove } from '../api-client/fn/bpmn-processus/bpmn-controller-remove';
+import { bpmnControllerAddElement } from '../api-client/fn/bpmn-processus/bpmn-controller-add-element';
+import { bpmnControllerUpdateElement } from '../api-client/fn/bpmn-processus/bpmn-controller-update-element';
+import { bpmnControllerRemoveElement } from '../api-client/fn/bpmn-processus/bpmn-controller-remove-element';
+import { bpmnControllerAddFlow } from '../api-client/fn/bpmn-processus/bpmn-controller-add-flow';
+import { bpmnControllerRemoveFlow } from '../api-client/fn/bpmn-processus/bpmn-controller-remove-flow';
 
 export type TypeBpmn =
   | 'EVENEMENT_DEBUT'
@@ -22,6 +42,17 @@ export type TypeTache = 'UTILISATEUR' | 'SERVICE' | 'MANUELLE' | 'ENVOI' | 'RECE
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
 export type TypeProcessus = 'METIER' | 'SUPPORT' | 'PILOTAGE';
 
+export type BpmnFlow = BpmnFlowEntity;
+export type BpmnView = BpmnViewResultEntity;
+
+/**
+ * `BpmnProcessusEntity`, `BpmnProcessusListItemEntity` (avec `_count`) et
+ * `BpmnProcessusDetailEntity` (avec `organisationId`) sont trois formes
+ * générées différentes pour la même notion de processus selon l'endpoint.
+ * On garde l'interface écrite à la main (compatible structurellement en
+ * lecture avec les trois) pour ne pas devoir la faire varier selon la
+ * méthode appelée.
+ */
 export interface BpmnProcessus {
   id: string;
   nom: string;
@@ -33,13 +64,11 @@ export interface BpmnProcessus {
   _count?: { elements: number };
 }
 
-export interface BpmnFlow {
-  id: string;
-  label?: string | null;
-  sourceId: string;
-  targetId: string;
-}
-
+/**
+ * `BpmnElementEntity` (sans flux) et `BpmnElementWithFlowsEntity` (flux
+ * obligatoires) sont utilisés selon l'endpoint. Interface écrite à la main
+ * avec flux optionnels, compatible structurellement avec les deux.
+ */
 export interface BpmnElement {
   id: string;
   nom: string;
@@ -58,45 +87,55 @@ export interface BpmnProcessusDetail extends BpmnProcessus {
   elements: BpmnElement[];
 }
 
-export interface BpmnView {
-  svg: string;
-  elementCount: number;
-  flowCount: number;
-}
-
+/**
+ * Enveloppe fine autour du client généré depuis le contrat OpenAPI
+ * (`../api-client`), pour garder les mêmes noms de méthode qu'avant partout
+ * ailleurs dans l'app.
+ */
 @Injectable({ providedIn: 'root' })
 export class BpmnService {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private config: ApiConfiguration) {}
+
+  // ── Processus ──────────────────────────────────────────────────────────────
 
   list(): Observable<BpmnProcessus[]> {
-    return this.http.get<BpmnProcessus[]>('/bpmn-processus');
+    return bpmnControllerFindAll(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 
   get(id: string): Observable<BpmnProcessusDetail> {
-    return this.http.get<BpmnProcessusDetail>(`/bpmn-processus/${id}`);
+    return bpmnControllerFindOne(this.http, this.config.rootUrl, { id }).pipe(map((r) => r.body));
   }
 
   generateView(id: string): Observable<BpmnView> {
-    return this.http.get<BpmnView>(`/bpmn-processus/${id}/generate-vue`);
+    return bpmnControllerGenerateVue(this.http, this.config.rootUrl, { id }).pipe(map((r) => r.body));
   }
 
   create(payload: { nom: string; description?: string; type?: TypeProcessus }): Observable<BpmnProcessus> {
-    return this.http.post<BpmnProcessus>('/bpmn-processus', payload);
+    return bpmnControllerCreate(this.http, this.config.rootUrl, { body: payload as CreateBpmnProcessusDto }).pipe(
+      map((r) => r.body),
+    );
   }
 
   update(id: string, payload: { nom?: string; description?: string; type?: TypeProcessus }): Observable<BpmnProcessus> {
-    return this.http.patch<BpmnProcessus>(`/bpmn-processus/${id}`, payload);
+    return bpmnControllerUpdate(this.http, this.config.rootUrl, { id, body: payload as UpdateBpmnProcessusDto }).pipe(
+      map((r) => r.body),
+    );
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`/bpmn-processus/${id}`);
+    return bpmnControllerRemove(this.http, this.config.rootUrl, { id }).pipe(map(() => undefined));
   }
+
+  // ── Éléments ───────────────────────────────────────────────────────────────
 
   addElement(
     processusId: string,
     payload: { nom: string; type: TypeBpmn; declencheur?: DeclencheurEvenement; typeTache?: TypeTache; statut?: StatutElement },
   ): Observable<BpmnElement> {
-    return this.http.post<BpmnElement>(`/bpmn-processus/${processusId}/elements`, payload);
+    return bpmnControllerAddElement(this.http, this.config.rootUrl, {
+      id: processusId,
+      body: payload as CreateBpmnElementDto,
+    }).pipe(map((r) => r.body));
   }
 
   updateElement(
@@ -111,21 +150,26 @@ export class BpmnService {
       positionY?: number;
     },
   ): Observable<BpmnElement> {
-    return this.http.patch<BpmnElement>(`/bpmn-processus/elements/${elementId}`, payload);
+    return bpmnControllerUpdateElement(this.http, this.config.rootUrl, {
+      elementId,
+      body: payload as UpdateBpmnElementDto,
+    }).pipe(map((r) => r.body));
   }
 
   deleteElement(elementId: string): Observable<void> {
-    return this.http.delete<void>(`/bpmn-processus/elements/${elementId}`);
+    return bpmnControllerRemoveElement(this.http, this.config.rootUrl, { elementId }).pipe(map(() => undefined));
   }
 
-  addFlow(
-    processusId: string,
-    payload: { sourceId: string; targetId: string; label?: string },
-  ): Observable<BpmnFlow> {
-    return this.http.post<BpmnFlow>(`/bpmn-processus/${processusId}/flows`, payload);
+  // ── Flux ───────────────────────────────────────────────────────────────────
+
+  addFlow(processusId: string, payload: { sourceId: string; targetId: string; label?: string }): Observable<BpmnFlow> {
+    return bpmnControllerAddFlow(this.http, this.config.rootUrl, {
+      id: processusId,
+      body: payload as CreateBpmnFlowDto,
+    }).pipe(map((r) => r.body));
   }
 
   deleteFlow(flowId: string): Observable<void> {
-    return this.http.delete<void>(`/bpmn-processus/flows/${flowId}`);
+    return bpmnControllerRemoveFlow(this.http, this.config.rootUrl, { flowId }).pipe(map(() => undefined));
   }
 }

@@ -21,7 +21,7 @@ const TENANT_NAV_GROUPS: NavGroup[] = [
     label: 'Général',
     items: [
       { label: 'Tableau de bord', path: '/dashboard', icon: 'home' },
-      { label: "Assistant d'architecture", path: '/assistant', icon: 'wand' },
+      { label: 'Révision', path: '/assistant', icon: 'search' },
     ],
   },
   {

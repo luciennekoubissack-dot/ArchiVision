@@ -26,6 +26,14 @@ module.exports = function (config) {
     },
     reporters: ['progress', 'kjhtml'],
     browsers: ['Chrome'],
+    customLaunchers: {
+      // Chrome sans sandbox : requis en CI (conteneur), --disable-gpu évite
+      // les erreurs GPU/DRM sans affichage sur les runners headless.
+      ChromeHeadlessCI: {
+        base: 'ChromeHeadless',
+        flags: ['--no-sandbox', '--disable-gpu'],
+      },
+    },
     restartOnFileChange: true,
   });
 };

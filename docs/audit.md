@@ -1226,3 +1226,543 @@ forme d'interface plutôt que de simple découpage de méthode :
   erreur, tailles de bundle stables.
 - Navigateur : session réelle sur les données K&B Groupe, écrans
   vérifiés en détail ci-dessus, aucune erreur console nouvelle.
+
+---
+
+## 2026-08-31 : conversion API First (contrat OpenAPI, versioning, client généré)
+
+L'utilisateur a demandé si l'application était API First. Réponse à ce
+moment-là : non, backend-serves-frontend classique (pas de Swagger, pas
+de versioning, pas de CORS, DTOs validés mais non documentés). Il a
+demandé la conversion complète, en trois paliers.
+
+### Palier 1 : documentation OpenAPI
+
+`@nestjs/swagger` (v11.4.7, compatible avec le Nest 11 déjà en place)
+installé et configuré dans `main.ts` : `DocumentBuilder` + Swagger UI
+sur `/api/docs`, schéma Bearer nommé `access-token` (seul praticable
+pour « Try it out » : `CsrfGuard` laisse passer les requêtes Bearer
+sans jeton CSRF, contrairement au flux cookie du frontend Angular).
+
+Chaque DTO de requête a reçu `@ApiProperty`/`@ApiPropertyOptional` (69
+classes), chaque contrôleur `@ApiTags`/`@ApiOperation`/`@ApiBearerAuth`
+(24 contrôleurs, 140 endpoints). Travail mécanique volumineux, réparti
+sur 7 agents en parallèle par groupe de modules.
+
+Un deuxième passage a documenté les réponses (`@ApiOkResponse` /
+`@ApiCreatedResponse` / `@ApiNoContentResponse`), avec création d'une
+classe « entity » par forme de réponse réellement renvoyée par chaque
+service (vérifiée contre la clause Prisma `include`/`select` du
+service, pas devinée) : sans ça, un client généré depuis le contrat
+n'aurait eu que des retours `void`. À nouveau réparti sur 7 agents.
+
+Un décorateur partagé `ApiPaginatedResponse` (`libs/shared`) documente
+la pagination opt-in en texte plutôt qu'en second schéma JSON : OpenAPI
+3 ne permet pas d'attacher deux schémas à un seul code 200 sur une même
+opération sans un `oneOf` qui forcerait chaque appel généré à
+discriminer `Array.isArray(...)`, y compris les appels qui n'utilisent
+jamais la pagination. Le contrat documenté et généré reste donc le
+tableau complet ; le mode paginé (`{items,total,page,pageSize}`) est
+décrit en prose et récupéré côté client par un cast explicite.
+
+Deux bugs réels trouvés et corrigés après coup, pas seulement des
+détails cosmétiques :
+- **Collision de noms** : `admin/entities/organisation.entity.ts` et
+  `organisation/entities/organisation.entity.ts` définissaient chacun
+  une classe `OrganisationEntity` différente. Swagger indexe ses schémas
+  par nom de classe à travers toute l'appli : la seconde écrasait
+  silencieusement la première dans le document généré. Renommée en
+  `SuperAdminOrganisationEntity` côté admin.
+- **Types nullable non inférés** : `@ApiPropertyOptional({..., nullable:
+  true })` sans `type:` explicite sur un champ `string | null` produit
+  un schéma vide `{}` (la métadonnée `design:type` de TypeScript ne
+  distingue pas les membres d'un type union). Touchait 89 champs dans 31
+  fichiers `entities/dto`, à cause d'un exemple donné aux agents qui
+  omettait `type:`. Corrigé par un script Node ciblé plutôt qu'une
+  nouvelle passe d'agents, avec re-scan de zéro occurrence restante.
+
+### Palier 2 : versioning et CORS
+
+Toutes les routes sont passées sous `/api/v1` (`app.setGlobalPrefix`),
+`/uploads` reste hors préfixe (fichiers statiques, en dehors du routeur
+Nest). CORS explicite (`app.enableCors`) avec origine configurable via
+`FRONTEND_ORIGIN` (`.env`, défaut `http://localhost:4201`) et
+`credentials: true` pour le cookie de session.
+
+Côté frontend, `proxy.conf.json` a d'abord reçu un `pathRewrite` par
+route pour absorber le nouveau préfixe sans toucher au code (27
+entrées), puis a été simplifié à deux entrées (`/api/v1` en
+passthrough, `/uploads`) une fois la migration du palier 3 terminée et
+plus aucun appel ne visant les anciennes routes à plat.
+
+### Palier 3 : client Angular généré depuis le contrat
+
+`ng-openapi-gen` génère un client dans `apps/web/src/app/api-client/`
+(157 modèles, 24 groupes de fonctions, une fonction par endpoint) à
+partir de `http://localhost:3000/api/docs-json`, régénérable via
+`npm run generate:api-client`. Choisi plutôt qu'openapi-generator car
+il émet des fonctions qui prennent `HttpClient` en paramètre : l'
+intercepteur d'authentification existant (cookie, redirection sur 401)
+et la config XSRF d'Angular continuent de fonctionner sans changement.
+
+Les 22 services `*.service.ts` qui appelaient `HttpClient` directement
+sont devenus des enveloppes fines autour de ce client généré, sans
+changer un seul nom de méthode ni de type exporté exposé aux
+composants (aucun fichier composant modifié). Pattern systématique :
+- Types réexportés en alias du modèle généré quand la forme correspond
+  exactement (`export type Objectif = ObjectifEntity`).
+- Interface manuscrite conservée telle quelle quand le modèle généré
+  diverge (champ requis côté généré mais optionnel en réalité, ou
+  inverse) plutôt que de forcer un alias trompeur ; plusieurs cas réels
+  rencontrés et documentés dans le code (ex. `ApplicationEchange` dans
+  `urbanisation.service.ts`, `BpmnProcessus`/`BpmnElement` dans
+  `bpmn.service.ts` à cause de formes différentes selon l'endpoint).
+- Méthode paginée : cast `r.body as unknown as Paginated<X>`, seule
+  incohérence assumée entre le contrat documenté (tableau) et le
+  comportement réel opt-in.
+
+Migration faite par 13 agents en parallèle au total (répartis en deux
+vagues : la première a échoué à mi-parcours sur une limite de session,
+mais les fichiers déjà écrits avant l'échec étaient corrects et
+compilaient ; la seconde vague a repris exactement là où la première
+s'était arrêtée sans dupliquer de travail).
+
+### Vérifié
+
+- Suite backend complète : 311/311, aucune régression sur l'ensemble
+  du travail (annotations Swagger, renommage, correctifs de type,
+  versioning, CORS).
+- `tsc --noEmit` backend et frontend : aucune erreur, y compris sur le
+  client généré (157 modèles) et les 22 services réécrits.
+- `ng build --configuration development` : aucune erreur, tailles de
+  bundle stables.
+- `POST /api/v1/auth/login` avec les identifiants K&B Groupe, jeton
+  Bearer obtenu et utilisé pour appeler un endpoint protégé et une
+  mutation (POST) : confirme que Swagger UI est réellement utilisable
+  pour « Try it out » et que Bearer contourne bien le CSRF comme prévu.
+- Navigateur, session réelle K&B Groupe : connexion/déconnexion/
+  reconnexion, tableau de bord, Vision (BPMN : liste, sélection d'un
+  processus, éditeur de canevas, diagramme de vision), Architecture
+  métier (Relations paginées sur 22 lignes/2 pages, menu déroulant
+  Source/Cible avec les 43 éléments complets malgré la pagination du
+  tableau), Gouvernance (matrice de conformité, rapport agrégé, cycle
+  complet créer/supprimer une politique), Opportunités (matrice
+  d'évaluation, graphique), Données (entités avec attributs imbriqués,
+  relations avec source/cible résolus), Architecture Système
+  (portefeuille d'applications, éditeur de diagramme d'architecture
+  applicative), Architecture technologique (composants avec
+  déploiements imbriqués et leur application), Migration Planning
+  (frise chronologique), Organisation (membres, structures,
+  génération d'organigramme, identité, parties prenantes) : toutes les
+  routes migrées vérifiées avec de vraies données, aucune régression.
+
+---
+
+## 2026-08-31 (suite) : audit du chantier API First
+
+Nouvel audit demandé juste après la conversion API First, spécifiquement
+pour chercher ce qu'un chantier aussi large (135 fichiers touchés, 12
+agents en parallèle sur deux vagues) aurait pu introduire comme
+anomalie sans que la vérification fonctionnelle du moment ne le voie.
+Cinq angles creusés en parallèle : sécurité, qualité du client généré,
+qualité de la migration frontend, performance/bundle, tests et code
+mort. Aucun point 🔴 trouvé.
+
+### Points forts confirmés
+
+- Aucune collision de nom de classe restante (la seule trouvée,
+  `OrganisationEntity`, a été corrigée pendant le chantier lui-même).
+- Aucun schéma Swagger vide restant (vérifié en interrogeant
+  `/api/docs-json` directement, 158 schémas, zéro `properties: {}`).
+- Bundle stable (1.39 Mo initial, inchangé), tree-shaking du client
+  généré confirmé correct (aucune fonction importée depuis le barrel
+  `functions.ts`, ce qui aurait tout embarqué d'un coup).
+- Gestion d'erreur HTTP inchangée : les fonctions générées ne font
+  qu'un `filter`/`map` sur les événements de progression, aucun
+  `catchError` qui avalerait une erreur silencieusement.
+- `HttpExceptionFilter` toujours étanche (aucune fuite de stack trace
+  ou de détail Prisma), indépendant des changements récents.
+- Suite de tests intacte (311/311) : les classes "entity" Swagger sont
+  purement déclaratives (jamais instanciées, jamais retournées par un
+  handler), donc structurellement incapables de casser un test qui
+  passait déjà.
+
+### 🟠 Important
+
+1. **`ApplicationEchange` : le cast masque une vraie divergence
+   backend/type** (`apps/web/src/app/urbanisation/urbanisation.service.ts`).
+   `createEchange()` renvoie la réponse brute de
+   `prisma.applicationEchange.create({ data: dto })` côté backend
+   (`apps/api/src/modules/urbanisation/urbanisation.service.ts:219`),
+   **sans** `include: { source, target }` : les champs `source`/`target`
+   sont donc réellement absents (`undefined`) sur la réponse de
+   création. Le type généré (`EchangeEntity`) le reflète correctement
+   en les marquant optionnels, mais le service frontend les caste
+   `as unknown as ApplicationEchange`, un type manuscrit qui les exige
+   non-nuls, pour rester compatible avec `listEchanges()` (qui, lui,
+   a bien l'`include` et renvoie ces champs). Ce défaut existait déjà
+   avant la migration (l'ancien code faisait
+   `this.http.post<ApplicationEchange>(...)`, même optimisme), donc ce
+   n'est pas une régression, mais le cast le rend maintenant invisible
+   au typage : le seul appelant actuel
+   (`applications-canevas.component.ts:541-553`) ignore la réponse et
+   recharge la liste, donc aucun impact aujourd'hui, mais un futur appel
+   qui lirait `result.source.nom` juste après une création plantera.
+   Correction propre : ajouter l'`include` manquant côté backend
+   (aligner `createEchange` sur `listEchanges`), ou distinguer un type
+   de retour dédié pour la création.
+2. **Même risque, latent, sur `admin.service.ts`** :
+   `AdminOrganisationActionResultEntity.organisation` (renvoyé par
+   valider/rejeter) est un `SuperAdminOrganisationEntity` sans `_count`,
+   casté vers `OrganisationAdmin` qui l'exige. Sans impact actuel (le
+   seul appelant ne lit que `.email`), même remède si un jour un
+   composant lit `_count` sur ce résultat.
+
+### 🟡 À planifier
+
+1. **CORS sans échec explicite si `FRONTEND_ORIGIN` est absent**
+   (`apps/api/src/main.ts`) : retombe silencieusement sur
+   `http://localhost:4201` au lieu de refuser de démarrer, contrairement
+   à `requireJwtSecret` qui lui est strict. Sans risque de sécurité
+   direct (une origine de repli restrictive n'ouvre rien), mais un
+   oubli de configuration en production se traduirait par un frontend
+   bloqué sans message clair plutôt que par un échec de démarrage
+   explicite.
+2. **`/api/docs` et `/api/docs-json` ne passent pas par le
+   `ThrottlerGuard`** : Swagger monte ses routes directement sur
+   l'adaptateur HTTP, hors du pipeline de guards Nest. Voulu pour
+   l'authentification (doc publique, cohérent), mais signifie aussi
+   qu'aucune limite de débit ne s'applique à ces deux routes. Risque
+   faible (endpoints de lecture seule, pas de calcul lourd), mais à
+   surveiller si la doc devient une cible de scraping.
+3. **13 des 140 fonctions générées ne sont appelées par aucun
+   service**, dont `GET /api/v1/auth/me`
+   (`apps/api/src/modules/auth/auth.controller.ts`) : le frontend
+   restaure l'utilisateur courant depuis `localStorage` sans jamais
+   revalider auprès du serveur au chargement de page. Les 12 autres
+   sont des `findOne` par id jamais utilisés par une UI qui ne
+   travaille qu'en listes. Ni bug ni régression, mais vaut la peine de
+   décider explicitement : endpoint mort à retirer, ou fonctionnalité
+   de revalidation à ajouter (recommandé pour `/auth/me`, pour détecter
+   une session serveur expirée ou un compte désactivé côté serveur
+   sans attendre le prochain appel API qui échoue).
+4. **Incohérence de nommage FR/EN dans le module admin** :
+   `AdminUtilisateurOrganisationRefEntity` (français) et
+   `AdminOrganisationUserRefEntity` (anglais) pour un concept
+   symétrique, créées par le même agent. Purement cosmétique, à
+   uniformiser sur le français au prochain passage dans ce module.
+5. **Un cast non commenté** dans
+   `apps/web/src/app/auth/auth.service.ts` (`uploadLogo`) : contrairement
+   aux casts similaires d'`admin.service.ts`/`urbanisation.service.ts`
+   qui expliquent pourquoi, celui-ci ne dit pas que c'est pour lever le
+   `| null` de `StrictHttpResponse`. Cosmétique, à documenter ou
+   remplacer par `r.body!`.
+6. **Confirmation d'une dette déjà connue** : `health.controller.ts`
+   reste sans `@ApiOkResponse` (seul contrôleur dans ce cas), et 13
+   contrôleurs sur 22 n'ont toujours pas de `*.controller.spec.ts`
+   dédié (couverture faite au niveau service dans ce projet, pattern
+   préexistant, pas une régression du chantier Swagger).
+7. **Doublon de requêtes `list()`/`listPaginated()` confirmé
+   préexistant, pas aggravé** : plusieurs composants
+   (`gouvernance.component.ts`, `opportunites.component.ts`) chargent
+   les deux variantes en parallèle au démarrage (une pour les
+   statistiques/la matrice, une pour le tableau paginé). Daté du
+   commit `pagination`, antérieur à ce chantier ; reste un vrai sujet
+   de perf à traiter séparément (dériver les stats du tableau, ou
+   fournir un agrégat côté backend).
+
+### Vérifié
+
+- `npx jest --silent` : 311/311, inchangé.
+- Recherche exhaustive de classes dupliquées sur tout `apps/api/src` et
+  `libs/shared/src` : aucune.
+- Interrogation directe de `/api/docs-json` (158 schémas) : aucun
+  schéma vide.
+- `ng build --configuration development` : 1.39 Mo initial, stable.
+- CsrfGuard : le contournement Bearer confirmé sûr (un site tiers ne
+  peut pas forcer l'ajout d'un en-tête `Authorization` sur une requête
+  cross-site sans déclencher un preflight CORS, lui-même bloqué par
+  l'origine unique configurée).
+- `uploadLogo` : confirmé fonctionnel malgré le typage généré `Blob`
+  (un `File` du DOM hérite de `Blob`, le nom de fichier est préservé
+  par le navigateur au moment de la construction du `FormData`).
+
+### Corrections apportées le jour même
+
+Tous les points 🟠 et une partie des points 🟡 de cet audit ont été
+corrigés dans la foulée plutôt que reportés :
+
+- **`createEchange` (🟠)** : ajout de l'`include: { source, target }`
+  manquant sur le `prisma.applicationEchange.create()`
+  (`apps/api/src/modules/urbanisation/urbanisation.service.ts`),
+  aligné sur `listEchanges`. `EchangeEntity.source`/`target` sont
+  passés de facultatifs à requis en conséquence. Côté frontend,
+  `ApplicationEchange` devient un simple alias du type généré, les
+  deux casts `as unknown as` disparaissent. Vérifié par un appel API
+  réel : création d'un échange, `source.nom`/`target.nom` bien
+  présents dans la réponse, nettoyé ensuite.
+- **`valider`/`rejeter` (🟠)** : ajout de l'`include: { _count: {
+  select: { users: true } } }` manquant sur les deux
+  `prisma.organisation.update()`
+  (`apps/api/src/modules/admin/admin.service.ts`), aligné sur
+  `listOrganisations`. Nouvelle entité
+  `SuperAdminOrganisationWithCountEntity` pour documenter cette forme
+  exacte. Côté frontend, `OrganisationActionResult` devient un alias
+  direct, les deux casts disparaissent. Vérifié par un appel API réel
+  en tant que superadmin (`rejeter` sur une organisation de test) :
+  `_count.users` bien présent dans la réponse.
+- **CORS sans échec explicite (🟡)** : nouvel utilitaire
+  `requireFrontendOrigin` (`libs/shared/src/utils/require-frontend-origin.ts`),
+  même principe que `requireJwtSecret` : l'API refuse de démarrer si
+  `FRONTEND_ORIGIN` est absent, au lieu de retomber sur
+  `localhost:4201`.
+- **Swagger non limité en débit (🟡)** : limiteur maison en mémoire
+  (`libs/shared/src/middleware/simple-rate-limit.middleware.ts`, pas
+  de Redis dans cette stack) posé sur `/api/docs` et `/api/docs-json`
+  (60 requêtes/minute, budget partagé entre les deux). Bug trouvé et
+  corrigé en le testant : `app.use('/api/docs', ...)` seul ne couvre
+  pas `/api/docs-json` (Express exige une frontière de segment `/`
+  après le préfixe, absente entre « docs » et « -json »), d'où le
+  montage explicite sur les deux chemins. Vérifié par bombardement de
+  65 requêtes : 429 déclenché exactement à la 60ᵉ sur chacune des deux
+  routes.
+- **`GET /auth/me` jamais appelé (🟡)** : nouvelle méthode
+  `AuthService.refreshMe()` (`apps/web/src/app/auth/auth.service.ts`),
+  appelée une fois au démarrage de l'app
+  (`apps/web/src/app/core/app.component.ts`) quand un utilisateur est
+  déjà en mémoire via `localStorage`. Revalide la session en
+  arrière-plan sans bloquer le rendu ; une réponse 401 déclenche une
+  déconnexion locale, toute autre erreur (réseau, etc.) est ignorée
+  pour ne pas déconnecter l'utilisateur sur un problème transitoire.
+  Vérifié : un appel `GET /api/v1/auth/me` part bien automatiquement
+  au chargement de l'app.
+- **Incohérence FR/EN dans le module admin (🟡)** : `AdminOrganisationUserRefEntity`
+  renommée en `AdminUtilisateurRefEntity`, cohérente avec
+  `AdminUtilisateurOrganisationRefEntity` du même module.
+- **Cast non commenté dans `uploadLogo` (🟡)** : supprimé purement et
+  simplement (`apps/web/src/app/auth/auth.service.ts`) ; le type
+  généré correspondait déjà exactement, le cast ne servait à rien.
+- **`health.controller.ts` sans doc de réponse (🟡)** : `@ApiOkResponse`
+  et nouvelle `HealthCheckResultEntity` ajoutées, pour cohérence avec
+  les 23 autres contrôleurs.
+
+Volontairement non traités maintenant, car explicitement qualifiés de
+dette antérieure au chantier API First et à traiter séparément dans
+cet audit même : le doublon de requêtes `list()`/`listPaginated()`
+dans `gouvernance.component.ts`/`opportunites.component.ts`, et
+l'absence de `*.controller.spec.ts` sur 13 contrôleurs (stratégie de
+test du projet, pas une régression).
+
+### Vérifié (corrections)
+
+- `npx jest --silent` : 311/311 après mise à jour des deux assertions
+  `admin.service.spec.ts` qui vérifiaient l'appel Prisma exact
+  (ajout de l'`include` attendu).
+- `tsc --noEmit` backend et frontend : aucune erreur.
+- `ng build --configuration development` : 1.39 Mo initial, stable.
+- Spec OpenAPI régénérée puis client Angular régénéré : `EchangeEntity`
+  a bien `source`/`target` requis, `SuperAdminOrganisationEntity` a
+  disparu du spec (attendu : plus aucun endpoint ne la référence
+  directement, elle reste inlinée dans ses deux sous-types via
+  l'héritage TypeScript, comportement normal de `@nestjs/swagger`,
+  pas une régression).
+
+## 2026-08-31 (suite 2) : mise en place de la CI
+
+Demande explicite : automatiser ce que la boucle de vérification de ce
+chantier a toujours fait à la main (tests, typecheck, build), pour ne
+plus dépendre de le redemander à chaque changement.
+
+### Mise en place
+
+- `.github/workflows/ci.yml` : deux jobs indépendants sur `push`/`pull_request`
+  vers `main`, `api` et `web`, chacun `typecheck` → `test` → `build`.
+- `npm run typecheck` ajouté côté racine (`tsc -p apps/api/tsconfig.app.json
+  --noEmit`) et côté `apps/web` (`tsc -p tsconfig.app.json --noEmit`) :
+  scripts qui n'existaient pas encore, alors que c'est la commande la
+  plus rejouée à la main tout au long de ce journal.
+- Job `api` : variables d'environnement factices (`JWT_SECRET`,
+  `FRONTEND_ORIGIN`, `DATABASE_URL`) posées juste pour satisfaire
+  `requireJwtSecret`/`requireFrontendOrigin` et `prisma generate` ; les
+  311 tests mockent Prisma et ne se connectent à aucune vraie base,
+  donc pas de service Postgres en CI pour l'instant (à revoir seulement
+  si des tests d'intégration/e2e apparaissent un jour).
+- Job `web` : nouveau script `test:ci` (`ng test --watch=false
+  --browsers=ChromeHeadlessCI`) et un `customLauncher` dédié dans
+  `karma.conf.js` (`--no-sandbox --disable-gpu`, nécessaire en
+  conteneur CI).
+
+### Bugs trouvés en vérifiant la CI localement
+
+- **`karmaConfig` absent de `angular.json` (🟠, propre à la CI)** :
+  `angular.json` ne référençait aucun `karmaConfig` sur la cible
+  `test`, donc le builder Angular ignorait totalement `karma.conf.js`
+  et le `customLauncher` fraîchement ajouté n'était jamais chargé
+  (« Cannot load browser "ChromeHeadlessCI": it is not registered »).
+  Corrigé en ajoutant `"karmaConfig": "karma.conf.js"` aux options de
+  la cible `test`.
+- **`app.component.spec.ts` cassé depuis le chantier API First (🟠,
+  trou de la boucle de vérification)** : en exécutant réellement
+  `ng test` pour la première fois de tout ce chantier (la boucle de
+  vérification habituelle s'arrêtait à `tsc --noEmit` + `ng build`,
+  jamais aux tests unitaires Angular), le seul spec Angular du projet
+  échouait avec `NullInjectorError: No provider for HttpClient!`.
+  Cause : l'ajout de `AuthService.refreshMe()` dans `AppComponent`
+  (entrée précédente, le jour même) fait désormais dépendre
+  `AppComponent` de `HttpClient` via `AuthService`, sans que le
+  `TestBed` du spec ne le fournisse. Corrigé en ajoutant
+  `provideHttpClient()`/`provideHttpClientTesting()` aux providers du
+  test. Une vraie régression fonctionnelle introduite plus tôt dans la
+  journée, invisible tant que personne ne lançait `ng test`.
+
+### Constat honnête, pas corrigé maintenant
+
+`apps/web/src/app/core/app.component.spec.ts` est **l'unique fichier de
+spec de tout le frontend Angular** : c'est le stub généré par défaut
+par `ng generate`, jamais complété. Autrement dit, la couverture de
+test frontend est quasi nulle, à l'opposé du backend (311 tests,
+44 suites). La CI rejouera ce seul test à chaque push, mais elle ne
+protège aujourd'hui contre pratiquement aucune régression côté
+composants/services Angular. 🟡 à traiter dans un futur audit dédié,
+distinct de la mise en place de la CI elle-même.
+
+### Vérifié
+
+- `npx prisma generate` avec les variables factices de CI : OK.
+- `npm run typecheck` (racine, backend) : aucune erreur.
+- `npm test` (racine, backend) : 311/311, avec uniquement les
+  variables d'environnement factices de CI (pas de `.env` local).
+- `npm run build` (racine, backend, `nest build api`) : OK.
+- `npm run typecheck` (`apps/web`) : aucune erreur.
+- `npm run test:ci` (`apps/web`, ChromeHeadlessCI) : 1/1 après le
+  correctif du spec.
+- `npm run build` (`apps/web`, `ng build`) : bundle initial ~346 Ko
+  brut / ~97 Ko transféré, généré sans erreur.
+
+## 2026-08-31 (suite 3) : couverture de tests (contrôleurs backend + services frontend) et doublon de requêtes
+
+Traitement des 3 points de dette explicitement laissés ouverts par les
+deux entrées précédentes : le doublon `list()`/`listPaginated()`, les
+13 contrôleurs backend sans `*.controller.spec.ts`, et la couverture
+frontend quasi nulle (un seul spec dans tout `apps/web`).
+
+### Doublon de requêtes : traité partiellement, par examen au cas par cas
+
+En relisant `gouvernance.component.ts` et `opportunites.component.ts`,
+le doublon `list()`/`listPaginated()` s'est révélé moins large que
+l'audit précédent ne le laissait penser : `politiquesAll`
+(gouvernance) et `solutionsAll` (opportunites) sont réellement
+nécessaires en plus de la liste paginée, car ils alimentent une
+matrice/un graphique qui ont besoin de l'ensemble des lignes, pas
+d'une page. Seul `changementsAll` (gouvernance, onglet Rapport) était
+un vrai doublon évitable : il ne servait qu'à calculer deux nombres
+(total, nombre "en cours").
+
+Corrigé en ajoutant un agrégat côté backend plutôt qu'en chargeant la
+liste complète :
+- `GET /demandes-changement/stats` (`changement.controller.ts`,
+  `changement.service.ts`) : deux `count()` Prisma (total, et
+  `statut IN (PROPOSE, APPROUVE)`), nouvelle
+  `ChangementStatsEntity`.
+- Client Angular régénéré, `ChangementService.list()` remplacé par
+  `stats()`, `GouvernanceComponent` n'a plus de champ `changementsAll`
+  ni de `loadChangementsAll()`.
+
+`politiquesAll`/`solutionsAll` sont volontairement laissés tels quels :
+ce n'est pas un doublon à corriger, c'est un besoin fonctionnel réel.
+
+### Contrôleurs backend : les 13 manquants sont maintenant couverts
+
+Travail délégué à des agents en parallèle (gabarit imposé :
+`changement.controller.spec.ts` et `vision-canvas.controller.spec.ts`
+existants). Deux vagues ont été nécessaires : la première (13 tâches
+lancées d'un coup) a échoué à mi-parcours sur une limite de session
+API, la seconde (4 puis 3 tâches, par prudence) a fini le travail.
+Résultat : `admin`, `archimate`, `architecture-applicative`, `bpmn`,
+`canevas`, `donnees`, `health`, `parties-prenantes`, `roadmap`,
+`service`, `technologie`, `uploads`, `urbanisation` ont chacun leur
+spec HTTP désormais. Suite backend : 44 → 57 suites, 311 → 463 tests.
+
+**Bug trouvé et corrigé (dans les tests, pas le code de prod)** :
+`donnees.controller.spec.ts` et `bpmn.controller.spec.ts` utilisaient
+des UUID factices du type `11111111-1111-1111-1111-111111111111`,
+syntaxiquement proches d'un UUID mais invalides au sens strict RFC
+4122 (le nibble de variante, 17ᵉ caractère, doit être 8/9/a/b ; ici
+c'était `1`). `class-validator`/`@IsUUID()` les rejetait avec un 400
+inattendu. Corrigé en changeant ce caractère (`...-8111-...`).
+
+**Anomalies de conception notées, non corrigées** (signalées par les
+agents, à trancher séparément) : `CanevasController`, `ArchimateController`
+et `UrbanisationController` n'ont aucun `@UseGuards(RolesGuard)` /
+`@Roles(...)`, contrairement à la plupart des autres contrôleurs
+d'écriture. Le seul filtre actuel est l'effet de bord de
+`requireOrganisationId()` (403 si `organisationId` est `null`, ce qui
+n'arrive qu'aux Superadmins) : aucun rôle authentifié avec une
+organisation n'est donc actuellement empêché de créer/modifier/supprimer
+sur ces 3 ressources. À vérifier si c'est voulu.
+
+### Services frontend : passage d'1 à 24 fichiers de spec
+
+Un gabarit (`changement.service.spec.ts`, `TestBed` +
+`provideHttpClient()`/`provideHttpClientTesting()` +
+`HttpTestingController`, URLs vérifiées contre les `.PATH` des
+fonctions générées) écrit à la main puis répliqué par agents sur les
+23 autres services (dont les 2 sans HTTP, `toast.service.ts` et
+`confirm-dialog.service.ts`, adaptés à leur propre logique). `auth.service.ts`
+et `urbanisation.service.ts` traités individuellement (état/`localStorage`
+pour le premier, 19 méthodes pour le second). Suite frontend : 1 → 161
+tests, tous verts, deux exécutions consécutives sans flakiness.
+
+**Bug de compilation trouvé et déjà résolu en cours de route** : une
+version intermédiaire de `urbanisation.service.spec.ts` avait un mock
+`EchangeEntity` sans `createdAt` (champ requis par le modèle généré) ;
+corrigé par l'agent qui l'a écrit avant la fin de sa propre
+vérification, confirmé propre par une exécution indépendante après
+coup.
+
+**Tiret cadratin trouvé dans 5 fichiers neufs** (`architecture-applicative.controller.spec.ts`,
+`bpmn.controller.spec.ts`, `donnees.controller.spec.ts`,
+`roadmap.controller.spec.ts`, `service.controller.spec.ts`) : les
+agents avaient fidèlement recopié le tour de phrase « (200) — lecture
+ouverte » déjà présent dans le gabarit imposé (`objectif.controller.spec.ts`),
+antérieur à la convention du projet. Remplacé par « (200) : lecture
+ouverte » dans ces 5 fichiers neufs uniquement ; le gabarit existant et
+les dizaines d'autres occurrences historiques de tirets cadratins dans
+le reste du code n'ont pas été touchées (hors périmètre de cette
+session, pas une régression introduite ici).
+
+### Incident en cours de route : connexion utilisateur cassée (500)
+
+Pendant ce chantier, l'utilisateur a signalé un vrai 500 sur
+`POST /auth/login`. Diagnostic immédiat par lecture des logs du
+serveur de dev : `PrismaClientKnownRequestError`, "Authentication
+failed against the database server". Cause : lors d'un redémarrage
+précédent du serveur (pour régénérer le client OpenAPI après l'ajout
+de `getStats`), le mot de passe PostgreSQL exporté à la main était
+celui, générique, de `.env.example` (`ChangeMeSecurely`) et non le
+vrai mot de passe du `.env` local. Corrigé en relançant le serveur
+sans écraser les variables d'environnement (lecture normale du
+`.env`). Vérifié par un appel direct à `/auth/login` (401 sur des
+identifiants inconnus, plus de 500).
+
+**Deuxième incident, enchaîné** : le serveur de dev tournait en mode
+`--watch` (`nest start --watch`) pendant que plusieurs agents
+ajoutaient des fichiers sous `apps/api/src`, provoquant des
+recompilations en rafale. Le bug de watch-mode déjà documenté le
+2026-08-26 (`tree-kill` qui échoue à libérer le port avant le
+rebind, `EADDRINUSE`) s'est reproduit plusieurs fois, jusqu'à un
+véritable crash du processus (plus de simple ralentissement). Corrigé
+en basculant sur une instance sans `--watch` (`npm run start`) le
+temps que les agents terminent d'écrire des fichiers de test, stable
+depuis. Ce bug de watch-mode reste un point de dette non résolu à la
+racine (voir entrée du 2026-08-26), seulement contourné ici.
+
+### Vérifié
+
+- Backend : `npm run typecheck`, `npx jest --silent` (57 suites, 463
+  tests), `npm run build` : tout propre.
+- Frontend : `npm run typecheck`, `npm run test:ci` exécuté deux fois
+  de suite (161/161 les deux fois, pas de flakiness résiduelle),
+  `npm run build` : tout propre.
+- `/api/v1/auth/login` : 401 sur identifiants invalides (confirmé
+  après correctif, sur l'instance sans `--watch`).

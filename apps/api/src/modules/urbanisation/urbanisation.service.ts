@@ -216,7 +216,7 @@ export class UrbanisationService {
     ) {
       throw new BadRequestException('Source et cible doivent appartenir à votre organisation');
     }
-    return this.prisma.applicationEchange.create({ data: dto });
+    return this.prisma.applicationEchange.create({ data: dto, include: { source: true, target: true } });
   }
 
   async removeEchange(echangeId: string, organisationId: string) {

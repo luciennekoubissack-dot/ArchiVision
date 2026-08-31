@@ -1,59 +1,50 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { RoleUtilisateur } from '../auth/auth.service';
+import { map } from 'rxjs/operators';
 import { Paginated } from '../shared/pagination.interface';
+import { ApiConfiguration } from '../api-client/api-configuration';
+import { MembreEntity } from '../api-client/models/membre-entity';
+import { CreateMembreDto } from '../api-client/models/create-membre-dto';
+import { UpdateMembreDto } from '../api-client/models/update-membre-dto';
+import { membresControllerFindAll } from '../api-client/fn/membres/membres-controller-find-all';
+import { membresControllerCreate } from '../api-client/fn/membres/membres-controller-create';
+import { membresControllerUpdate } from '../api-client/fn/membres/membres-controller-update';
+import { membresControllerRemove } from '../api-client/fn/membres/membres-controller-remove';
 
-export interface Membre {
-  id: string;
-  email: string;
-  nom: string;
-  role: RoleUtilisateur;
-  serviceId?: string | null;
-  poste?: string | null;
-  contact?: string | null;
-  createdAt: string;
-}
+export type Membre = MembreEntity;
+export type CreateMembrePayload = CreateMembreDto;
+export type UpdateMembrePayload = UpdateMembreDto;
 
-export interface CreateMembrePayload {
-  email: string;
-  password: string;
-  nom: string;
-  role: RoleUtilisateur;
-  serviceId?: string;
-  poste?: string;
-  contact?: string;
-}
-
-export interface UpdateMembrePayload {
-  role?: RoleUtilisateur;
-  serviceId?: string | null;
-  poste?: string;
-  contact?: string;
-}
-
+/**
+ * Enveloppe fine autour du client généré depuis le contrat OpenAPI
+ * (`../api-client`), pour garder les mêmes noms de méthode qu'avant partout
+ * ailleurs dans l'app.
+ */
 @Injectable({ providedIn: 'root' })
 export class MembresService {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private config: ApiConfiguration) {}
 
   /** Utilisé pour un simple comptage (ex. tableau de bord) : pas de pagination. */
   list(): Observable<Membre[]> {
-    return this.http.get<Membre[]>('/membres');
+    return membresControllerFindAll(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 
   listPaginated(page: number, pageSize: number): Observable<Paginated<Membre>> {
-    return this.http.get<Paginated<Membre>>('/membres', { params: { page, pageSize } });
+    return membresControllerFindAll(this.http, this.config.rootUrl, { page, pageSize }).pipe(
+      map((r) => r.body as unknown as Paginated<Membre>),
+    );
   }
 
   create(payload: CreateMembrePayload): Observable<Membre> {
-    return this.http.post<Membre>('/membres', payload);
+    return membresControllerCreate(this.http, this.config.rootUrl, { body: payload }).pipe(map((r) => r.body));
   }
 
   update(id: string, payload: UpdateMembrePayload): Observable<Membre> {
-    return this.http.patch<Membre>(`/membres/${id}`, payload);
+    return membresControllerUpdate(this.http, this.config.rootUrl, { id, body: payload }).pipe(map((r) => r.body));
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`/membres/${id}`);
+    return membresControllerRemove(this.http, this.config.rootUrl, { id }).pipe(map(() => undefined));
   }
 }

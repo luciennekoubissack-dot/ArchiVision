@@ -1,97 +1,99 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { Paginated } from '../shared/pagination.interface';
+import { ApiConfiguration } from '../api-client/api-configuration';
+import { DataEntityEntity } from '../api-client/models/data-entity-entity';
+import { DataAttributeEntity } from '../api-client/models/data-attribute-entity';
+import { DataRelationEntity } from '../api-client/models/data-relation-entity';
+import { DataRelationDetailEntity } from '../api-client/models/data-relation-detail-entity';
+import { CreateDataEntityDto } from '../api-client/models/create-data-entity-dto';
+import { UpdateDataEntityDto } from '../api-client/models/update-data-entity-dto';
+import { CreateDataAttributeDto } from '../api-client/models/create-data-attribute-dto';
+import { CreateDataRelationDto } from '../api-client/models/create-data-relation-dto';
+import { donneesControllerFindAll } from '../api-client/fn/data-entities/donnees-controller-find-all';
+import { donneesControllerCreate } from '../api-client/fn/data-entities/donnees-controller-create';
+import { donneesControllerUpdate } from '../api-client/fn/data-entities/donnees-controller-update';
+import { donneesControllerRemove } from '../api-client/fn/data-entities/donnees-controller-remove';
+import { donneesControllerAddAttribute } from '../api-client/fn/data-entities/donnees-controller-add-attribute';
+import { donneesControllerRemoveAttribute } from '../api-client/fn/data-entities/donnees-controller-remove-attribute';
+import { donneesControllerFindAllRelations } from '../api-client/fn/data-entities/donnees-controller-find-all-relations';
+import { donneesControllerCreateRelation } from '../api-client/fn/data-entities/donnees-controller-create-relation';
+import { donneesControllerRemoveRelation } from '../api-client/fn/data-entities/donnees-controller-remove-relation';
 
 export type TypeCardinalite = 'UN_A_UN' | 'UN_A_PLUSIEURS' | 'PLUSIEURS_A_PLUSIEURS';
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
 
-export interface DataAttribute {
-  id: string;
-  nom: string;
-  type: string;
-  entityId: string;
-}
+export type DataAttribute = DataAttributeEntity;
+export type DataEntity = DataEntityEntity;
+/** Renvoyée par la liste des relations : source/target sont des DataEntityRefEntity (sans les attributs imbriqués). */
+export type DataRelation = DataRelationDetailEntity;
 
-export interface DataEntity {
-  id: string;
-  nom: string;
-  description?: string | null;
-  proprietaire?: string | null;
-  statut: StatutElement;
-  positionX?: number | null;
-  positionY?: number | null;
-  attributs: DataAttribute[];
-  _count?: { attributs: number };
-}
-
-export interface DataRelation {
-  id: string;
-  cardinalite: TypeCardinalite;
-  label?: string | null;
-  sourceId: string;
-  targetId: string;
-  source: DataEntity;
-  target: DataEntity;
-}
-
+/**
+ * Enveloppe fine autour du client généré depuis le contrat OpenAPI
+ * (`../api-client`), pour garder les mêmes noms de méthode qu'avant partout
+ * ailleurs dans l'app.
+ */
 @Injectable({ providedIn: 'root' })
 export class DonneesService {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private config: ApiConfiguration) {}
 
   /** Utilisé par le canevas interactif : a besoin de toutes les entités pour se dessiner. */
   list(): Observable<DataEntity[]> {
-    return this.http.get<DataEntity[]>('/data-entities');
+    return donneesControllerFindAll(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 
   listPaginated(page: number, pageSize: number): Observable<Paginated<DataEntity>> {
-    return this.http.get<Paginated<DataEntity>>('/data-entities', { params: { page, pageSize } });
+    return donneesControllerFindAll(this.http, this.config.rootUrl, { page, pageSize }).pipe(
+      map((r) => r.body as unknown as Paginated<DataEntity>),
+    );
   }
 
-  create(
-    payload: { nom: string; description?: string; proprietaire?: string; positionX?: number; positionY?: number },
-  ): Observable<DataEntity> {
-    return this.http.post<DataEntity>('/data-entities', payload);
+  create(payload: CreateDataEntityDto): Observable<DataEntity> {
+    return donneesControllerCreate(this.http, this.config.rootUrl, { body: payload }).pipe(map((r) => r.body));
   }
 
-  update(
-    id: string,
-    payload: { nom?: string; description?: string; proprietaire?: string; positionX?: number; positionY?: number },
-  ): Observable<DataEntity> {
-    return this.http.patch<DataEntity>(`/data-entities/${id}`, payload);
+  update(id: string, payload: UpdateDataEntityDto): Observable<DataEntity> {
+    return donneesControllerUpdate(this.http, this.config.rootUrl, { id, body: payload }).pipe(map((r) => r.body));
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`/data-entities/${id}`);
+    return donneesControllerRemove(this.http, this.config.rootUrl, { id }).pipe(map(() => undefined));
   }
 
-  addAttribute(entityId: string, payload: { nom: string; type: string }): Observable<DataAttribute> {
-    return this.http.post<DataAttribute>(`/data-entities/${entityId}/attributs`, payload);
+  addAttribute(entityId: string, payload: CreateDataAttributeDto): Observable<DataAttribute> {
+    return donneesControllerAddAttribute(this.http, this.config.rootUrl, { id: entityId, body: payload }).pipe(
+      map((r) => r.body),
+    );
   }
 
   removeAttribute(attributeId: string): Observable<void> {
-    return this.http.delete<void>(`/data-entities/attributs/${attributeId}`);
+    return donneesControllerRemoveAttribute(this.http, this.config.rootUrl, { attributeId }).pipe(
+      map(() => undefined),
+    );
   }
 
   /** Utilisé par le canevas interactif : a besoin de toutes les relations pour se dessiner. */
   listRelations(): Observable<DataRelation[]> {
-    return this.http.get<DataRelation[]>('/data-entities/relations');
+    return donneesControllerFindAllRelations(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 
   listRelationsPaginated(page: number, pageSize: number): Observable<Paginated<DataRelation>> {
-    return this.http.get<Paginated<DataRelation>>('/data-entities/relations', { params: { page, pageSize } });
+    return donneesControllerFindAllRelations(this.http, this.config.rootUrl, { page, pageSize }).pipe(
+      map((r) => r.body as unknown as Paginated<DataRelation>),
+    );
   }
 
-  createRelation(payload: {
-    sourceId: string;
-    targetId: string;
-    cardinalite: TypeCardinalite;
-    label?: string;
-  }): Observable<DataRelation> {
-    return this.http.post<DataRelation>('/data-entities/relations', payload);
+  createRelation(payload: CreateDataRelationDto): Observable<DataRelationEntity> {
+    return donneesControllerCreateRelation(this.http, this.config.rootUrl, { body: payload }).pipe(
+      map((r) => r.body),
+    );
   }
 
   removeRelation(relationId: string): Observable<void> {
-    return this.http.delete<void>(`/data-entities/relations/${relationId}`);
+    return donneesControllerRemoveRelation(this.http, this.config.rootUrl, { relationId }).pipe(
+      map(() => undefined),
+    );
   }
 }

@@ -262,8 +262,7 @@ export class GouvernanceComponent implements OnInit {
   changementsPage = 1;
   changementsTotal = 0;
   changementsPageSize = DEFAULT_PAGE_SIZE;
-  /** Toutes les demandes, sans pagination : statistiques du rapport (compte total, en cours). */
-  changementsAll: DemandeChangement[] = [];
+  changementsStats = { total: 0, enCours: 0 };
   creatingChangement = false;
   createChangementPopover = false;
   newChangement: CreateChangementPayload = { titre: '' };
@@ -288,7 +287,7 @@ export class GouvernanceComponent implements OnInit {
     this.loadPolitiques();
     this.loadPolitiquesAll();
     this.loadChangements();
-    this.loadChangementsAll();
+    this.loadChangementsStats();
     this.solutionService.list().subscribe({
       next: (solutions) => (this.solutions = solutions),
       error: () => this.toast.error('Impossible de charger les solutions.'),
@@ -311,7 +310,7 @@ export class GouvernanceComponent implements OnInit {
   }
 
   get changementsEnCours(): number {
-    return this.changementsAll.filter((c) => c.statut === 'PROPOSE' || c.statut === 'APPROUVE').length;
+    return this.changementsStats.enCours;
   }
 
   // ── Politiques ───────────────────────────────────────────────────────────
@@ -390,10 +389,10 @@ export class GouvernanceComponent implements OnInit {
     });
   }
 
-  loadChangementsAll(): void {
-    this.changementService.list().subscribe({
-      next: (changements) => (this.changementsAll = changements),
-      error: () => this.toast.error('Impossible de charger les demandes de changement.'),
+  loadChangementsStats(): void {
+    this.changementService.stats().subscribe({
+      next: (stats) => (this.changementsStats = stats),
+      error: () => this.toast.error('Impossible de charger les statistiques des demandes de changement.'),
     });
   }
 
@@ -420,7 +419,7 @@ export class GouvernanceComponent implements OnInit {
         this.closeCreateChangement();
         this.toast.success('Demande de changement créée.');
         this.loadChangements();
-        this.loadChangementsAll();
+        this.loadChangementsStats();
       },
       error: () => {
         this.creatingChangement = false;
@@ -433,7 +432,7 @@ export class GouvernanceComponent implements OnInit {
     this.changementService.update(c.id, { statut }).subscribe({
       next: (updated) => {
         c.statut = updated.statut;
-        this.loadChangementsAll();
+        this.loadChangementsStats();
       },
       error: () => this.toast.error('Impossible de modifier le statut.'),
     });
@@ -446,7 +445,7 @@ export class GouvernanceComponent implements OnInit {
       next: () => {
         this.toast.success('Demande supprimée.');
         this.loadChangements();
-        this.loadChangementsAll();
+        this.loadChangementsStats();
       },
       error: () => this.toast.error('Impossible de supprimer cette demande.'),
     });
@@ -516,7 +515,7 @@ export class GouvernanceComponent implements OnInit {
         'Non conforme': this.conformiteStats.nonConforme,
         'À évaluer': this.conformiteStats.aEvaluer,
         'Changements en cours': this.changementsEnCours,
-        'Total demandes de changement': this.changementsAll.length,
+        'Total demandes de changement': this.changementsStats.total,
       },
     ]);
   }

@@ -51,6 +51,7 @@ describe('AdminService', () => {
       expect(prismaMock.organisation.update).toHaveBeenCalledWith({
         where: { id: ORG_ID },
         data: { statut: 'VALIDEE', validatedAt: expect.any(Date) },
+        include: { _count: { select: { users: true } } },
       });
       expect(result.email.to).toBe('admin@entreprise-test.local');
       expect(result.email.subject).toContain('validée');
@@ -75,6 +76,7 @@ describe('AdminService', () => {
       expect(prismaMock.organisation.update).toHaveBeenCalledWith({
         where: { id: ORG_ID },
         data: { statut: 'REJETEE' },
+        include: { _count: { select: { users: true } } },
       });
       expect(result.email.subject).not.toContain('validée');
     });

@@ -27,6 +27,8 @@ describe('ChangementService', () => {
     },
   };
 
+  const countMock = prismaMock.demandeChangement.count as jest.Mock;
+
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
@@ -72,5 +74,15 @@ describe('ChangementService', () => {
   it('lève NotFoundException lors de la suppression d\'une demande inconnue', async () => {
     prismaMock.demandeChangement.count.mockResolvedValue(0);
     await expect(service.remove('inconnu', ORG_ID)).rejects.toThrow(NotFoundException);
+  });
+
+  it('calcule les statistiques (total et en cours) sans charger la liste complète', async () => {
+    countMock.mockResolvedValueOnce(5).mockResolvedValueOnce(2);
+    const result = await service.getStats(ORG_ID);
+    expect(result).toEqual({ total: 5, enCours: 2 });
+    expect(countMock).toHaveBeenNthCalledWith(1, { where: { organisationId: ORG_ID } });
+    expect(countMock).toHaveBeenNthCalledWith(2, {
+      where: { organisationId: ORG_ID, statut: { in: ['PROPOSE', 'APPROUVE'] } },
+    });
   });
 });

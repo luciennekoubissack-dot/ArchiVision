@@ -33,6 +33,7 @@ services:
       # n'est pas exporté avant `docker compose up` (voir requireJwtSecret()).
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET doit être défini (export JWT_SECRET=... avant docker compose up)}
       PORT: 3000
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4201}
     ports:
       - '3000:3000'
     depends_on:

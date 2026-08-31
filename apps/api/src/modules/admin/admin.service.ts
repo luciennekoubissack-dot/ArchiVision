@@ -54,6 +54,7 @@ export class AdminService {
     const organisation = await this.prisma.organisation.update({
       where: { id },
       data: { statut: StatutOrganisation.VALIDEE, validatedAt: new Date() },
+      include: { _count: { select: { users: true } } },
     });
     const email = await this.buildEmail(id, organisation.nom, 'VALIDEE');
     this.logSimulatedEmail(email);
@@ -65,6 +66,7 @@ export class AdminService {
     const organisation = await this.prisma.organisation.update({
       where: { id },
       data: { statut: StatutOrganisation.REJETEE },
+      include: { _count: { select: { users: true } } },
     });
     const email = await this.buildEmail(id, organisation.nom, 'REJETEE');
     this.logSimulatedEmail(email);

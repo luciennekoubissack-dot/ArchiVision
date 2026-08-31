@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
@@ -8,12 +9,14 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
  * client qui fournit `page` reçoit un `PaginatedResult` à la place.
  */
 export class PaginationQueryDto {
+  @ApiPropertyOptional({ description: "Numéro de page, à partir de 1. Absent, la réponse n'est pas paginée (tableau complet).", minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number;
 
+  @ApiPropertyOptional({ description: "Nombre d'éléments par page, entre 1 et 200.", minimum: 1, maximum: 200, default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
