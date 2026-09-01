@@ -13,6 +13,7 @@ import { UpdateBpmnProcessusDto } from '../api-client/models/update-bpmn-process
 import { bpmnControllerFindAll } from '../api-client/fn/bpmn-processus/bpmn-controller-find-all';
 import { bpmnControllerFindOne } from '../api-client/fn/bpmn-processus/bpmn-controller-find-one';
 import { bpmnControllerGenerateVue } from '../api-client/fn/bpmn-processus/bpmn-controller-generate-vue';
+import { bpmnControllerGenererDiagramme } from '../api-client/fn/bpmn-processus/bpmn-controller-generer-diagramme';
 import { bpmnControllerCreate } from '../api-client/fn/bpmn-processus/bpmn-controller-create';
 import { bpmnControllerUpdate } from '../api-client/fn/bpmn-processus/bpmn-controller-update';
 import { bpmnControllerRemove } from '../api-client/fn/bpmn-processus/bpmn-controller-remove';
@@ -57,6 +58,8 @@ export interface BpmnProcessus {
   id: string;
   nom: string;
   description?: string | null;
+  /** Étapes en langage naturel, une par ligne : source de la proposition de diagramme. */
+  etapes?: string | null;
   type: TypeProcessus;
   bpmnXml?: string | null;
   createdAt: string;
@@ -110,13 +113,24 @@ export class BpmnService {
     return bpmnControllerGenerateVue(this.http, this.config.rootUrl, { id }).pipe(map((r) => r.body));
   }
 
-  create(payload: { nom: string; description?: string; type?: TypeProcessus }): Observable<BpmnProcessus> {
+  /**
+   * Génère (côté backend) une proposition de diagramme à partir du champ
+   * `etapes` du processus. Échoue si le diagramme contient déjà des éléments.
+   */
+  generateDiagramme(id: string): Observable<BpmnProcessusDetail> {
+    return bpmnControllerGenererDiagramme(this.http, this.config.rootUrl, { id }).pipe(map((r) => r.body));
+  }
+
+  create(payload: { nom: string; description?: string; type?: TypeProcessus; etapes?: string }): Observable<BpmnProcessus> {
     return bpmnControllerCreate(this.http, this.config.rootUrl, { body: payload as CreateBpmnProcessusDto }).pipe(
       map((r) => r.body),
     );
   }
 
-  update(id: string, payload: { nom?: string; description?: string; type?: TypeProcessus }): Observable<BpmnProcessus> {
+  update(
+    id: string,
+    payload: { nom?: string; description?: string; type?: TypeProcessus; etapes?: string },
+  ): Observable<BpmnProcessus> {
     return bpmnControllerUpdate(this.http, this.config.rootUrl, { id, body: payload as UpdateBpmnProcessusDto }).pipe(
       map((r) => r.body),
     );

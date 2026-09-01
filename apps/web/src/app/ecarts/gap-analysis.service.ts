@@ -5,8 +5,18 @@ import { ArchimateService } from '../architecture-metier/archimate.service';
 import { DonneesService } from '../donnees/donnees.service';
 import { UrbanisationService } from '../urbanisation/urbanisation.service';
 import { TechnologieService } from '../technologie/technologie.service';
+import { DomaineEcart } from '../opportunites/solution.service';
 
 export type DomainTab = 'objectifs' | 'metier' | 'donnees' | 'applicatif' | 'technologique';
+
+/** Correspondance entre l'onglet de domaine (Analyse des écarts) et l'enum `DomaineEcart` du lien Solution↔écart (Opportunités & solutions). */
+export const DOMAIN_TO_DOMAINE_ECART: Record<DomainTab, DomaineEcart> = {
+  objectifs: 'OBJECTIF',
+  metier: 'METIER',
+  donnees: 'DONNEES',
+  applicatif: 'APPLICATIF',
+  technologique: 'TECHNOLOGIQUE',
+};
 
 /** Élément minimal nécessaire pour figurer dans une matrice d'écarts (id + libellé). */
 export interface GapItem {

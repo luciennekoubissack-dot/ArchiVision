@@ -3,12 +3,22 @@ import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Chart, registerables } from 'chart.js';
 import { AuthService } from '../auth/auth.service';
-import { CreateSolutionPayload, ScoreItem, Solution, SolutionService, StatutSolution, UpdateSolutionPayload } from './solution.service';
+import {
+  CreateSolutionPayload,
+  DomaineEcart,
+  GapLinkItem,
+  ScoreItem,
+  Solution,
+  SolutionService,
+  StatutSolution,
+  UpdateSolutionPayload,
+} from './solution.service';
 import { CritereEvaluation, CritereEvaluationService } from './critere-evaluation.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { PaginationComponent } from '../shared/pagination.component';
 import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
+import { DomainTab, DOMAIN_LABEL, DOMAIN_TO_DOMAINE_ECART, GapAnalysisService, GapRow } from '../ecarts/gap-analysis.service';
 
 Chart.register(...registerables);
 
@@ -26,6 +36,24 @@ const STATUT_BADGE: Record<StatutSolution, string> = { PROPOSEE: 'badge-neutral'
 const STATUTS: StatutSolution[] = ['PROPOSEE', 'RETENUE', 'REJETEE'];
 const SCORES = [0, 1, 2, 3, 4, 5];
 
+const GAP_DOMAINS: DomainTab[] = ['objectifs', 'metier', 'donnees', 'applicatif', 'technologique'];
+
+const DOMAINE_ECART_LABEL: Record<DomaineEcart, string> = {
+  OBJECTIF: 'Objectifs',
+  METIER: 'Architecture métier',
+  DONNEES: 'Données',
+  APPLICATIF: 'Applicatif',
+  TECHNOLOGIQUE: 'Technologique',
+};
+
+/** Un élément sélectionnable dans le sélecteur d'écarts : le nœud principal d'une ligne de la matrice TOGAF (le TO-BE visé, ou l'AS-IS seul pour un écart « Éliminé »). */
+interface GapCandidate {
+  elementId: string;
+  elementNom: string;
+  etat: GapRow['etat'];
+  contextLabel: string;
+}
+
 const ICONS: Record<string, string> = {
   eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
@@ -33,6 +61,7 @@ const ICONS: Record<string, string> = {
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
 };
 
 @Component({
@@ -62,17 +91,21 @@ const ICONS: Record<string, string> = {
         <div class="empty-state" *ngIf="solutions.length === 0">Aucune solution proposée pour l'instant.</div>
         <div class="table-scroll" *ngIf="solutions.length > 0">
           <table class="table">
-            <thead><tr><th>Nom</th><th>Statut</th><th>Note moyenne</th><th></th></tr></thead>
+            <thead><tr><th>Nom</th><th>Statut</th><th>Note moyenne</th><th>Écarts adressés</th><th></th></tr></thead>
             <tbody>
               <tr *ngFor="let solution of solutions">
                 <td>{{ solution.nom }}</td>
                 <td><span class="badge" [class]="statutBadge(solution.statut)">{{ statutLabel(solution.statut) }}</span></td>
                 <td>{{ noteMoyenne(solution) ?? '—' }}</td>
+                <td>{{ solution.gaps?.length || 0 }}</td>
                 <td class="row-actions">
                   <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openView(solution)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('eye')"></svg>
                   </button>
                   <ng-container *ngIf="canWrite">
+                    <button type="button" class="icon-btn icon-btn-edit" title="Écarts adressés" (click)="openGaps(solution)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('link')"></svg>
+                    </button>
                     <button type="button" class="icon-btn icon-btn-edit" title="Modifier" (click)="openEdit(solution)">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
                     </button>
@@ -129,7 +162,44 @@ const ICONS: Record<string, string> = {
           <dt>Statut</dt><dd>{{ statutLabel(s.statut) }}</dd>
           <dt>Note moyenne</dt><dd>{{ noteMoyenne(s) ?? '—' }}</dd>
           <dt>Plan de mise en œuvre</dt><dd>{{ s.planMiseOeuvre || '—' }}</dd>
+          <dt>Écarts adressés</dt>
+          <dd>
+            <span *ngIf="!s.gaps?.length">—</span>
+            <ul class="chip-list" *ngIf="s.gaps?.length">
+              <li class="chip" *ngFor="let g of s.gaps">{{ domaineLabel(g.domaine) }} : {{ g.elementNom }}</li>
+            </ul>
+          </dd>
         </dl>
+      </div>
+    </div>
+
+    <!-- ── Popover : écarts adressés par une solution ────────────────────── -->
+    <div class="popover-backdrop" *ngIf="gapsPopoverTarget as gs" (click)="closeGaps()">
+      <div class="popover-card popover-card-wide" (click)="$event.stopPropagation()">
+        <div class="popover-head">
+          <h3>Écarts adressés par « {{ gs.nom }} »</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeGaps()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <p class="hint">Sélectionnez les écarts de la matrice TOGAF (Analyse des écarts) que cette solution adresse.</p>
+        <div class="tabs">
+          <button type="button" class="tab" *ngFor="let d of gapsDomains" [class.active]="gapsDomain === d" (click)="selectGapsDomain(d)">{{ domainLabelFor(d) }}</button>
+        </div>
+        <div class="gap-picker">
+          <p class="hint" *ngIf="gapsLoadingDomain">Chargement…</p>
+          <p class="empty-state" *ngIf="!gapsLoadingDomain && gapsCandidates.length === 0">Aucun écart dans ce domaine.</p>
+          <label class="gap-candidate" *ngFor="let c of gapsCandidates; trackBy: trackByElementId">
+            <input type="checkbox" [checked]="isGapSelected(gapsDomain, c.elementId)" (change)="toggleGap(gapsDomain, c)" />
+            <span class="gap-candidate-label">{{ c.contextLabel }}</span>
+            <span class="badge badge-neutral">{{ c.etat }}</span>
+          </label>
+        </div>
+        <p class="hint" *ngIf="draftGaps.length > 0">{{ draftGaps.length }} écart(s) sélectionné(s) au total, tous domaines confondus.</p>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeGaps()">Annuler</button>
+          <button type="button" class="btn btn-success" [disabled]="gapsSaving" (click)="saveGaps()">{{ gapsSaving ? 'Enregistrement…' : 'Enregistrer' }}</button>
+        </div>
       </div>
     </div>
 
@@ -255,6 +325,10 @@ const ICONS: Record<string, string> = {
       .chip-remove { border: none; background: none; cursor: pointer; font-size: 1rem; line-height: 1; color: var(--color-text-muted); }
       .chip-remove:hover { color: var(--color-danger); }
       .chart-container { position: relative; height: 260px; }
+      .popover-card-wide { max-width: 640px; width: 100%; }
+      .gap-picker { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; margin: 0.75rem 0; }
+      .gap-candidate { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.6rem; border: 1px solid var(--color-border); border-radius: 8px; cursor: pointer; }
+      .gap-candidate-label { flex: 1; }
     `,
   ],
 })
@@ -289,6 +363,15 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
   critereCreatePopover = false;
   newCritere: { nom: string; description?: string } = { nom: '' };
 
+  gapsPopoverTarget: Solution | null = null;
+  gapsDomains = GAP_DOMAINS;
+  gapsDomain: DomainTab = 'objectifs';
+  gapsRowsByDomain: Partial<Record<DomainTab, GapRow[]>> = {};
+  gapsCandidates: GapCandidate[] = [];
+  gapsLoadingDomain = false;
+  draftGaps: GapLinkItem[] = [];
+  gapsSaving = false;
+
   private viewReady = false;
   private chart?: Chart;
 
@@ -296,6 +379,7 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     private auth: AuthService,
     private solutionService: SolutionService,
     private critereService: CritereEvaluationService,
+    private gapAnalysisService: GapAnalysisService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
     private sanitizer: DomSanitizer,
@@ -369,6 +453,14 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!solution.scores.length) return null;
     const somme = solution.scores.reduce((acc, s) => acc + s.score, 0);
     return Math.round((somme / solution.scores.length) * 10) / 10;
+  }
+
+  domaineLabel(d: DomaineEcart): string {
+    return DOMAINE_ECART_LABEL[d];
+  }
+
+  domainLabelFor(d: DomainTab): string {
+    return DOMAIN_LABEL[d];
   }
 
   // ── Solutions ────────────────────────────────────────────────────────────
@@ -456,6 +548,95 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
         this.loadSolutionsAll();
       },
       error: () => this.toast.error('Impossible de supprimer cette solution.'),
+    });
+  }
+
+  // ── Écarts adressés ──────────────────────────────────────────────────────
+
+  openGaps(solution: Solution): void {
+    this.gapsPopoverTarget = solution;
+    this.draftGaps = (solution.gaps ?? []).map((g) => ({ domaine: g.domaine, elementId: g.elementId, elementNom: g.elementNom }));
+    this.gapsRowsByDomain = {};
+    this.gapsCandidates = [];
+    this.selectGapsDomain('objectifs');
+  }
+
+  closeGaps(): void {
+    this.gapsPopoverTarget = null;
+  }
+
+  selectGapsDomain(domain: DomainTab): void {
+    this.gapsDomain = domain;
+    const cached = this.gapsRowsByDomain[domain];
+    if (cached) {
+      this.gapsCandidates = this.buildCandidates(cached);
+      return;
+    }
+    this.gapsLoadingDomain = true;
+    this.gapsCandidates = [];
+    this.gapAnalysisService.rowsFor(domain).subscribe({
+      next: (rows) => {
+        this.gapsRowsByDomain[domain] = rows;
+        this.gapsLoadingDomain = false;
+        if (this.gapsDomain === domain) this.gapsCandidates = this.buildCandidates(rows);
+      },
+      error: () => {
+        this.gapsLoadingDomain = false;
+        this.toast.error(`Impossible de charger le domaine « ${DOMAIN_LABEL[domain]} ».`);
+      },
+    });
+  }
+
+  private buildCandidates(rows: GapRow[]): GapCandidate[] {
+    const candidates: GapCandidate[] = [];
+    for (const row of rows) {
+      if (row.toBe.length > 0) {
+        for (const item of row.toBe) {
+          candidates.push({
+            elementId: item.id,
+            elementNom: item.nom,
+            etat: row.etat,
+            contextLabel: row.asIs ? `${row.asIs.nom} → ${item.nom}` : item.nom,
+          });
+        }
+      } else if (row.asIs) {
+        candidates.push({ elementId: row.asIs.id, elementNom: row.asIs.nom, etat: row.etat, contextLabel: row.asIs.nom });
+      }
+    }
+    return candidates;
+  }
+
+  trackByElementId(_index: number, candidate: GapCandidate): string {
+    return candidate.elementId;
+  }
+
+  isGapSelected(domain: DomainTab, elementId: string): boolean {
+    const domaine = DOMAIN_TO_DOMAINE_ECART[domain];
+    return this.draftGaps.some((g) => g.domaine === domaine && g.elementId === elementId);
+  }
+
+  toggleGap(domain: DomainTab, candidate: GapCandidate): void {
+    const domaine = DOMAIN_TO_DOMAINE_ECART[domain];
+    const idx = this.draftGaps.findIndex((g) => g.domaine === domaine && g.elementId === candidate.elementId);
+    if (idx >= 0) this.draftGaps.splice(idx, 1);
+    else this.draftGaps.push({ domaine, elementId: candidate.elementId, elementNom: candidate.elementNom });
+  }
+
+  saveGaps(): void {
+    if (!this.gapsPopoverTarget) return;
+    this.gapsSaving = true;
+    this.solutionService.updateGaps(this.gapsPopoverTarget.id, this.draftGaps).subscribe({
+      next: () => {
+        this.gapsSaving = false;
+        this.toast.success('Écarts adressés mis à jour.');
+        this.closeGaps();
+        this.loadSolutions();
+        this.loadSolutionsAll();
+      },
+      error: () => {
+        this.gapsSaving = false;
+        this.toast.error("Impossible d'enregistrer les écarts adressés.");
+      },
     });
   }
 

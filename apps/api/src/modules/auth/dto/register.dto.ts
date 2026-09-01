@@ -1,4 +1,4 @@
-import { IsArray, IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -27,11 +27,11 @@ export class RegisterDto {
   @MaxLength(2000)
   organisationDescription?: string;
 
-  @ApiPropertyOptional({ description: 'Secteur d\'activité de l\'organisation.' })
+  @ApiProperty({ description: 'Secteur d\'activité de l\'organisation.' })
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   @MaxLength(100)
-  secteur?: string;
+  secteur!: string;
 
   @ApiPropertyOptional({ description: 'Taille de l\'organisation.' })
   @IsString()
@@ -39,11 +39,17 @@ export class RegisterDto {
   @MaxLength(100)
   taille?: string;
 
-  @ApiPropertyOptional({ description: 'Pays de l\'organisation.' })
+  @ApiProperty({ description: 'Pays du siège social de l\'organisation.' })
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   @MaxLength(100)
-  pays?: string;
+  pays!: string;
+
+  @ApiProperty({ description: 'Ville du siège social de l\'organisation.' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  ville!: string;
 
   @ApiPropertyOptional({ description: 'URL du logo de l\'organisation.' })
   @IsString()
@@ -51,11 +57,11 @@ export class RegisterDto {
   @MaxLength(300)
   logoUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Vision de l\'organisation.' })
+  @ApiProperty({ description: 'Objectif principal / vision de l\'organisation (sert à la revue du superadmin).' })
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   @MaxLength(4000)
-  vision?: string;
+  vision!: string;
 
   @ApiPropertyOptional({ description: 'Problèmes que l\'organisation cherche à résoudre.' })
   @IsString()
@@ -86,6 +92,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [ObjectifItemDto], description: 'Objectifs à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => ObjectifItemDto)
   objectifs?: ObjectifItemDto[];
@@ -93,6 +100,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [PartiePrenanteItemDto], description: 'Parties prenantes à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => PartiePrenanteItemDto)
   partiesPrenantes?: PartiePrenanteItemDto[];
@@ -100,6 +108,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [BpmnProcessusItemDto], description: 'Processus BPMN à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => BpmnProcessusItemDto)
   bpmnProcessus?: BpmnProcessusItemDto[];
@@ -107,6 +116,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [CapaciteItemDto], description: 'Capacités métier à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => CapaciteItemDto)
   capacitesMetier?: CapaciteItemDto[];
@@ -114,6 +124,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [ActeurItemDto], description: 'Acteurs à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => ActeurItemDto)
   acteurs?: ActeurItemDto[];
@@ -121,6 +132,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [DataEntityItemDto], description: 'Entités de données à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => DataEntityItemDto)
   dataEntities?: DataEntityItemDto[];
@@ -128,6 +140,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [ApplicationItemDto], description: 'Applications à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => ApplicationItemDto)
   applications?: ApplicationItemDto[];
@@ -135,6 +148,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ type: () => [TechComponentItemDto], description: 'Composants technologiques à pré-remplir pour l\'organisation.' })
   @IsArray()
   @IsOptional()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => TechComponentItemDto)
   techComponents?: TechComponentItemDto[];

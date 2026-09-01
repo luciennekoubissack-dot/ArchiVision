@@ -88,7 +88,6 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
         </div>
 
         <h1>Créer mon organisation</h1>
-        <p class="subtitle">Quelques informations pour démarrer votre référentiel d'architecture d'entreprise.</p>
 
         <div class="stepper">
           <button
@@ -96,12 +95,12 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
             class="step"
             *ngFor="let s of steps"
             [class.active]="s.key === current.key"
-            [class.done]="s.numero < current.numero"
+            [class.done]="stepDone(s)"
             (click)="goTo(s)"
           >
             <span class="step-circle">
-              <svg *ngIf="s.numero < current.numero" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('check')"></svg>
-              <ng-container *ngIf="s.numero >= current.numero">{{ s.numero }}</ng-container>
+              <svg *ngIf="stepDone(s)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('check')"></svg>
+              <ng-container *ngIf="!stepDone(s)">{{ s.numero }}</ng-container>
             </span>
             <span class="step-titre">{{ s.titre }}</span>
           </button>
@@ -131,8 +130,8 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
 
             <div class="grid-2">
               <label class="field">
-                Secteur <app-info-tip text="Le secteur d'activité principal, ex. Banque, Santé, Distribution." />
-                <input type="text" [value]="secteur" (input)="secteur = $any($event.target).value" />
+                Secteur * <app-info-tip text="Le secteur d'activité principal, ex. Banque, Santé, Distribution." />
+                <input type="text" [value]="secteur" (input)="secteur = $any($event.target).value" required />
               </label>
               <label class="field">
                 Taille <app-info-tip text="Effectif approximatif de l'entreprise, ex. 150 collaborateurs." />
@@ -140,14 +139,25 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
               </label>
             </div>
 
-            <label class="field">
-              Pays <app-info-tip text="Le pays du siège social de l'entreprise." />
-              <input type="text" [value]="pays" (input)="pays = $any($event.target).value" />
-            </label>
+            <div class="grid-2">
+              <label class="field">
+                Pays * <app-info-tip text="Le pays du siège social de l'entreprise." />
+                <input type="text" [value]="pays" (input)="pays = $any($event.target).value" required />
+              </label>
+              <label class="field">
+                Ville * <app-info-tip text="La ville du siège social de l'entreprise." />
+                <input type="text" [value]="ville" (input)="ville = $any($event.target).value" required />
+              </label>
+            </div>
 
             <label class="field">
               Description courte <app-info-tip text="Une ou deux phrases décrivant l'activité de l'entreprise (facultatif)." />
               <textarea rows="2" [value]="organisationDescription" (input)="organisationDescription = $any($event.target).value"></textarea>
+            </label>
+
+            <label class="field">
+              Objectif de l'entreprise * <app-info-tip text="Où voulez-vous emmener l'entreprise à moyen terme ? Cet objectif est vérifié par l'équipe ArchiVision avant validation de votre inscription." />
+              <textarea rows="3" placeholder="Quel est l'objectif principal de l'entreprise ?" [value]="vision" (input)="vision = $any($event.target).value" required></textarea>
             </label>
 
             <hr />
@@ -172,10 +182,6 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
 
           <!-- ── Étape 2 : Stratégie ──────────────────────────────────────── -->
           <div *ngIf="current.key === 'strategie'">
-            <label class="field">
-              Vision <app-info-tip text="Où voulez-vous emmener l'entreprise à moyen terme ? Cette vision guide toute l'architecture." />
-              <textarea rows="3" placeholder="Quelle est la vision de l'entreprise ?" [value]="vision" (input)="vision = $any($event.target).value"></textarea>
-            </label>
             <label class="field">
               Problèmes à résoudre <app-info-tip text="Les difficultés concrètes que la transformation doit résoudre en priorité." />
               <textarea rows="3" placeholder="Quels problèmes veut-on résoudre ?" [value]="problemesResoudre" (input)="problemesResoudre = $any($event.target).value"></textarea>
@@ -329,9 +335,11 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
 
           <!-- ── Étape 8 : Récapitulatif ───────────────────────────────────── -->
           <div *ngIf="current.key === 'recap'" class="recap">
-            <div class="recap-row"><span>Organisation</span><strong>{{ organisationNom || '—' }}</strong></div>
-            <div class="recap-row"><span>Administrateur</span><strong>{{ nom || '—' }} ({{ email || '—' }})</strong></div>
-            <div class="recap-row"><span>Vision renseignée</span><strong>{{ vision ? 'Oui' : 'Non' }}</strong></div>
+            <div class="recap-row"><span>Organisation</span><strong>{{ organisationNom || 'Non renseigné' }}</strong></div>
+            <div class="recap-row"><span>Secteur</span><strong>{{ secteur || 'Non renseigné' }}</strong></div>
+            <div class="recap-row"><span>Localisation</span><strong>{{ ville || 'Non renseignée' }}, {{ pays || 'Non renseigné' }}</strong></div>
+            <div class="recap-row"><span>Responsable</span><strong>{{ nom || 'Non renseigné' }} ({{ email || 'Non renseigné' }})</strong></div>
+            <div class="recap-row"><span>Objectif</span><strong>{{ vision ? 'Renseigné' : 'Non renseigné' }}</strong></div>
             <div class="recap-row"><span>Objectifs stratégiques</span><strong>{{ objectifs.length }}</strong></div>
             <div class="recap-row"><span>Parties prenantes</span><strong>{{ partiesPrenantes.length }}</strong></div>
             <div class="recap-row"><span>Processus métier</span><strong>{{ bpmnProcessus.length }}</strong></div>
@@ -341,12 +349,16 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
             <div class="recap-row"><span>Entités de données</span><strong>{{ dataEntities.length }}</strong></div>
             <div class="recap-row"><span>Applications</span><strong>{{ applications.length }}</strong></div>
             <div class="recap-row"><span>Composants technologiques</span><strong>{{ techComponents.length }}</strong></div>
-            <p class="muted" style="margin-top: 1rem;">Tout ce qui n'a pas été rempli pourra l'être plus tard, directement depuis l'application.</p>
+            <p class="muted" style="margin-top: 1rem;">
+              Après validation, votre organisation sera vérifiée par l'équipe ArchiVision.
+              Vous recevrez un e-mail avec le lien de connexion une fois l'inscription approuvée.
+              Tout ce qui n'a pas été rempli pourra l'être plus tard, directement depuis l'application.
+            </p>
           </div>
         </div>
 
         <div class="step-nav">
-          <button type="button" class="btn btn-outline" [disabled]="current.numero === 1" (click)="previous()">← Précédent</button>
+          <button type="button" class="btn btn-outline" *ngIf="current.numero > 1" (click)="previous()">← Précédent</button>
           <button type="button" class="btn btn-ghost" *ngIf="current.numero > 1 && current.numero < steps.length" (click)="next()">Passer cette étape</button>
           <button type="button" class="btn btn-primary" *ngIf="current.numero < steps.length" (click)="next()">Suivant →</button>
           <button type="button" class="btn btn-primary" *ngIf="current.numero === steps.length" [disabled]="loading" (click)="submit()">
@@ -386,18 +398,16 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
 
       .auth-form-col {
         height: 100vh;
-        overflow-y: auto;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        padding: 0.85rem 3rem;
+        padding: 1.25rem 3rem;
       }
       .logo { width: 56px; height: 56px; border-radius: 12px; margin-bottom: 1rem; }
       .wizard-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
       .logo-sm { width: 32px; height: 32px; border-radius: 8px; }
-      h1 { font-size: 1.3rem; font-weight: 800; }
+      h1 { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.6rem; }
       h3 { font-size: 0.94rem; margin-bottom: 0.5rem; display: flex; align-items: center; }
-      .subtitle { color: var(--color-text-muted); margin: 0.25rem 0 0.85rem; font-size: 0.86rem; }
       .muted { color: var(--color-text-muted); font-size: 0.86rem; }
       .field { text-align: left; display: flex; align-items: center; flex-wrap: wrap; margin-bottom: 0.55rem; }
       .field input, .field textarea { flex-basis: 100%; }
@@ -407,12 +417,6 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
       hr { border: none; border-top: 1px solid var(--color-border); margin: 0.75rem 0; }
       .switch { font-size: 0.86rem; color: var(--color-text-muted); }
       .switch a { color: var(--color-primary); font-weight: 700; text-decoration: none; }
-
-      @media (max-width: 900px) {
-        .auth-screen { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
-        .auth-image { min-height: 200px; }
-        .auth-form-col { height: auto; }
-      }
 
       .entreprise-head { display: flex; align-items: flex-start; gap: 1.5rem; }
       .entreprise-fields { flex: 1; }
@@ -506,9 +510,15 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
       .step.active .step-titre { color: var(--color-text); }
       .step.done .step-circle { border-color: var(--color-success); color: var(--color-success); background: var(--color-success-light); }
 
-      .step-body { min-height: 0; }
+      .step-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+      }
 
       .step-nav {
+        flex: none;
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -516,12 +526,65 @@ const TECH_TYPES: { value: TechComponentItem['type']; label: string }[] = [
         margin-top: 0.75rem;
         padding-top: 0.75rem;
         border-top: 1px solid var(--color-border);
+        flex-wrap: wrap;
       }
       .step-nav .btn-outline { margin-right: auto; }
 
-      @media (max-width: 560px) {
-        .grid-2 { grid-template-columns: 1fr; }
-        .entreprise-head { flex-direction: column; align-items: center; text-align: center; }
+      /* ── Tablette et mobile : passage en une colonne, la page défile ─────── */
+      @media (max-width: 900px) {
+        .auth-screen {
+          grid-template-columns: 1fr;
+          height: auto;
+          min-height: 100vh;
+          overflow: visible;
+        }
+        .auth-image {
+          min-height: 150px;
+          max-height: 220px;
+          align-items: center;
+        }
+        .auth-image-overlay { padding: 1.25rem 1.5rem; }
+        .auth-image-quote { font-size: 1rem; line-height: 1.4; max-width: none; }
+        .auth-form-col {
+          height: auto;
+          overflow: visible;
+          padding: 1.25rem 1.5rem;
+        }
+        .step-body { overflow: visible; padding-right: 0; }
+        .step-nav {
+          position: sticky;
+          bottom: 0;
+          z-index: 5;
+          background: var(--color-white);
+          box-shadow: 0 -6px 12px -8px rgba(0, 0, 0, 0.15);
+        }
+      }
+
+      /* ── Mobile : stepper compact, grilles empilées ────────────────────── */
+      @media (max-width: 600px) {
+        .auth-image { min-height: 110px; max-height: 140px; }
+        .auth-image-overlay { display: none; }
+        .auth-form-col { padding: 1rem 1rem 1.25rem; }
+        .grid-2 { grid-template-columns: 1fr; gap: 0; }
+        .entreprise-head { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+        .photo-upload { flex-direction: row; align-items: center; align-self: flex-start; gap: 0.6rem; }
+        h1 { font-size: 1.15rem; }
+        .stepper { padding: 0.25rem 0; margin-bottom: 0.6rem; }
+        .step { min-width: 58px; gap: 0.25rem; }
+        .step-circle { width: 26px; height: 26px; font-size: 0.75rem; }
+        .step:not(:last-child)::after { top: 13px; }
+        .step-titre { font-size: 0.62rem; }
+        .inline-form input, .inline-form select { min-width: 100%; }
+        .step-nav { gap: 0.5rem; }
+        .step-nav .btn { flex: 1 1 auto; }
+        .step-nav .btn-primary { flex-basis: 100%; }
+        .step-nav .btn-outline { margin-right: 0; }
+      }
+
+      /* ── Petit mobile : on masque la bannière image ────────────────────── */
+      @media (max-width: 420px) {
+        .auth-image { display: none; }
+        .checkbox-grid { grid-template-columns: 1fr; }
       }
     `,
   ],
@@ -540,7 +603,9 @@ export class RegisterComponent {
   secteur = '';
   taille = '';
   pays = '';
+  ville = '';
   organisationDescription = '';
+  vision = '';
   logoUrl: string | null = null;
   logoPreview: string | null = null;
   uploadingLogo = false;
@@ -549,7 +614,6 @@ export class RegisterComponent {
   password = '';
 
   // Étape 2
-  vision = '';
   problemesResoudre = '';
   objectifs: ObjectifItem[] = [];
   newObjectif: ObjectifItem = { nom: '', description: '' };
@@ -599,6 +663,31 @@ export class RegisterComponent {
     if (step.numero === 1 || this.current.numero >= 1) this.current = step;
   }
 
+  /**
+   * Une étape est « faite » (pastille verte + coche) uniquement si tous ses
+   * champs obligatoires sont remplis et qu'on n'est pas en train de la
+   * remplir. Seule l'étape 1 a des champs obligatoires ; les étapes 2 à 8
+   * sont facultatives, considérées faites dès qu'on les a dépassées.
+   */
+  stepDone(step: WizardStep): boolean {
+    if (step.key === this.current.key) return false;
+    if (step.key === 'entreprise') return this.entrepriseComplete();
+    return step.numero < this.current.numero;
+  }
+
+  private entrepriseComplete(): boolean {
+    return (
+      !!this.organisationNom.trim() &&
+      !!this.secteur.trim() &&
+      !!this.pays.trim() &&
+      !!this.ville.trim() &&
+      !!this.vision.trim() &&
+      !!this.nom.trim() &&
+      !!this.email.trim() &&
+      this.password.length >= 8
+    );
+  }
+
   next(): void {
     if (this.current.numero === 1 && !this.validateEntreprise()) return;
     const idx = this.steps.findIndex((s) => s.key === this.current.key);
@@ -617,8 +706,9 @@ export class RegisterComponent {
   }
 
   private validateEntreprise(): boolean {
-    if (!this.organisationNom.trim() || !this.nom.trim() || !this.email.trim() || this.password.length < 8) {
-      this.error = 'Merci de compléter tous les champs requis (mot de passe : 8 caractères minimum).';
+    if (!this.entrepriseComplete()) {
+      this.error =
+        'Merci de compléter tous les champs requis : nom, secteur, pays, ville, objectif, ainsi que le compte administrateur (mot de passe : 8 caractères minimum).';
       return false;
     }
     this.error = '';
@@ -729,11 +819,12 @@ export class RegisterComponent {
       .register({
         organisationNom: this.organisationNom,
         organisationDescription: this.organisationDescription || undefined,
-        secteur: this.secteur || undefined,
+        secteur: this.secteur,
         taille: this.taille || undefined,
-        pays: this.pays || undefined,
+        pays: this.pays,
+        ville: this.ville,
         logoUrl: this.logoUrl || undefined,
-        vision: this.vision || undefined,
+        vision: this.vision,
         problemesResoudre: this.problemesResoudre || undefined,
         nom: this.nom,
         email: this.email,
@@ -750,7 +841,7 @@ export class RegisterComponent {
       .subscribe({
         next: () => {
           this.loading = false;
-          this.router.navigate(['/canevas']);
+          this.router.navigate(['/inscription-recue']);
         },
         error: (err) => {
           this.loading = false;

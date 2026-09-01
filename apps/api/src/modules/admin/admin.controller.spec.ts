@@ -1,10 +1,12 @@
 import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { PrismaModule, PrismaService } from '@archivision/infrastructure';
 import { RoleUtilisateur } from '@prisma/client';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { MailService } from '../mail/mail.service';
 
 describe('AdminController (HTTP)', () => {
   let app: INestApplication;
@@ -27,6 +29,7 @@ describe('AdminController (HTTP)', () => {
     secteur: 'Technologie',
     taille: 'PME',
     pays: 'FR',
+    ville: 'Paris',
     statut: 'EN_ATTENTE',
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     validatedAt: null,
@@ -36,6 +39,7 @@ describe('AdminController (HTTP)', () => {
   const mockOrganisationDetail = {
     ...mockOrganisationListItem,
     description: null,
+    vision: 'Digitaliser la relation client',
     users: [{ id: 'user-010', nom: 'Amina Admin', email: 'amina@acme.local', role: 'ADMINISTRATEUR', createdAt: mockOrganisationListItem.createdAt }],
   };
 
@@ -76,6 +80,19 @@ describe('AdminController (HTTP)', () => {
     },
   };
 
+  const configMock = {
+    get: jest.fn((key: string) => (key === 'FRONTEND_ORIGIN' ? 'http://localhost:4201' : undefined)),
+  };
+
+  const mailMock = {
+    sendOrganisationValidee: jest.fn((to: string, _nom: string, loginUrl: string) =>
+      Promise.resolve({ to, subject: 'Bienvenue sur ArchiVision : votre organisation est validée', body: loginUrl }),
+    ),
+    sendOrganisationRejetee: jest.fn((to: string) =>
+      Promise.resolve({ to, subject: "ArchiVision : votre demande d'inscription", body: '' }),
+    ),
+  };
+
   const fakeAuthGuard = {
     canActivate: (context: ExecutionContext) => {
       context.switchToHttp().getRequest().user = currentUser;
@@ -90,7 +107,11 @@ describe('AdminController (HTTP)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule],
       controllers: [AdminController],
-      providers: [AdminService],
+      providers: [
+        AdminService,
+        { provide: ConfigService, useValue: configMock },
+        { provide: MailService, useValue: mailMock },
+      ],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)

@@ -71,6 +71,8 @@ export type { UrbanisationControllerCreateApplication$Params as UrbanisationCont
 export { urbanisationControllerCreateApplication as urbanisationControllerCreateApplication } from './fn/urbanisation/urbanisation-controller-create-application';
 export type { UrbanisationControllerGenerateComponentsVue$Params as UrbanisationControllerGenerateComponentsVue$Params } from './fn/urbanisation/urbanisation-controller-generate-components-vue';
 export { urbanisationControllerGenerateComponentsVue as urbanisationControllerGenerateComponentsVue } from './fn/urbanisation/urbanisation-controller-generate-components-vue';
+export type { UrbanisationControllerGenerateApplicationsLayout$Params as UrbanisationControllerGenerateApplicationsLayout$Params } from './fn/urbanisation/urbanisation-controller-generate-applications-layout';
+export { urbanisationControllerGenerateApplicationsLayout as urbanisationControllerGenerateApplicationsLayout } from './fn/urbanisation/urbanisation-controller-generate-applications-layout';
 export type { UrbanisationControllerFindOneApplication$Params as UrbanisationControllerFindOneApplication$Params } from './fn/urbanisation/urbanisation-controller-find-one-application';
 export { urbanisationControllerFindOneApplication as urbanisationControllerFindOneApplication } from './fn/urbanisation/urbanisation-controller-find-one-application';
 export type { UrbanisationControllerRemoveApplication$Params as UrbanisationControllerRemoveApplication$Params } from './fn/urbanisation/urbanisation-controller-remove-application';
@@ -151,6 +153,8 @@ export type { BpmnControllerUpdate$Params as BpmnControllerUpdate$Params } from 
 export { bpmnControllerUpdate as bpmnControllerUpdate } from './fn/bpmn-processus/bpmn-controller-update';
 export type { BpmnControllerGenerateVue$Params as BpmnControllerGenerateVue$Params } from './fn/bpmn-processus/bpmn-controller-generate-vue';
 export { bpmnControllerGenerateVue as bpmnControllerGenerateVue } from './fn/bpmn-processus/bpmn-controller-generate-vue';
+export type { BpmnControllerGenererDiagramme$Params as BpmnControllerGenererDiagramme$Params } from './fn/bpmn-processus/bpmn-controller-generer-diagramme';
+export { bpmnControllerGenererDiagramme as bpmnControllerGenererDiagramme } from './fn/bpmn-processus/bpmn-controller-generer-diagramme';
 export type { BpmnControllerAddElement$Params as BpmnControllerAddElement$Params } from './fn/bpmn-processus/bpmn-controller-add-element';
 export { bpmnControllerAddElement as bpmnControllerAddElement } from './fn/bpmn-processus/bpmn-controller-add-element';
 export type { BpmnControllerRemoveElement$Params as BpmnControllerRemoveElement$Params } from './fn/bpmn-processus/bpmn-controller-remove-element';
@@ -169,6 +173,8 @@ export type { DonneesControllerFindAllRelations$Params as DonneesControllerFindA
 export { donneesControllerFindAllRelations as donneesControllerFindAllRelations } from './fn/data-entities/donnees-controller-find-all-relations';
 export type { DonneesControllerCreateRelation$Params as DonneesControllerCreateRelation$Params } from './fn/data-entities/donnees-controller-create-relation';
 export { donneesControllerCreateRelation as donneesControllerCreateRelation } from './fn/data-entities/donnees-controller-create-relation';
+export type { DonneesControllerGenerateLayout$Params as DonneesControllerGenerateLayout$Params } from './fn/data-entities/donnees-controller-generate-layout';
+export { donneesControllerGenerateLayout as donneesControllerGenerateLayout } from './fn/data-entities/donnees-controller-generate-layout';
 export type { DonneesControllerFindOne$Params as DonneesControllerFindOne$Params } from './fn/data-entities/donnees-controller-find-one';
 export { donneesControllerFindOne as donneesControllerFindOne } from './fn/data-entities/donnees-controller-find-one';
 export type { DonneesControllerRemove$Params as DonneesControllerRemove$Params } from './fn/data-entities/donnees-controller-remove';
@@ -185,6 +191,8 @@ export type { TechnologieControllerFindAll$Params as TechnologieControllerFindAl
 export { technologieControllerFindAll as technologieControllerFindAll } from './fn/tech-components/technologie-controller-find-all';
 export type { TechnologieControllerCreate$Params as TechnologieControllerCreate$Params } from './fn/tech-components/technologie-controller-create';
 export { technologieControllerCreate as technologieControllerCreate } from './fn/tech-components/technologie-controller-create';
+export type { TechnologieControllerGenerateLayout$Params as TechnologieControllerGenerateLayout$Params } from './fn/tech-components/technologie-controller-generate-layout';
+export { technologieControllerGenerateLayout as technologieControllerGenerateLayout } from './fn/tech-components/technologie-controller-generate-layout';
 export type { TechnologieControllerFindOne$Params as TechnologieControllerFindOne$Params } from './fn/tech-components/technologie-controller-find-one';
 export { technologieControllerFindOne as technologieControllerFindOne } from './fn/tech-components/technologie-controller-find-one';
 export type { TechnologieControllerRemove$Params as TechnologieControllerRemove$Params } from './fn/tech-components/technologie-controller-remove';
@@ -275,6 +283,8 @@ export type { ArchitectureApplicativeControllerCreateElement$Params as Architect
 export { architectureApplicativeControllerCreateElement as architectureApplicativeControllerCreateElement } from './fn/architecture-applicative/architecture-applicative-controller-create-element';
 export type { ArchitectureApplicativeControllerGenerateVue$Params as ArchitectureApplicativeControllerGenerateVue$Params } from './fn/architecture-applicative/architecture-applicative-controller-generate-vue';
 export { architectureApplicativeControllerGenerateVue as architectureApplicativeControllerGenerateVue } from './fn/architecture-applicative/architecture-applicative-controller-generate-vue';
+export type { ArchitectureApplicativeControllerGenerateLayout$Params as ArchitectureApplicativeControllerGenerateLayout$Params } from './fn/architecture-applicative/architecture-applicative-controller-generate-layout';
+export { architectureApplicativeControllerGenerateLayout as architectureApplicativeControllerGenerateLayout } from './fn/architecture-applicative/architecture-applicative-controller-generate-layout';
 export type { ArchitectureApplicativeControllerRemoveElement$Params as ArchitectureApplicativeControllerRemoveElement$Params } from './fn/architecture-applicative/architecture-applicative-controller-remove-element';
 export { architectureApplicativeControllerRemoveElement as architectureApplicativeControllerRemoveElement } from './fn/architecture-applicative/architecture-applicative-controller-remove-element';
 export type { ArchitectureApplicativeControllerUpdateElement$Params as ArchitectureApplicativeControllerUpdateElement$Params } from './fn/architecture-applicative/architecture-applicative-controller-update-element';

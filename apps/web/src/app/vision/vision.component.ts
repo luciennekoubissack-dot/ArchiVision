@@ -1,10 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { BpmnComponent } from './bpmn.component';
 import { ArchimateService, CategorieExigence, ElementArchimate } from '../architecture-metier/archimate.service';
 import { UpdateVisionCanvasPayload, VisionCanvas, VisionCanvasField, VisionCanvasService } from './vision-canvas.service';
+import { buildVisionCanvasPrefill } from './vision-canvas.prefill';
+import { OrganisationService } from '../organisation/organisation.service';
+import { ObjectifService } from '../organisation/objectif.service';
+import { PartiesPrenantesService } from '../organisation/parties-prenantes.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { exportToExcel, importFromExcel } from '../shared/excel.util';
@@ -304,6 +309,9 @@ export class VisionComponent implements OnInit {
   constructor(
     private archimateService: ArchimateService,
     private visionCanvasService: VisionCanvasService,
+    private organisationService: OrganisationService,
+    private objectifService: ObjectifService,
+    private partiesPrenantesService: PartiesPrenantesService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
     private sanitizer: DomSanitizer,
@@ -439,13 +447,50 @@ export class VisionComponent implements OnInit {
     this.visionCanvasService.get().subscribe({
       next: (canvas) => {
         this.canvas = canvas;
-        this.canvasLoading = false;
         this.canvasLoaded = true;
+        if (this.isCanvasEmpty()) {
+          this.prefillCanvas();
+        } else {
+          this.canvasLoading = false;
+        }
       },
       error: () => {
         this.canvasLoading = false;
         this.toast.error('Impossible de charger le canevas de vision.');
       },
+    });
+  }
+
+  private isCanvasEmpty(): boolean {
+    return this.blocks.every((b) => !(this.canvas[b.field] ?? '').trim());
+  }
+
+  /**
+   * Première ouverture d'un canevas vide : on le pré-remplit à partir des
+   * données déjà saisies (vision, problèmes, objectifs, parties prenantes).
+   * L'utilisateur peut ensuite tout modifier.
+   */
+  private prefillCanvas(): void {
+    forkJoin({
+      org: this.organisationService.getMine().pipe(catchError(() => of(null))),
+      objectifs: this.objectifService.list().pipe(catchError(() => of([]))),
+      parties: this.partiesPrenantesService.list().pipe(catchError(() => of([]))),
+    }).subscribe(({ org, objectifs, parties }) => {
+      this.canvasLoading = false;
+      if (!org) return;
+      const payload = buildVisionCanvasPrefill(org, objectifs, parties);
+      if (Object.keys(payload).length === 0) return;
+      this.visionCanvasService.update(payload).subscribe({
+        next: (canvas) => {
+          this.canvas = canvas;
+          this.toast.success('Diagramme de vision pré-rempli à partir de vos données.');
+        },
+        error: () => {
+          // Pré-remplissage local même si la sauvegarde échoue : l'utilisateur
+          // pourra corriger et re-déclencher un enregistrement au blur.
+          this.canvas = { ...this.canvas, ...payload };
+        },
+      });
     });
   }
 

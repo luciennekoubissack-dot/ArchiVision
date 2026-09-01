@@ -6,6 +6,7 @@ import { UpdateBpmnProcessusDto } from './dto/update-bpmn-processus.dto';
 import { CreateBpmnElementDto } from './dto/create-bpmn-element.dto';
 import { UpdateBpmnElementDto } from './dto/update-bpmn-element.dto';
 import { CreateBpmnFlowDto } from './dto/create-bpmn-flow.dto';
+import { construirePropositionDiagramme } from './bpmn-diagramme-proposal';
 
 @Injectable()
 export class BpmnService {
@@ -13,8 +14,70 @@ export class BpmnService {
 
   // ── Processus ────────────────────────────────────────────────────────────
 
-  create(organisationId: string, dto: CreateBpmnProcessusDto) {
-    return this.prisma.bpmnProcessus.create({ data: { ...dto, organisationId } });
+  async create(organisationId: string, dto: CreateBpmnProcessusDto) {
+    const processus = await this.prisma.bpmnProcessus.create({ data: { ...dto, organisationId } });
+    if (dto.etapes?.trim()) {
+      await this.genererDiagramme(processus.id, organisationId);
+    }
+    return processus;
+  }
+
+  /**
+   * Génère une proposition de diagramme (éléments + flux) à partir du champ
+   * `etapes` du processus et la persiste. Refuse si le diagramme contient déjà
+   * des éléments (l'utilisateur doit d'abord le vider), pour ne jamais écraser
+   * un travail d'édition.
+   */
+  async genererDiagramme(id: string, organisationId: string) {
+    const processus = await this.prisma.bpmnProcessus.findUnique({
+      where: { id },
+      include: { elements: { select: { id: true } } },
+    });
+    if (!processus || processus.organisationId !== organisationId) {
+      throw new NotFoundException(`Processus BPMN ${id} introuvable`);
+    }
+    if (processus.elements.length > 0) {
+      throw new BadRequestException(
+        'Le diagramme contient déjà des éléments. Videz-le avant de régénérer une proposition.',
+      );
+    }
+    const etapes = (processus.etapes ?? '').trim();
+    if (!etapes) {
+      throw new BadRequestException("Aucune étape n'est renseignée pour ce processus.");
+    }
+
+    let proposition: ReturnType<typeof construirePropositionDiagramme>;
+    try {
+      proposition = construirePropositionDiagramme(etapes);
+    } catch (erreur) {
+      throw new BadRequestException(erreur instanceof Error ? erreur.message : 'Étapes invalides.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const ids: string[] = [];
+      for (const noeud of proposition.noeuds) {
+        const element = await tx.bpmnElement.create({
+          data: {
+            processusId: id,
+            nom: noeud.nom,
+            type: noeud.type,
+            typeTache: noeud.typeTache ?? null,
+            declencheur: noeud.declencheur ?? null,
+            statut: 'LES_DEUX',
+            positionX: noeud.x,
+            positionY: noeud.y,
+          },
+        });
+        ids.push(element.id);
+      }
+      for (const lien of proposition.liens) {
+        await tx.bpmnFlow.create({
+          data: { sourceId: ids[lien.source], targetId: ids[lien.cible], label: lien.label ?? null },
+        });
+      }
+    });
+
+    return this.findOne(id, organisationId);
   }
 
   findAll(organisationId: string, pagination?: PaginationQueryDto) {
@@ -43,7 +106,16 @@ export class BpmnService {
 
   async update(id: string, organisationId: string, dto: UpdateBpmnProcessusDto) {
     await this.assertProcessusExists(id, organisationId);
-    return this.prisma.bpmnProcessus.update({ where: { id }, data: dto });
+    const processus = await this.prisma.bpmnProcessus.update({ where: { id }, data: dto });
+    // Même comportement qu'à la création : des étapes renseignées sur un
+    // diagramme encore vide déclenchent la génération d'une proposition.
+    if (dto.etapes?.trim()) {
+      const nbElements = await this.prisma.bpmnElement.count({ where: { processusId: id } });
+      if (nbElements === 0) {
+        return this.genererDiagramme(id, organisationId);
+      }
+    }
+    return processus;
   }
 
   async remove(id: string, organisationId: string) {

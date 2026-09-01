@@ -11,6 +11,8 @@ import {
 } from '@nestjs/swagger';
 import { ApiPaginatedResponse } from '@archivision/shared';
 import { DonneesService } from './donnees.service';
+import { DonneesLayoutService } from './donnees-layout.service';
+import { DiagramLayoutResultEntity } from '../../common/entities/diagram-layout.entity';
 import { CreateDataEntityDto } from './dto/create-data-entity.dto';
 import { UpdateDataEntityDto } from './dto/update-data-entity.dto';
 import { CreateDataAttributeDto } from './dto/create-data-attribute.dto';
@@ -24,7 +26,10 @@ import { DataRelationDetailEntity } from './entities/data-relation-detail.entity
 @ApiBearerAuth('access-token')
 @Controller('data-entities')
 export class DonneesController {
-  constructor(private readonly donneesService: DonneesService) {}
+  constructor(
+    private readonly donneesService: DonneesService,
+    private readonly donneesLayoutService: DonneesLayoutService,
+  ) {}
 
   @ApiOperation({ summary: 'Liste les entites de donnees de l\'organisation' })
   @Get()
@@ -46,6 +51,20 @@ export class DonneesController {
   @ApiPaginatedResponse(DataRelationDetailEntity)
   findAllRelations(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
     return this.donneesService.findAllRelations(requireOrganisationId(user), pagination);
+  }
+
+  @ApiOperation({
+    summary: 'Genere une disposition automatique du diagramme de classe',
+    description:
+      "Place les entites en grille (persiste positionX/positionY) et deduit les relations manquantes a partir des attributs de type cle etrangere. A appeler notamment a la premiere ouverture de l'editeur.",
+  })
+  @Post('generate-layout')
+  @UseGuards(RolesGuard)
+  @Roles(RoleUtilisateur.ADMINISTRATEUR, RoleUtilisateur.ARCHITECTE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: DiagramLayoutResultEntity })
+  generateLayout(@CurrentUser() user: AuthUser) {
+    return this.donneesLayoutService.generateAndPersist(requireOrganisationId(user));
   }
 
   @ApiOperation({ summary: 'Recupere une entite de donnees par son identifiant' })

@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import bcrypt from 'bcrypt';
@@ -16,6 +16,7 @@ describe('AuthService', () => {
     nom: 'Admin',
     organisationId: 'org-001',
     role: RoleUtilisateur.ADMINISTRATEUR,
+    organisation: { statut: 'VALIDEE' as const },
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
   };
@@ -56,7 +57,7 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('retourne un accessToken et le user pour des identifiants valides', async () => {
+    it('retourne un accessToken et le user pour des identifiants valides (organisation VALIDEE)', async () => {
       prismaMock.user.findUnique.mockResolvedValue(mockUser);
       jwtMock.sign.mockReturnValue('signed.jwt.token');
 
@@ -105,8 +106,36 @@ describe('AuthService', () => {
       );
     });
 
-    it("réussit même si l'organisation de l'utilisateur est EN_ATTENTE ou REJETEE (plus de blocage à la connexion)", async () => {
-      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+    it("lève ForbiddenException si l'organisation est EN_ATTENTE", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organisation: { statut: 'EN_ATTENTE' },
+      });
+
+      await expect(service.login('admin@archivision.local', 'Admin123!')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(jwtMock.sign).not.toHaveBeenCalled();
+    });
+
+    it("lève ForbiddenException si l'organisation est REJETEE", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organisation: { statut: 'REJETEE' },
+      });
+
+      await expect(service.login('admin@archivision.local', 'Admin123!')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it("laisse passer le SUPERADMIN qui n'a pas d'organisation", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        role: RoleUtilisateur.SUPERADMIN,
+        organisationId: null,
+        organisation: null,
+      });
       jwtMock.sign.mockReturnValue('signed.jwt.token');
 
       const result = await service.login('admin@archivision.local', 'Admin123!');
@@ -118,20 +147,25 @@ describe('AuthService', () => {
   describe('register', () => {
     const registerDto = {
       organisationNom: 'Nouvelle Entreprise',
+      secteur: 'Conseil',
+      pays: 'France',
+      ville: 'Lyon',
+      vision: 'Digitaliser la gestion administrative',
       email: 'fondateur@nouvelle-entreprise.local',
       password: 'MotDePasse123!',
       nom: 'Fondateur',
     };
 
-    it("crée une organisation en attente et son premier utilisateur (rôle Administrateur), et connecte immédiatement", async () => {
+    it("crée une organisation EN_ATTENTE et son premier administrateur, sans ouvrir de session", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
       const createdOrg = {
         id: 'org-002',
         nom: registerDto.organisationNom,
         description: null,
-        secteur: null,
+        secteur: registerDto.secteur,
         taille: null,
-        pays: null,
+        pays: registerDto.pays,
+        ville: registerDto.ville,
         logoUrl: null,
         statut: 'EN_ATTENTE',
       };
@@ -145,10 +179,20 @@ describe('AuthService', () => {
       };
       txMock.organisation.create.mockResolvedValue(createdOrg);
       txMock.user.create.mockResolvedValue(createdUser);
-      jwtMock.sign.mockReturnValue('signed.jwt.token');
 
       const result = await service.register(registerDto);
 
+      expect(txMock.organisation.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            nom: registerDto.organisationNom,
+            secteur: registerDto.secteur,
+            pays: registerDto.pays,
+            ville: registerDto.ville,
+            vision: registerDto.vision,
+          }),
+        }),
+      );
       expect(txMock.user.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -157,23 +201,13 @@ describe('AuthService', () => {
           }),
         }),
       );
-      expect(jwtMock.sign).toHaveBeenCalledWith({
-        sub: createdUser.id,
-        email: createdUser.email,
-        organisationId: createdUser.organisationId,
-        role: createdUser.role,
-      });
+      // Aucune session n'est émise à l'inscription.
+      expect(jwtMock.sign).not.toHaveBeenCalled();
       expect(result).toEqual({
-        accessToken: 'signed.jwt.token',
-        user: {
-          id: createdUser.id,
-          email: createdUser.email,
-          nom: createdUser.nom,
-          avatarUrl: null,
-          role: createdUser.role,
-        },
         organisation: { id: createdOrg.id, nom: createdOrg.nom, statut: createdOrg.statut },
+        message: expect.any(String),
       });
+      expect(result).not.toHaveProperty('accessToken');
     });
 
     it('lève ConflictException si l\'email est déjà utilisé', async () => {
@@ -186,7 +220,7 @@ describe('AuthService', () => {
 
   describe('me', () => {
     it("retourne le profil de l'utilisateur courant", async () => {
-      const { passwordHash: _unused, organisationId: _org, ...profile } = mockUser;
+      const { passwordHash: _unused, organisationId: _org, organisation: _o, ...profile } = mockUser;
       prismaMock.user.findUnique.mockResolvedValue(profile);
 
       const result = await service.me(mockUser.id);

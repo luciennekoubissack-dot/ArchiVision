@@ -53,6 +53,8 @@ import {
 } from '../api-client/fn/urbanisation/urbanisation-controller-find-all-echanges';
 import { urbanisationControllerCreateEchange } from '../api-client/fn/urbanisation/urbanisation-controller-create-echange';
 import { urbanisationControllerRemoveEchange } from '../api-client/fn/urbanisation/urbanisation-controller-remove-echange';
+import { urbanisationControllerGenerateApplicationsLayout } from '../api-client/fn/urbanisation/urbanisation-controller-generate-applications-layout';
+import { DiagramLayoutResultEntity } from '../api-client/models/diagram-layout-result-entity';
 
 export type TypeZone = 'ZONE' | 'QUARTIER' | 'ILOT';
 
@@ -130,6 +132,11 @@ export class UrbanisationService {
 
   generateComponentsView(): Observable<ComponentsView> {
     return urbanisationControllerGenerateComponentsVue(this.http, this.config.rootUrl).pipe(map((r) => r.body));
+  }
+
+  /** Dispose automatiquement les applications du diagramme de composants en grille. */
+  generateApplicationsLayout(): Observable<DiagramLayoutResultEntity> {
+    return urbanisationControllerGenerateApplicationsLayout(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 
   // ── Zones d'urbanisation ──────────────────────────────────────────────────

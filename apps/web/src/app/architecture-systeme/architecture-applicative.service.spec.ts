@@ -131,4 +131,15 @@ describe('ArchitectureApplicativeService', () => {
 
     expect(result).toEqual({ elementCount: 4, fluxCount: 2, svg: '<svg></svg>' });
   });
+
+  it("génère la disposition automatique du diagramme d'architecture applicative", () => {
+    let result: unknown;
+    service.generateLayout().subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne('/api/v1/architecture-applicative/generate-layout');
+    expect(req.request.method).toBe('POST');
+    req.flush({ elements: [], count: 0 });
+
+    expect(result).toEqual({ elements: [], count: 0 });
+  });
 });

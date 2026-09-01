@@ -117,4 +117,15 @@ describe('TechnologieService', () => {
 
     expect(completed).toBe(true);
   });
+
+  it('génère la disposition automatique du diagramme de déploiement', () => {
+    let result: unknown;
+    service.generateLayout().subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne('/api/v1/tech-components/generate-layout');
+    expect(req.request.method).toBe('POST');
+    req.flush({ elements: [], count: 0 });
+
+    expect(result).toEqual({ elements: [], count: 0 });
+  });
 });

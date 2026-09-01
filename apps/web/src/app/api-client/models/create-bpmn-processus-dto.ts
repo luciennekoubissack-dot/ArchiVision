@@ -9,6 +9,11 @@ export interface CreateBpmnProcessusDto {
   description?: string;
 
   /**
+   * Étapes du processus en langage naturel, une par ligne. Si renseigné à la création, une proposition de diagramme (éléments + flux) est générée automatiquement.
+   */
+  etapes?: string;
+
+  /**
    * Nom du processus BPMN
    */
   nom: string;

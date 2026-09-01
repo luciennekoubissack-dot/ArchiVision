@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { PrismaModule } from '@archivision/infrastructure';
-import { CsrfGuard, JwtAuthGuard, SuperAdminGuard } from '@archivision/shared';
+import { CsrfGuard, JwtAuthGuard, OrganisationStatusGuard, SuperAdminGuard } from '@archivision/shared';
 import { OrganisationModule } from './organisation/organisation.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ArchimateModule } from './modules/archimate/archimate.module';
@@ -58,8 +58,9 @@ import { ArchitectureApplicativeModule } from './modules/architecture-applicativ
     // Ordre important : ThrottlerGuard rejette les requêtes en excès avant
     // tout travail d'auth ; JwtAuthGuard peuple ensuite request.user avant
     // que CsrfGuard ne vérifie les requêtes de mutation authentifiées par
-    // cookie, et que SuperAdminGuard ne lise le rôle pour bloquer les fuites
-    // cross-tenant.
+    // cookie, que SuperAdminGuard ne lise le rôle pour bloquer les fuites
+    // cross-tenant, et qu'OrganisationStatusGuard ne refuse l'accès tant que
+    // l'organisation n'est pas validée par le superadmin.
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -75,6 +76,10 @@ import { ArchitectureApplicativeModule } from './modules/architecture-applicativ
     {
       provide: APP_GUARD,
       useClass: SuperAdminGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: OrganisationStatusGuard,
     },
   ],
 })

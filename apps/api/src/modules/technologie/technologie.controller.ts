@@ -11,6 +11,8 @@ import {
 } from '@nestjs/swagger';
 import { ApiPaginatedResponse } from '@archivision/shared';
 import { TechnologieService } from './technologie.service';
+import { TechnologieLayoutService } from './technologie-layout.service';
+import { DiagramLayoutResultEntity } from '../../common/entities/diagram-layout.entity';
 import { CreateTechComponentDto } from './dto/create-tech-component.dto';
 import { UpdateTechComponentDto } from './dto/update-tech-component.dto';
 import { DeployerApplicationDto } from './dto/deployer-application.dto';
@@ -21,7 +23,10 @@ import { TechDeploiementEntity } from './entities/tech-deploiement.entity';
 @ApiBearerAuth('access-token')
 @Controller('tech-components')
 export class TechnologieController {
-  constructor(private readonly technologieService: TechnologieService) {}
+  constructor(
+    private readonly technologieService: TechnologieService,
+    private readonly technologieLayoutService: TechnologieLayoutService,
+  ) {}
 
   @ApiOperation({ summary: 'Liste les composants technologiques de l\'organisation' })
   @Get()
@@ -32,6 +37,20 @@ export class TechnologieController {
   @ApiPaginatedResponse(TechComponentEntity)
   findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
     return this.technologieService.findAll(requireOrganisationId(user), pagination);
+  }
+
+  @ApiOperation({
+    summary: 'Genere une disposition automatique du diagramme de deploiement',
+    description:
+      "Place les composants techniques en grille et persiste positionX/positionY. A appeler notamment a la premiere ouverture de l'editeur.",
+  })
+  @Post('generate-layout')
+  @UseGuards(RolesGuard)
+  @Roles(RoleUtilisateur.ADMINISTRATEUR, RoleUtilisateur.ARCHITECTE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: DiagramLayoutResultEntity })
+  generateLayout(@CurrentUser() user: AuthUser) {
+    return this.technologieLayoutService.generateAndPersist(requireOrganisationId(user));
   }
 
   @ApiOperation({ summary: 'Recupere un composant technologique par son identifiant' })

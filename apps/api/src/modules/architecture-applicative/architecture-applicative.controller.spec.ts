@@ -6,6 +6,7 @@ import { RoleUtilisateur } from '@prisma/client';
 import { ArchitectureApplicativeController } from './architecture-applicative.controller';
 import { ArchitectureApplicativeService } from './architecture-applicative.service';
 import { ArchitectureApplicativeViewService } from './architecture-applicative-view.service';
+import { ArchitectureApplicativeLayoutService } from './architecture-applicative-layout.service';
 
 describe('ArchitectureApplicativeController (HTTP)', () => {
   let app: INestApplication;
@@ -67,7 +68,11 @@ describe('ArchitectureApplicativeController (HTTP)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule],
       controllers: [ArchitectureApplicativeController],
-      providers: [ArchitectureApplicativeService, ArchitectureApplicativeViewService],
+      providers: [
+        ArchitectureApplicativeService,
+        ArchitectureApplicativeViewService,
+        ArchitectureApplicativeLayoutService,
+      ],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
@@ -179,5 +184,18 @@ describe('ArchitectureApplicativeController (HTTP)', () => {
   it('un Superadmin reçoit 403 en tentant de supprimer un flux', async () => {
     currentUser = superadmin;
     await request(app.getHttpServer()).delete(`/architecture-applicative/flux/${mockFlux.id}`).expect(403);
+  });
+
+  it('un Architecte peut générer la disposition automatique (200)', async () => {
+    prismaMock.archiApplicativeElement.findMany.mockResolvedValue([]);
+    const response = await request(app.getHttpServer())
+      .post('/architecture-applicative/generate-layout')
+      .expect(200);
+    expect(response.body).toEqual({ elements: [], count: 0 });
+  });
+
+  it('un Superadmin reçoit 403 en tentant de générer la disposition', async () => {
+    currentUser = superadmin;
+    await request(app.getHttpServer()).post('/architecture-applicative/generate-layout').expect(403);
   });
 });

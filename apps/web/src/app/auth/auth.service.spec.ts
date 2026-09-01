@@ -58,23 +58,31 @@ describe('AuthService', () => {
     expect(JSON.parse(localStorage.getItem('archivision_user')!)).toEqual(mockUser);
   });
 
-  it('register stocke la session dans localStorage et met à jour le signal currentUser', () => {
+  it("register n'ouvre aucune session : rien n'est stocké, currentUser reste null", () => {
     let result: unknown;
-    const registerPayload = { email: mockUser.email, password: 'motdepasse', nom: mockUser.nom, organisationNom: 'Acme' };
+    const registerPayload = {
+      email: mockUser.email,
+      password: 'motdepasse',
+      nom: mockUser.nom,
+      organisationNom: 'Acme',
+      secteur: 'Conseil',
+      pays: 'France',
+      ville: 'Lyon',
+      vision: 'Objectif',
+    };
     service.register(registerPayload as any).subscribe((r) => (result = r));
 
     const req = httpMock.expectOne('/api/v1/auth/register');
     expect(req.request.method).toBe('POST');
     const mockRegisterResponse = {
-      accessToken: 'jwt-fake',
-      organisation: { id: 'org-001', nom: 'Acme' },
-      user: mockUser,
+      organisation: { id: 'org-001', nom: 'Acme', statut: 'EN_ATTENTE' },
+      message: 'Votre inscription a bien été enregistrée.',
     };
     req.flush(mockRegisterResponse);
 
     expect(result).toEqual(mockRegisterResponse);
-    expect(service.currentUser()).toEqual(mockUser);
-    expect(JSON.parse(localStorage.getItem('archivision_user')!)).toEqual(mockUser);
+    expect(service.currentUser()).toBeNull();
+    expect(localStorage.getItem('archivision_user')).toBeNull();
   });
 
   it('logout vide localStorage et remet currentUser à null immédiatement, sans attendre la réponse HTTP', () => {

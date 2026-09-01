@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "archivision-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start:dev"],
+      "port": 3000
+    },
+    {
       "name": "archivision-web",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "start", "--prefix", "apps/web", "--", "--port", "4201"],

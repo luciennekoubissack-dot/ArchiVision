@@ -87,6 +87,7 @@ export type { DataRelationDetailEntity } from './models/data-relation-detail-ent
 export type { DataRelationEntity } from './models/data-relation-entity';
 export type { DemandeChangementEntity } from './models/demande-changement-entity';
 export type { DeployerApplicationDto } from './models/deployer-application-dto';
+export type { DiagramLayoutResultEntity } from './models/diagram-layout-result-entity';
 export type { EchangeEntity } from './models/echange-entity';
 export type { ElementArchimateEntity } from './models/element-archimate-entity';
 export type { ElementCountEntity } from './models/element-count-entity';
@@ -97,6 +98,7 @@ export type { EvaluationScoreEntity } from './models/evaluation-score-entity';
 export type { GapLinkItemDto } from './models/gap-link-item-dto';
 export type { HealthCheckResultEntity } from './models/health-check-result-entity';
 export type { ImportEnqueteDto } from './models/import-enquete-dto';
+export type { LayoutPositionEntity } from './models/layout-position-entity';
 export type { LinkGapsDto } from './models/link-gaps-dto';
 export type { LoginDto } from './models/login-dto';
 export type { MeEntity } from './models/me-entity';

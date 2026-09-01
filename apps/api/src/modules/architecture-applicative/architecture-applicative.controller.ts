@@ -4,6 +4,8 @@ import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from 
 import { RoleUtilisateur } from '@prisma/client';
 import { ArchitectureApplicativeService } from './architecture-applicative.service';
 import { ArchitectureApplicativeViewService } from './architecture-applicative-view.service';
+import { ArchitectureApplicativeLayoutService } from './architecture-applicative-layout.service';
+import { DiagramLayoutResultEntity } from '../../common/entities/diagram-layout.entity';
 import { CreateArchiApplicativeElementDto } from './dto/create-element.dto';
 import { UpdateArchiApplicativeElementDto } from './dto/update-element.dto';
 import { CreateArchiApplicativeFluxDto } from './dto/create-flux.dto';
@@ -18,6 +20,7 @@ export class ArchitectureApplicativeController {
   constructor(
     private readonly service: ArchitectureApplicativeService,
     private readonly viewService: ArchitectureApplicativeViewService,
+    private readonly layoutService: ArchitectureApplicativeLayoutService,
   ) {}
 
   @ApiOperation({ summary: "Lister les éléments d'architecture applicative de l'organisation." })
@@ -32,6 +35,20 @@ export class ArchitectureApplicativeController {
   @ApiOkResponse({ type: ArchitectureApplicativeVueEntity })
   generateVue(@CurrentUser() user: AuthUser) {
     return this.viewService.generate(requireOrganisationId(user));
+  }
+
+  @ApiOperation({
+    summary: "Générer une disposition automatique du diagramme d'architecture applicative.",
+    description:
+      "Place les éléments en couloirs par type et persiste positionX/positionY. À appeler notamment à la première ouverture de l'éditeur.",
+  })
+  @Post('generate-layout')
+  @UseGuards(RolesGuard)
+  @Roles(RoleUtilisateur.ADMINISTRATEUR, RoleUtilisateur.ARCHITECTE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: DiagramLayoutResultEntity })
+  generateLayout(@CurrentUser() user: AuthUser) {
+    return this.layoutService.generateAndPersist(requireOrganisationId(user));
   }
 
   @ApiOperation({ summary: "Créer un élément d'architecture applicative." })

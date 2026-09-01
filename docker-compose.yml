@@ -13,7 +13,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit être défini (export POSTGRES_PASSWORD=... avant docker compose up)}
       POSTGRES_DB: archivision
     ports:
-      - '5433:5432'
+      # Liée à localhost : l'API atteint Postgres via le réseau Docker interne
+      # (postgres:5432) et n'a pas besoin de ce port publié ; il ne sert qu'aux
+      # outils locaux (client DB), et ne doit pas être exposé sur les autres
+      # interfaces réseau de l'hôte en production.
+      - '127.0.0.1:5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,6 +25,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Applique les migrations en attente avant le démarrage de l'API : service
+  # ponctuel (pas de `restart`), réutilise l'étape `builder` du Dockerfile
+  # (seule à contenir la CLI Prisma, absente de l'image d'exécution `api`
+  # pour rester légère). Idempotent (migrate deploy ne rejoue jamais une
+  # migration déjà appliquée), donc sûr à relancer à chaque `docker compose up`.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/archivision?schema=public
+    command: ['npx', 'prisma', 'migrate', 'deploy', '--schema', 'apps/api/prisma/schema.prisma']
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   api:
     build:
@@ -33,12 +54,27 @@ services:
       # n'est pas exporté avant `docker compose up` (voir requireJwtSecret()).
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET doit être défini (export JWT_SECRET=... avant docker compose up)}
       PORT: 3000
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4201}
+      # Pas de valeur par défaut ici non plus (voir JWT_SECRET ci-dessus) :
+      # un `:-http://localhost:4201` masquerait le contrôle fait par
+      # requireFrontendOrigin() côté code, qui ne verrait jamais l'absence de
+      # configuration puisque docker compose l'aurait déjà comblée en silence.
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN doit être défini (export FRONTEND_ORIGIN=... avant docker compose up)}
+      # Envoi d'e-mails (validation/rejet d'organisation) : facultatifs, la
+      # valeur par défaut de MailService reste le mode simulé (journalisation
+      # seule) si SMTP_HOST est absent — voir apps/api/src/modules/mail/mail.service.ts.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-ArchiVision <no-reply@archivision.local>}
     ports:
       - '3000:3000'
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

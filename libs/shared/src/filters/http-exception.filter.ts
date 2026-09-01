@@ -13,6 +13,8 @@ interface ErrorBody {
   statusCode: number;
   message: string | string[];
   error: string;
+  /** Code machine optionnel, pour un traitement ciblé côté client. */
+  code?: string;
   path: string;
   timestamp: string;
 }
@@ -35,12 +37,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const { status, message, error } = this.resolve(exception);
+    const { status, message, error, code } = this.resolve(exception);
 
     const body: ErrorBody = {
       statusCode: status,
       message,
       error,
+      ...(code ? { code } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
     };
@@ -59,17 +62,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
     status: number;
     message: string | string[];
     error: string;
+    code?: string;
   } {
     if (exception instanceof HttpException) {
       const response = exception.getResponse();
       if (typeof response === 'string') {
         return { status: exception.getStatus(), message: response, error: exception.name };
       }
-      const { message, error } = response as { message?: string | string[]; error?: string };
+      const { message, error, code } = response as {
+        message?: string | string[];
+        error?: string;
+        code?: string;
+      };
       return {
         status: exception.getStatus(),
         message: message ?? exception.message,
         error: error ?? exception.name,
+        code,
       };
     }
 

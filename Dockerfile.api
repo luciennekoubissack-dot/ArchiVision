@@ -11,8 +11,11 @@ COPY apps/api/ apps/api/
 
 RUN npm ci --ignore-scripts
 
-# Générer le client Prisma
-RUN npx prisma generate
+# Générer le client Prisma. Chemin de schéma explicite : la CLI Prisma 7 ne
+# lit plus le champ package.json#prisma.schema (utilisé en local), et sans
+# --schema elle ne cherche qu'aux emplacements par défaut (./schema.prisma,
+# ./prisma/schema.prisma), absents depuis /app.
+RUN npx prisma generate --schema apps/api/prisma/schema.prisma
 
 # Compiler l'API
 RUN npx nest build api
@@ -32,6 +35,12 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY apps/api/prisma/schema.prisma ./apps/api/prisma/schema.prisma
+
+# Le conteneur tourne en utilisateur non-root (image node:alpine par défaut :
+# uid/gid "node" déjà présents) plutôt qu'en root par défaut ; uploads/ doit
+# exister et lui appartenir puisque l'app y écrit les logos à l'exécution.
+RUN mkdir -p apps/api/uploads && chown -R node:node /app
+USER node
 
 EXPOSE 3000
 

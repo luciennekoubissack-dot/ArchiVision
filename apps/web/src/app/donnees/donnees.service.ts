@@ -21,12 +21,15 @@ import { donneesControllerRemoveAttribute } from '../api-client/fn/data-entities
 import { donneesControllerFindAllRelations } from '../api-client/fn/data-entities/donnees-controller-find-all-relations';
 import { donneesControllerCreateRelation } from '../api-client/fn/data-entities/donnees-controller-create-relation';
 import { donneesControllerRemoveRelation } from '../api-client/fn/data-entities/donnees-controller-remove-relation';
+import { donneesControllerGenerateLayout } from '../api-client/fn/data-entities/donnees-controller-generate-layout';
+import { DiagramLayoutResultEntity } from '../api-client/models/diagram-layout-result-entity';
 
 export type TypeCardinalite = 'UN_A_UN' | 'UN_A_PLUSIEURS' | 'PLUSIEURS_A_PLUSIEURS';
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
 
 export type DataAttribute = DataAttributeEntity;
 export type DataEntity = DataEntityEntity;
+export type DiagramLayoutResult = DiagramLayoutResultEntity;
 /** Renvoyée par la liste des relations : source/target sont des DataEntityRefEntity (sans les attributs imbriqués). */
 export type DataRelation = DataRelationDetailEntity;
 
@@ -95,5 +98,10 @@ export class DonneesService {
     return donneesControllerRemoveRelation(this.http, this.config.rootUrl, { relationId }).pipe(
       map(() => undefined),
     );
+  }
+
+  /** Dispose automatiquement les entités et déduit les relations clé étrangère manquantes. */
+  generateLayout(): Observable<DiagramLayoutResult> {
+    return donneesControllerGenerateLayout(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 }

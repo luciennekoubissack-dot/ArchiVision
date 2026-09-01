@@ -2209,3 +2209,832 @@ enrichir) : laissé de côté tant que ce n'est pas demandé explicitement.
   session de test antérieure (avant un redémarrage backend) ; confirmé
   qu'elles ne se reproduisent pas maintenant (contenu affiché correct,
   et `curl` direct sur les mêmes routes répond normalement).
+
+---
+
+## 2026-09-01 : lien entre l'analyse des écarts et les solutions (module Opportunités)
+
+Suite de l'entrée précédente : le module Opportunités & solutions
+(Phase E de l'ADM) ne pointait vers aucun écart identifié en amont, un
+`Solution` n'ayant aucun lien avec la matrice d'écarts. Objectif : rendre
+explicite quel(s) écart(s) une solution candidate adresse, dans les deux
+sens (depuis une solution, et depuis la matrice d'écarts elle-même).
+
+### Schéma (`schema.prisma`)
+
+Prisma ne supporte pas de clé étrangère polymorphe native (un
+`SolutionGap` peut pointer vers un `Objectif`, un `ElementArchimate`, une
+`DataEntity`, une `Application` ou un `TechComponent` selon le domaine).
+Plutôt que 5 colonnes FK nullables ou une fausse table mère commune, choix
+assumé d'un instantané dénormalisé : `SolutionGap { domaine: DomaineEcart,
+elementId: string, elementNom: string }`, sans intégrité référentielle
+depuis le côté élément source (une suppression de l'élément d'origine
+laisse un lien orphelin mais toujours affichable). Nouvel enum
+`DomaineEcart` (OBJECTIF/METIER/DONNEES/APPLICATIF/TECHNOLOGIQUE).
+Contrainte `@@unique([solutionId, domaine, elementId])` pour éviter les
+doublons. Migration `20260831165051_add_solution_gap_links`.
+
+### Backend (`opportunites/`)
+
+`SolutionService.updateGaps()` remplace tous les liens d'une solution en
+une transaction (`deleteMany` + `createMany`), même convention que
+`updateScores()` déjà en place. `SolutionService.listGaps()` sert la vue
+inverse : tous les écarts déjà adressés, toutes solutions confondues (sert
+au calcul de couverture côté Analyse des écarts). Route `GET
+/solutions/gaps` déclarée **avant** `GET /solutions/:id` dans le
+contrôleur (même piège Express déjà rencontré et corrigé ailleurs dans ce
+projet : une route littérale après une route `:id` se ferait avaler comme
+valeur de paramètre) — un test dédié vérifie explicitement que
+`solution.findUnique` n'est pas appelé sur cette route pour détecter une
+régression de ce type. Suite `solution.service.spec.ts` /
+`solution.controller.spec.ts` étendue en conséquence.
+
+### Frontend
+
+- `GapAnalysisService` (déjà extrait dans l'entrée précédente pour
+  `ecarts.component.ts`) exporte maintenant aussi
+  `DOMAIN_TO_DOMAINE_ECART`, la correspondance entre l'onglet de domaine
+  de l'UI et l'enum backend — évite de dupliquer cette table dans les deux
+  écrans qui en ont besoin.
+- `opportunites.component.ts` : nouveau sélecteur d'écarts par solution
+  (bouton « Écarts adressés » sur chaque ligne). Chaque ligne de la
+  matrice TOGAF est réduite à un ou plusieurs « candidats » sélectionnables
+  (le ou les éléments TO-BE visés, ou l'élément AS-IS seul pour un écart
+  Éliminé sans cible). Sélection multi-domaines cumulée dans un brouillon,
+  envoyée en un seul appel à l'enregistrement.
+- `ecarts.component.ts` : nouvelle colonne « Solution » sur la matrice
+  (badge Adressé/Non adressé) et un 5ᵉ indicateur de synthèse « Non
+  adressés par une solution », calculés à partir de
+  `SolutionService.listGaps()`.
+
+### Bug trouvé et corrigé pendant la vérification navigateur
+
+Le sélecteur d'écarts appelait `candidatesFor(gapsDomain)` directement
+dans le `*ngFor` du template. Angular réévalue une expression de méthode à
+chaque cycle de détection de changement ; comme `candidatesFor()`
+reconstruit un nouveau tableau (et de nouveaux objets) à chaque appel, et
+qu'aucun `trackBy` n'était fourni, Angular détruisait et recréait les
+cases à cocher à chaque cycle déclenché par l'événement `(change)`
+lui-même : la coche visuelle apparaissait un instant puis revenait à
+l'état précédent, et le tableau de sélection interne restait vide.
+Corrigé en calculant la liste de candidats une seule fois (propriété
+`gapsCandidates`, recalculée uniquement à l'ouverture ou au changement de
+domaine) et en ajoutant un `trackBy` par `elementId`. Ce type de piège
+(appel de méthode coûteux ou non idempotent directement dans un
+`*ngFor`/`*ngIf` de template) n'avait pas d'occurrence connue ailleurs
+dans le projet à ce jour, mais reste à surveiller.
+
+### Vérifié
+
+- Backend : suite complète du module `opportunites` (19/19), suite
+  complète `apps/api` (475/475 avant ce correctif de bug frontend, non
+  affectée par un changement purement Angular), `nest build` propre.
+- Frontend : `npm run typecheck`, `npm run build`, `npm run test:ci`
+  (163/163) propres après le correctif.
+- Navigateur : lien créé depuis « Externaliser le support N1 » vers
+  l'objectif « Digitaliser la gestion administrative », visible
+  immédiatement dans la fiche solution (« Écarts adressés ») et dans
+  Analyse des écarts (badge Adressé, compteur Non adressés passé à 0) ;
+  lien retiré ensuite pour ne pas polluer le jeu de données de
+  démonstration.
+
+---
+
+## 2026-09-01 : accès bloqué avant validation superadmin, panneau de revue, e-mail SMTP réel
+
+### 🔴 Sécurité : faille corrigée
+
+Depuis la refonte du workflow superadmin (voir 2026-08-06), le statut
+`EN_ATTENTE` d'une organisation ne bloquait plus rien : `POST /auth/register`
+([auth.service.ts](../apps/api/src/modules/auth/auth.service.ts)) connectait
+immédiatement l'utilisateur, aucun guard ni le login ne lisait le statut, et
+le commentaire du service l'assumait explicitement. N'importe qui pouvait
+donc s'inscrire et utiliser toute l'application sans revue humaine.
+
+Corrigé :
+
+- Nouveau guard global `OrganisationStatusGuard`
+  ([organisation-status.guard.ts](../libs/shared/src/guards/organisation-status.guard.ts)),
+  enregistré en 5ᵉ `APP_GUARD` après `JwtAuthGuard`
+  ([app.module.ts](../apps/api/src/app.module.ts)). Renvoie 403
+  (`code: ORGANISATION_NON_VALIDEE`) tant que `organisation.statut !== VALIDEE`.
+  Exemptions : routes `@Public()`, `SUPERADMIN`, et routes marquées
+  `@AllowPendingOrganisation()`
+  ([allow-pending-organisation.decorator.ts](../libs/shared/src/decorators/allow-pending-organisation.decorator.ts))
+  posé sur `GET /auth/me` et `GET /organisations/me` pour permettre au
+  frontend d'afficher un écran d'attente si une session est révoquée après
+  coup.
+- `login()` refuse aussi la connexion (403, même `code`) si l'organisation
+  n'est pas validée. Le `SUPERADMIN`, sans organisation, reste exempté.
+- `register()` n'ouvre plus de session : `setAuthCookies` retiré du
+  contrôleur, réponse réduite à `{ organisation, message }`
+  ([auth-response.entity.ts](../apps/api/src/modules/auth/entities/auth-response.entity.ts)).
+- `HttpExceptionFilter`
+  ([http-exception.filter.ts](../libs/shared/src/filters/http-exception.filter.ts))
+  propage désormais un champ `code` optionnel quand l'exception en fournit un.
+
+### Champs de revue rendus obligatoires
+
+`RegisterDto` ([register.dto.ts](../apps/api/src/modules/auth/dto/register.dto.ts)) :
+`secteur`, `pays`, `vision` passent de facultatifs à requis ; nouveau champ
+`ville` requis. Nouvelle colonne `Organisation.ville`
+([schema.prisma](../apps/api/prisma/schema.prisma), migration
+`20260901091014_add_organisation_ville`, nullable en base pour ne pas casser
+l'existant, obligation portée par le DTO et par le contrôle de complétude).
+
+Frontend inscription
+([register.component.ts](../apps/web/src/app/auth/register.component.ts)) :
+champ Ville ajouté, Secteur/Pays rendus obligatoires, textarea « Objectif »
+(= `vision`) déplacé de l'étape 2 à l'étape 1 pour regrouper toutes les
+informations de revue sous le gate `validateEntreprise()`. Après soumission,
+plus de redirection vers l'app : nouvelle page publique `/inscription-recue`
+([inscription-recue.component.ts](../apps/web/src/app/auth/inscription-recue.component.ts)).
+
+### Panneau de revue superadmin
+
+`AdminService.valider()`
+([admin.service.ts](../apps/api/src/modules/admin/admin.service.ts)) contrôle
+la complétude avant de valider : `nom, secteur, pays, ville, vision` non vides
++ un compte `ADMINISTRATEUR`. Sinon `BadRequestException` listant les champs
+manquants.
+
+Frontend
+([admin-organisations.component.ts](../apps/web/src/app/admin/admin-organisations.component.ts)) :
+le bouton « Détails » devient « Vérifier » sur les lignes `EN_ATTENTE` et
+ouvre un bloc de revue structuré (Nom, Localisation, Secteur, Responsable,
+Objectif) avec la liste des champs manquants. Bouton « Valider » désactivé
+tant que la revue est incomplète, « Rejeter » à côté. `auth.interceptor.ts`
+déconnecte proprement sur un 403 `ORGANISATION_NON_VALIDEE` hors route d'auth.
+
+### E-mail SMTP réel
+
+Nouveau `MailModule` / `MailService`
+([mail.service.ts](../apps/api/src/modules/mail/mail.service.ts)) sur
+`nodemailer`. Config via `.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
+`SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`). Repli automatique en mode simulé
+(`[MAIL:SIMULÉ]` journalisé) si `SMTP_HOST` est absent, pour ne pas casser le
+dev local / la CI / les tests. `valider()` envoie un e-mail contenant
+`<FRONTEND_ORIGIN>/login` ; `rejeter()` envoie une notification sans lien.
+
+### 🟡 Restant / non traité
+
+- Toujours aucune vérification d'identité réelle de l'entreprise (Kbis,
+  annuaire d'entreprises, double opt-in e-mail) : la revue superadmin reste
+  une relecture visuelle des informations auto-déclarées. À planifier si le
+  périmètre l'exige.
+- Le JWT ne porte pas le statut de l'organisation : le guard fait un
+  `findUnique` léger (une colonne) par requête tenant. Acceptable à cette
+  échelle ; à revoir si le volume de requêtes augmente fortement.
+
+### Vérifié
+
+- Backend : `nest build` propre ; suite complète `apps/api` 487/487
+  (nouveau `organisation-status.guard.spec.ts`, specs `auth` / `admin`
+  réécrites pour le nouveau comportement).
+- Frontend : `npm run typecheck` propre ; `npm run test:ci` 163/163 ; client
+  API régénéré (`npm run generate:api-client`).
+- Bout en bout contre Postgres : inscription sans `ville` → 400 ; inscription
+  complète → 201 `EN_ATTENTE` sans `accessToken` ; login du compte → 403
+  `ORGANISATION_NON_VALIDEE` ; login superadmin → 200 ; `valider` → 200
+  `VALIDEE` + e-mail (simulé) vers l'admin avec le lien `/login` ; re-login
+  du compte → 200 avec `accessToken`. Organisation de test supprimée ensuite
+  pour ne garder que K&B Groupe SARL.
+
+---
+
+## 2026-09-01 : le module Urbanisation s'aligne sur les autres, le POS revient dans son module
+
+### Constat
+
+Le module Urbanisation était le seul à ne pas suivre la structure commune
+des autres écrans métier (`donnees`, `technologie`, `architecture-metier`,
+`architecture-systeme`) : pas de question d'étape en tête, pas d'onglets,
+et surtout le diagramme généré (« POS ») vivait dans un module tiers
+(`vues`, aux côtés d'ArchiMate et de l'organigramme) alors que tous les
+autres modules embarquent leur diagramme comme un onglet interne. En
+prime, le rendu POS était une simple grille carrée des zones racines, sans
+rapport avec le gabarit d'urbanisation attendu (bandes Échange / Ressource
+& Support, colonnes Pilotage & Contrôle / Données transverses, cœur
+Opération).
+
+### Frontend
+
+- [urbanisation.component.ts](../apps/web/src/app/urbanisation/urbanisation.component.ts) :
+  passage à la structure commune. Question d'étape (`p.step-question`) +
+  trois onglets « Zones » / « Affectations » / « Plan d'occupation des
+  sols ». Les deux premiers reprennent à l'identique l'arbre Zone >
+  Quartier > Îlot et le formulaire d'affectation existants. Le troisième
+  embarque le diagramme généré avec le même patron que les autres écrans
+  de vue (bouton rafraîchir en icône, `app-download-menu` SVG/PNG,
+  conteneur `.svg-container`). Le plan est régénéré automatiquement après
+  toute création/suppression de zone ou affectation (`invalidatePos()`).
+- [vues.component.ts](../apps/web/src/app/vues/vues.component.ts) : l'onglet
+  « POS (urbanisation) » est retiré. `VueTab` se réduit à `archimate` /
+  `organigramme`, la dépendance `UrbanisationService` disparaît du module.
+  Le raccourci « Plan d'occupation des sols » de l'assistant pointait déjà
+  vers `/urbanisation`, il est donc désormais cohérent.
+
+### Backend
+
+[urbanisation-view.service.ts](../apps/api/src/modules/urbanisation/urbanisation-view.service.ts),
+méthode `generate()` réécrite : rendu figé du gabarit POS à cinq couches
+toujours toutes affichées. L'application remplit les couches
+automatiquement : chaque zone racine est rattachée à une couche via des
+mots-clés de son nom (`POS_LAYER_KEYWORDS`, comparaison sans accent et en
+minuscules), avec repli sur « Opération » pour toute zone non reconnue.
+Les zones d'Opération sont numérotées comme des quartiers. Les helpers
+existants (`renderNode`, `renderAppChips`, `gridCells`, comptages,
+état vide) et `generateComponents()` sont inchangés ; le contrat
+`UrbanisationVueEntity` (`svg` / `zoneCount` / `applicationCount`) ne
+bouge pas.
+
+### Limite assumée
+
+Le rattachement par mot-clé est heuristique : une zone au nom sans indice
+(« Zone 1 ») tombera dans Opération. Un champ `couche` explicite sur
+`ZoneUrbanisation` serait plus fiable mais impose une migration + la
+régénération du client API ; non retenu ici, à rouvrir si la répartition
+automatique se révèle trop approximative sur des données réelles.
+
+### Vérifié
+
+- Backend : `npm run typecheck` propre ; suite `apps/api` module
+  `urbanisation` 61/61 (3 nouveaux tests sur le gabarit POS et le
+  rattachement par mot-clé).
+- Frontend : `npx tsc -p tsconfig.app.json --noEmit` propre ;
+  `ng build` (development) propre ; specs web `urbanisation` 20/20.
+- Rendu : SVG de contrôle généré sur un jeu de zones représentatif
+  (Échanges partenaires, Pilotage décisionnel, Ventes, Production,
+  Référentiels de données, Support RH et Finance) : les six zones se
+  répartissent dans les bonnes couches, Ventes/Production numérotées 1 et
+  2 au centre, débordement d'applications « +1 autre » conservé.
+
+---
+
+## 2026-09-01 (suite) : nouvel audit de sécurité pré-déploiement
+
+Audit demandé explicitement par l'utilisateur pour avoir confiance dans la
+sécurité de l'application au moment du déploiement. Portée : revue des
+correctifs de sécurité déjà tracés dans ce journal (aucune régression
+trouvée), revue ciblée du chantier en cours non commité au moment de
+l'audit (blocage d'accès avant validation superadmin, e-mail SMTP réel,
+voir entrée précédente), `npm audit` sur les dépendances de production, et
+les artefacts de déploiement (`Dockerfile.api`, `docker-compose.yml`)
+jamais revus jusqu'ici dans ce journal.
+
+### 🔴 Sécurité : trouvé et corrigé
+
+1. **`nodemailer@6.10.1` : deux failles hautes gravité.** `npm audit`
+   révèle que la version installée du tout nouveau `MailModule`
+   ([mail.service.ts](../apps/api/src/modules/mail/mail.service.ts))
+   est concernée par
+   [GHSA-p6gq-j5cr-w38f](https://github.com/advisories/GHSA-p6gq-j5cr-w38f)
+   (l'option `raw` au niveau message contourne
+   `disableFileAccess`/`disableUrlAccess`, lecture de fichier arbitraire et
+   SSRF, CVSS 7.1) et
+   [GHSA-rcmh-qjqh-p98v](https://github.com/advisories/GHSA-rcmh-qjqh-p98v)
+   (déni de service par récursion dans l'analyseur d'adresses, CVSS 7.5).
+   Le code actuel n'utilise pas l'option `raw` et le destinataire (`to`)
+   provient toujours d'une adresse validée par `@IsEmail()` en base, jamais
+   d'une entrée libre au moment de l'envoi — donc pas d'exploitation
+   trouvée aujourd'hui — mais la dépendance elle-même reste vulnérable, et
+   un futur usage de `raw` ou un contournement de la validation rendrait
+   la faille directement exploitable. Corrigé : mise à jour vers
+   `nodemailer@9.1.0` (`@types/nodemailer@7`), seule version corrigeant les
+   deux avis. Migration majeure mais sans impact sur l'usage réduit qu'en
+   fait ce projet (`createTransport`/`sendMail` avec `to`/`from`/`subject`/`text`).
+
+### 🟠 Important : trouvé et corrigé
+
+2. **`Dockerfile.api` ne construisait plus l'image du tout** (bug
+   préexistant, découvert en vérifiant le correctif suivant, sans lien
+   avec le chantier du jour). `RUN npx prisma generate` échouait
+   systématiquement à l'étape `[builder 8/9]` : la CLI Prisma 7 installée
+   (`prisma@7.9.0`) ne lit plus le champ historique
+   `package.json#prisma.schema` (utilisé avec succès en local tout au long
+   de ce journal, mais uniquement parce que les commandes y sont lancées
+   depuis `apps/api`, où `./prisma/schema.prisma` correspond à
+   l'emplacement par défaut) ; sans argument `--schema` explicite et hors
+   des emplacements par défaut, elle échoue. Un déploiement Docker de
+   l'image telle quelle était donc impossible. Corrigé : `--schema
+   apps/api/prisma/schema.prisma` explicite sur la commande. Reconstruction
+   complète vérifiée (voir plus bas).
+3. **Conteneur API exécuté en `root`** (`Dockerfile.api`) : aucune
+   directive `USER`, alors que l'image `node:22-alpine` fournit déjà un
+   utilisateur non privilégié (`node`, uid 1000). Corrigé : `RUN mkdir -p
+   apps/api/uploads && chown -R node:node /app` puis `USER node` en fin
+   d'étape d'exécution (le dossier d'upload doit lui appartenir, l'app y
+   écrit les logos à l'exécution).
+4. **`docker-compose.yml` : `FRONTEND_ORIGIN` avait un repli silencieux**
+   (`${FRONTEND_ORIGIN:-http://localhost:4201}`), contrairement à
+   `JWT_SECRET`/`POSTGRES_PASSWORD` qui utilisent `:?` pour refuser de
+   démarrer si absents. Ce repli neutralisait exactement la protection
+   apportée par `requireFrontendOrigin()` côté code (suite du 2026-08-31) :
+   le conteneur recevait toujours une valeur, donc le contrôle de code ne
+   voyait jamais l'absence de configuration. Pas de faille d'ouverture
+   (le repli reste restrictif, pas un joker `*`), mais un oubli de
+   configuration se traduirait par un frontend silencieusement bloqué
+   plutôt que par un conteneur qui refuse de démarrer avec un message
+   clair. Corrigé : `:?` comme les deux autres secrets requis.
+5. **`docker-compose.yml` ne transmettait aucune variable `SMTP_*` au
+   service `api`** : le tout nouveau `MailService` y basculerait donc
+   systématiquement en mode simulé (organisations validées/rejetées sans
+   jamais recevoir l'e-mail réel), quel que soit le contenu du `.env` de
+   l'opérateur, simplement parce que les variables n'étaient pas
+   déclarées dans le bloc `environment:`. Corrigé : `SMTP_HOST`,
+   `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`
+   ajoutées avec repli explicite (`:-`, ces variables restent facultatives
+   par conception du service).
+6. **Port Postgres publié sur toutes les interfaces réseau de l'hôte**
+   (`'5433:5432'`) : le conteneur `api` atteint Postgres via le réseau
+   Docker interne (`postgres:5432`) et n'a pas besoin de ce port publié
+   sur l'hôte ; en production, sur une machine avec une IP publique et
+   sans pare-feu, ce mapping expose la base directement à internet, avec
+   pour seule protection le mot de passe Postgres. Corrigé : liaison
+   explicite à `127.0.0.1:5433:5432`.
+7. **`RegisterDto` : aucune borne de taille sur les 7 tableaux
+   d'amorçage optionnels** (`objectifs`, `partiesPrenantes`,
+   `bpmnProcessus`, `capacitesMetier`, `acteurs`, `dataEntities`,
+   `applications`, `techComponents`) — `/auth/register` est `@Public()`
+   et limité en débit (`@Throttle`), mais un payload volumineux et
+   individuellement valide pouvait insérer un nombre arbitraire de lignes
+   en une seule inscription (chaque tableau est inséré via `createMany`,
+   donc pas de boucle séquentielle, mais toujours sans plafond). Gravité
+   réelle limitée par la limite de taille de corps par défaut
+   d'Express/body-parser, mais correctif gratuit. Corrigé :
+   `@ArrayMaxSize(50)` sur les 7 tableaux.
+
+### 🟡 Dette, non traité
+
+- **`npm audit` signale aussi `prisma` (CLI), `@prisma/dev`,
+  `@prisma/config`, `valibot`, `brace-expansion`, `deepmerge-ts`,
+  `fast-uri`, `find-my-way`, `js-yaml`** en sévérité haute/modérée : tous
+  transitifs de `prisma`, une dépendance de développement (CLI, jamais
+  copiée dans l'image d'exécution — `Dockerfile.api` fait `npm ci
+  --omit=dev` à l'étape runtime). Aucune exposition en production
+  aujourd'hui ; à mettre à jour à l'occasion plutôt qu'en urgence.
+- **Aucune étape `prisma migrate deploy` dans `Dockerfile.api` ou
+  `docker-compose.yml`** : les migrations doivent être appliquées
+  manuellement avant/pendant le déploiement, ce qui n'est documenté nulle
+  part (`docs/stack.md` ne mentionne pas le sujet). Pas une faille de
+  sécurité, mais un point opérationnel à trancher explicitly avant le
+  premier vrai déploiement (étape CI dédiée, ou commande de démarrage du
+  conteneur qui l'inclut).
+- Points déjà connus et toujours assumés comme dette (inchangés) :
+  pagination des `findMany` sans tri par défaut documenté au-delà de ce
+  qui existe, absence de vérification d'identité réelle de l'entreprise à
+  l'inscription (notée dans l'entrée précédente), doublon de requêtes
+  `list()`/`listPaginated()` dans deux composants (noté le 2026-08-31).
+
+### Confirmé sain (revue ciblée, pas de régression)
+
+- `OrganisationStatusGuard` (nouveau, voir entrée précédente) : défense en
+  profondeur correcte — vérifié en profondeur ligne par ligne, pas
+  seulement confiance dans l'entrée précédente. Refuse par défaut, lit le
+  statut en base à chaque requête (pas seulement au login), exemptions
+  limitées à `@Public()`/`SUPERADMIN`/`@AllowPendingOrganisation()`. Le
+  message d'erreur distinct pour un compte non validé n'ouvre pas
+  d'énumération de comptes : il ne se déclenche qu'après un mot de passe
+  correct (la comparaison à temps constant reste avant ce contrôle dans
+  `login()`).
+- E-mails transactionnels envoyés en `text` (jamais `html`) : aucune
+  injection HTML possible via `organisationNom`, quel que soit son
+  contenu. Destinataire toujours recherché en base par rôle, jamais pris
+  tel quel dans le corps de la requête au moment de l'envoi : pas
+  d'injection de destinataire.
+- `main.ts` : `helmet`, `compression`, préfixe `/api/v1`, `ValidationPipe`
+  strict, filtre d'exceptions global, CORS à origine unique avec
+  identifiants, Swagger limité en débit — tout confirmé en place et
+  inchangé depuis le 2026-08-31.
+- `.env` correctement ignoré par git ; `.env.example` déjà à jour avec les
+  nouvelles variables `SMTP_*`, aucune valeur réelle.
+- Pagination (`PaginationQueryDto`) : `pageSize` borné à 200, pas de
+  risque d'épuisement de ressources par une page démesurée.
+- Upload de logo : allowlist MIME (PNG/JPEG/WEBP, SVG toujours exclu),
+  limite de taille 5 Mo, nom de fichier régénéré en UUID côté serveur —
+  inchangé.
+
+### Vérifié
+
+- Backend : `tsc -p apps/api/tsconfig.app.json --noEmit` propre après la
+  mise à jour `nodemailer` et l'ajout des `@ArrayMaxSize` ; suite complète
+  `apps/api` 489/489.
+- `npm audit` (prod) : 0 vulnérabilité restante sur les dépendances
+  d'exécution après la mise à jour `nodemailer` (les 8 restantes sont
+  toutes dev-only, cf. plus haut).
+- Image Docker reconstruite de bout en bout après les deux correctifs
+  (`--schema` + non-root) : build complet réussi, conteneur démarré avec
+  les variables minimales requises, `whoami`/`id` dans le conteneur
+  confirment l'exécution en `node` (uid 1000, non root), logs de démarrage
+  propres (connexion Postgres, bascule mode simulé du `MailService` en
+  l'absence de `SMTP_HOST`, comme conçu), `GET /api/v1/health` répond 200.
+  Image et conteneur de test supprimés ensuite.
+
+### Note
+
+Ce chantier de blocage superadmin/e-mail (entrée précédente) était en
+cours dans une session parallèle au moment de cet audit : les fichiers
+listés par `git status` ont continué à grandir pendant l'audit
+(composants frontend `register.component.ts`, `admin-organisations.component.ts`,
+`inscription-recue.component.ts`, `auth.interceptor.ts`, régénération du
+client API). Cet audit porte sur l'état du code au moment de chaque
+vérification citée ci-dessus ; un audit de la partie frontend de ce même
+chantier reste à faire séparément une fois cette session parallèle
+stabilisée.
+
+---
+
+## 2026-09-01 (suite) : assistant « Révision » sans diagramme, diagramme de vision pré-rempli
+
+### ⚪ UX
+
+**Aucun diagramme dans l'assistant « Révision » (`/assistant`).** Les étapes 2 à
+6 du `WizardComponent`
+([wizard.component.ts](../apps/web/src/app/assistant/wizard.component.ts))
+embarquaient les composants de feature complets, diagrammes compris (BPMN,
+ArchiMate SVG, diagramme de classe, diagramme de composants, diagramme de
+déploiement). Ajout d'un `@Input() hideDiagram` (défaut `false`, aucun impact
+sur les pages dédiées) à :
+
+- [architecture-metier.component.ts](../apps/web/src/app/architecture-metier/architecture-metier.component.ts)
+  (masque les mainTabs BPMN/ArchiMate + le sous-onglet Diagramme, force
+  `mainTab = 'archimate'`, garde Capacités/Éléments/Relations),
+- [applications.component.ts](../apps/web/src/app/architecture-systeme/applications.component.ts)
+  (masque « Diagramme de composants » et « Diagramme d'architecture applicative »
+  + skip des générations SVG à l'init),
+- [donnees.component.ts](../apps/web/src/app/donnees/donnees.component.ts)
+  (masque « Diagramme de classe »),
+- [technologie.component.ts](../apps/web/src/app/technologie/technologie.component.ts)
+  (masque « Diagramme de déploiement »),
+- [vision/bpmn.component.ts](../apps/web/src/app/vision/bpmn.component.ts)
+  (masque le panneau détail d'un processus qui contient l'éditeur BPMN).
+
+`WizardComponent` passe `[hideDiagram]="true"` sur ces 5 composants.
+
+**Diagramme de vision pré-rempli automatiquement.** L'onglet « Diagramme de
+vision » de
+[vision.component.ts](../apps/web/src/app/vision/vision.component.ts) s'ouvrait
+vide. À la première ouverture, si les 8 blocs sont vides, il est désormais
+pré-rempli à partir des données déjà saisies via un helper pur déterministe
+[vision-canvas.prefill.ts](../apps/web/src/app/vision/vision-canvas.prefill.ts)
+(pas d'IA) : `needs` ← problèmes à résoudre ; `businessGoals` ← vision +
+objectifs ; `targetGroup` ← parties prenantes ; `competitors` ← parties
+prenantes de rôle « concurrent » ; `product` ← description sinon secteur. Un
+seul `PATCH /vision-canvas` ; l'utilisateur modifie ensuite librement
+(persistance au blur déjà en place) ; pas de re-remplissage au rechargement
+(le canevas n'est plus vide).
+
+### Vérifié
+
+- Frontend : `npm run typecheck` propre ; `npm run test:ci` 167/167 (nouveau
+  `vision-canvas.prefill.spec.ts`, 4 cas).
+- Navigateur : parcours des étapes 2 à 6 de `/assistant` → aucun onglet ni
+  aperçu « Diagramme », listes toujours éditables ; `/architecture-metier`
+  autonome → diagrammes toujours présents (non-régression) ; sur un canevas de
+  vision vidé (org K&B, restauré ensuite), l'ouverture de l'onglet remplit
+  Target Group / Needs / Product / Business Goals depuis les données de
+  l'organisation, un seul PATCH, aucune erreur console, pas de re-remplissage
+  après rechargement.
+
+## 2026-09-01 (suite 2) : champ « étapes » sur un processus BPMN et proposition de diagramme
+
+### Ce qui a été fait
+
+Ajout d'un champ **étapes** (texte libre, une étape par ligne) sur un processus
+BPMN. À la création, si le champ est renseigné, l'application génère une
+**proposition** de diagramme que l'utilisateur ajuste ensuite dans l'éditeur
+Konva existant.
+
+- **Schéma** : nouvelle colonne `etapes TEXT` nullable sur `BpmnProcessus`
+  (migration `20260901120000_add_bpmn_processus_etapes`). Conservée pour
+  permettre une régénération ultérieure.
+- **Génération déterministe, sans IA** :
+  [bpmn-diagramme-proposal.ts](../apps/api/src/modules/bpmn/bpmn-diagramme-proposal.ts)
+  est un module pur. Règles : un événement de début et un de fin encadrent
+  toujours le flux ; chaque ligne devient une tâche, sauf si elle ressemble à
+  une décision (« Si … », « … ? ») → passerelle exclusive ; la nature de la
+  tâche (utilisateur / service / envoi / réception) est devinée par mots-clés ;
+  les éléments sont reliés séquentiellement dans l'ordre de saisie ; puces et
+  numéros de liste retirés ; positions calculées en lignes qui se replient au-
+  delà de 1000 px ; maximum 40 étapes.
+- **API** : `POST /bpmn-processus/:id/generer-diagramme` (ADMIN/ARCHITECTE)
+  crée les éléments et flux dans une transaction et **refuse** (400) si le
+  diagramme contient déjà des éléments, pour ne jamais écraser un travail
+  d'édition. `BpmnService.create` appelle cette génération quand `etapes` est
+  fourni.
+- **Frontend** : `bpmn.component.ts` ajoute une zone de texte « Étapes » dans
+  les popovers de création et de modification ; après création avec étapes, le
+  processus est sélectionné pour afficher la proposition ; bouton « Régénérer
+  depuis les étapes » dans le panneau détail (confirmation + rechargement du
+  canevas via `BpmnCanevasComponent.reload()`), masqué en mode assistant
+  « Révision » (`hideDiagram`). Client généré (`api-client`) étendu à la main
+  (nouveau `bpmnControllerGenererDiagramme`, champ `etapes` sur les modèles),
+  à re-synchroniser au prochain `npm run generate:api-client`.
+
+### Point de vigilance
+
+- 🟡 La proposition est volontairement linéaire : une étape « Si … » devient une
+  passerelle mais garde un seul flux entrant et un seul sortant, sans créer les
+  branches. L'utilisateur doit tracer les branches à la main. Assumé pour
+  garder la génération prévisible ; à réévaluer si le besoin de branches
+  automatiques se confirme.
+- 🟡 Client `api-client` édité à la main (pas régénéré depuis le contrat
+  OpenAPI faute de serveur + BDD au moment du commit).
+
+### Vérifié
+
+- Backend : `npm run typecheck` propre ; `npx jest bpmn` 49/49 (nouveaux
+  `bpmn-diagramme-proposal.spec.ts` 8 cas, + génération à la création / refus
+  si diagramme peuplé / 403 superadmin dans les specs service et contrôleur).
+- Frontend : `npm run typecheck` propre ; `bpmn.service.spec.ts` 12/12
+  (nouveau cas `generer-diagramme`).
+- Migration appliquée sur la BDD de dev (`prisma migrate deploy`).
+
+---
+
+## 2026-09-01 (suite 3) : nouvel audit de sécurité, régénération de diagramme BPMN comprise
+
+Nouvel audit demandé par l'utilisateur, portant sur ce qui s'est ajouté
+depuis le précédent (suite 1) : le module de génération de proposition de
+diagramme BPMN (`bpmn-diagramme-proposal.ts`, entrée précédente) et le
+pré-remplissage du diagramme de vision (`vision-canvas.prefill.ts`).
+
+### Confirmé sain
+
+- **`POST /bpmn-processus/:id/generer-diagramme`** : `@Roles(ADMINISTRATEUR,
+  ARCHITECTE)`, isolation multi-tenant standard du projet
+  (`processus.organisationId !== organisationId` → 404, pas 403, pour ne
+  pas confirmer l'existence d'un id d'une autre organisation). Double
+  plafond sur le texte source : `@MaxLength(5000)` en entrée DTO
+  ([create-bpmn-processus.dto.ts](../apps/api/src/modules/bpmn/dto/create-bpmn-processus.dto.ts))
+  et `MAX_ETAPES = 40` lignes dans
+  [bpmn-diagramme-proposal.ts](../apps/api/src/modules/bpmn/bpmn-diagramme-proposal.ts)
+  (l'un des deux suffirait, les deux sont présents). Module de construction
+  pur (aucun accès DB, aucun `eval`, pas d'appel externe) : la seule sortie
+  est une liste de nœuds/liens en mémoire.
+- Le nom de chaque nœud généré (texte utilisateur quasi brut, seules les
+  puces/numéros sont retirés) rejoint le même chemin de rendu SVG déjà
+  audité (`bpmn-view.service.ts`, `wrap()`/`escape()` sur chaque `<text>`) :
+  aucun nouveau point d'injection, la fonction d'échappement n'a pas été
+  contournée par ce nouveau générateur.
+- `vision-canvas.prefill.ts` (frontend) : pure concaténation de chaînes
+  côté client pour préremplir un formulaire déjà validé par son propre DTO
+  à l'enregistrement ; aucune surface nouvelle.
+- Dette de sécurité du 2026-09-01 (suite 1) toujours en place et non
+  régressée : `nodemailer@9.1.0`, `Dockerfile.api` non-root avec `--schema`
+  explicite, `docker-compose.yml` (origine/SMTP/port Postgres/migration),
+  `RegisterDto` avec `@ArrayMaxSize(50)`.
+- `npm audit` (prod) : toujours 0 vulnérabilité d'exécution ; les
+  vulnérabilités dev-only restantes (CLI `prisma` et ses transitifs) sont
+  identiques à l'audit précédent, décision de ne pas forcer la mise à jour
+  toujours valable (le correctif proposé reste une régression majeure).
+
+### Rien de nouveau à corriger
+
+Aucun point 🔴 ni 🟠 trouvé sur ce qui a été ajouté depuis le dernier
+audit. Les points 🟡 déjà notés par la session parallèle elle-même dans
+l'entrée précédente (proposition volontairement linéaire sans branches,
+client `api-client` édité à la main faute de régénération) sont des choix
+de conception assumés et documentés au moment du commit, pas des angles
+morts de sécurité.
+
+### Vérifié
+
+- Backend : suite complète `apps/api` 504/504 (contre 489 à l'audit
+  précédent : 15 tests nets ajoutés par le chantier BPMN).
+- `npm audit --omit=dev` : 0 haute/critique sur les dépendances
+  d'exécution, confirmé une seconde fois après les nouveaux ajouts.
+
+## 2026-09-01 (suite 4) : correctif UX « étapes ajoutées mais diagramme vide »
+
+### 🟠 Écart de comportement remonté par l'utilisateur
+
+Ajouter des étapes à un processus **existant** via « Modifier » enregistrait le
+texte sans construire le diagramme : la génération n'était câblée qu'à la
+création. Vérifié en base (processus « Analyse des besoins du client » :
+`etapes` peuplé, `elementCount = 0`). Le générateur lui-même est sain
+(rejoué à la main contre la vraie base via l'adaptateur `PrismaPg` : 9 nœuds
++ 8 flux créés sans erreur, transaction interactive OK).
+
+### Corrections
+
+- `BpmnService.update` déclenche désormais la même génération que `create`
+  quand `etapes` est renseigné **et** que le diagramme est encore vide
+  (`bpmnElement.count === 0`), pour ne jamais écraser un diagramme édité.
+- [bpmn.component.ts](../apps/web/src/app/vision/bpmn.component.ts) :
+  - `saveEdit` force le rechargement du canevas (`BpmnCanevasComponent.reload()`)
+    après enregistrement, sinon une proposition générée par cette étape
+    n'apparaissait qu'au rechargement de la page ;
+  - le bouton du panneau détail s'intitule « Générer le diagramme depuis les
+    étapes » quand le diagramme est vide, « Régénérer… » sinon ;
+  - message trompeur retiré : l'ancien texte de confirmation demandait de
+    « supprimer d'abord les étapes existantes » (confusion étapes-texte /
+    éléments-plan). Sur un diagramme vide la génération est directe ; sur un
+    diagramme peuplé, un message clair invite à vider le plan d'abord.
+
+### Vérifié
+
+- `npx jest bpmn` 52/52 ; `bpmn.service.spec.ts` (web) 12/12 ; typecheck
+  backend et frontend propres.
+- Génération rejouée en base : le processus concerné a maintenant 9 éléments
+  et 8 flux.
+
+## 2026-09-01 (suite 5) : génération des passerelles (décisions, boucles, parallèles)
+
+### Ce qui a été fait
+
+Le générateur ne faisait qu'une chaîne linéaire : une étape « Si… » devenait
+une passerelle mais sans branche. Il comprend désormais une petite syntaxe
+d'écriture, toujours déterministe et sans IA.
+
+- **Réécriture de**
+  [bpmn-diagramme-proposal.ts](../apps/api/src/modules/bpmn/bpmn-diagramme-proposal.ts)
+  en deux passes : découpage en blocs (étape simple, décision, parallèle) puis
+  construction d'un graphe nœuds + liens.
+  - **Décision** : ligne finissant par « ? » (ou « Si… », « Selon… ») suivie de
+    branches « `= libellé : étape ; étape` ». Produit une passerelle exclusive
+    de divergence, un flux libellé par branche, et une passerelle de fusion
+    automatique ; la première ligne sans « = » est le point de convergence.
+  - **Boucle** : une étape de branche « `→ "Nom d'une étape déjà définie"` »
+    crée un flux de retour (rapproché par nom normalisé) au lieu d'un doublon.
+  - **Parallèle** : ligne « En parallèle : » + branches « = » → passerelle
+    parallèle (divergence + jonction).
+  - Placement **en couches** (profondeur = plus long chemin depuis « Début »,
+    flux de retour ignorés ; empilement vertical par ordre de création) au lieu
+    de la rangée unique.
+  - Garde-fous : décision/parallèle à moins de deux branches, branche « = »
+    sans en-tête, retour vers une étape inconnue → `BadRequestException` avec
+    message clair. `MAX_ETAPES` porté à 60 (les branches ajoutent des nœuds).
+- `PropositionDiagramme.liens` passe de `[source, cible]` à
+  `{ source, cible, label? }` ; `BpmnService` persiste `label` sur `BpmnFlow`.
+- [bpmn.component.ts](../apps/web/src/app/vision/bpmn.component.ts) : le champ
+  « Étapes » (création et modification) documente la syntaxe via un bloc
+  `<details>` repliable et un exemple de placeholder avec décision, branches et
+  boucle.
+- Aucune migration (le rendu SVG et l'éditeur Konva affichaient déjà les
+  libellés de flux et respectaient les positions enregistrées).
+
+### Point de vigilance
+
+- 🟡 Pas de décision imbriquée en v1 (une branche qui contient elle-même une
+  ligne « ? »). Documenté, choix assumé.
+- 🟡 Le placement en couches empile les branches par ordre de création sans
+  minimiser les croisements : lisible mais parfois à réajuster à la main sur
+  les processus très ramifiés. Le résultat reste une proposition.
+
+### Vérifié
+
+- `npx jest bpmn` 59/59 (spec du générateur portée à 15 cas : branches
+  libellées + fusion, découpage « ; », boucle « → », passerelle parallèle,
+  cohérence des couches, rejets). `bpmn.service.spec.ts` (web) 12/12.
+  Typecheck backend et frontend propres.
+- Bout en bout contre la vraie base (adaptateur `PrismaPg`) : un processus
+  avec décision + boucle + parallèle génère 14 éléments, les flux « Oui »/
+  « Non » portent leur libellé, le flux de retour pointe vers l'étape existante,
+  la passerelle parallèle diverge puis converge. Processus de test remis dans
+  son état initial ensuite.
+
+## 2026-09-01 (suite 6) : conformité UML du diagramme de déploiement
+
+### Contexte
+
+Vérification de la notation du diagramme de déploiement
+([technologie-canevas.component.ts](../apps/web/src/app/technologie/technologie-canevas.component.ts))
+contre UML 2.5 (OMG formal/2017-12-05, clause 19 « Deployments ») et
+uml-diagrams.org.
+
+### 🟠 Écarts trouvés et corrigés
+
+- **Mot-clé de stéréotype** : `«execution environment»` (deux mots) → le
+  mot-clé UML normatif est `«executionEnvironment»` (un seul mot, casse de la
+  métaclasse). Corrigé pour CLOUD / BASE_DE_DONNEES / MIDDLEWARE.
+- **Sens de la dépendance «deploy»** : la flèche allait du Nœud vers
+  l'Artefact. UML 2.4+ : la dépendance de déploiement va de l'Artefact
+  (`client`) vers la cible de déploiement (`supplier` = le Nœud). Flèche
+  ré-orientée Artefact → Nœud.
+- **Pointe de flèche** : `Konva.Arrow` traçait une pointe pleine (triangle).
+  Une dépendance UML se termine par une pointe **ouverte** (en V). Remplacé
+  par un trait pointillé + chevron ouvert (`buildDeployDependency`).
+
+### Déjà conforme (inchangé)
+
+- Nœud = boîte 3D en perspective ; une boîte sans mot-clé = Nœud générique.
+- Application déployée = **Artefact** (icône document à coin plié + `«artifact»`),
+  et non l'icône Composant à encoches. Le code le soulignait déjà.
+- `«device»` pour SERVEUR / RESEAU (équipement matériel, ex. serveur, switch) ;
+  `«executionEnvironment»` pour les environnements logiciels.
+
+### 🟡 Limite assumée
+
+- Pas de **chemin de communication** entre nœuds (association trait plein,
+  éventuellement `«TCP/IP»`...) : le modèle ne relie pas les `TechComponent`
+  entre eux, seulement application → composant. Élément UML optionnel ;
+  documenté dans l'en-tête du canevas. À ouvrir si le besoin se confirme
+  (schéma + migration + interface).
+
+### Vérifié
+
+- `npm run typecheck` (frontend) propre ; tests web `technologie` 7/7.
+- Revue manuelle du rendu Konva (nœud, artefact, dépendance) ; pas de
+  vérification navigateur en direct (serveur de dev d'une autre session sur le
+  port 4201).
+
+---
+
+## 2026-09-01 (suite 2) : génération automatique de la disposition des diagrammes
+
+### ⚪ UX / ergonomie
+
+Les 4 éditeurs Konva (diagramme de classe, diagramme de composants, diagramme
+d'architecture applicative, diagramme de déploiement) affichaient une simple
+pile d'éléments non positionnés, jamais persistée, tant que l'utilisateur ne
+déplaçait pas chaque boîte à la main. Le canevas global et le BPMN avaient déjà
+une génération ; ces 4-là non.
+
+Ajout, sur le modèle de `ArchimateLayoutService.generateAndPersist` :
+
+- **API** : util partagé
+  [diagram-layout.util.ts](../apps/api/src/common/diagram-layout.util.ts)
+  (`computeFlowGrid`, `computeLaneGrid`) + une route
+  `POST .../generate-layout` par module
+  ([donnees-layout.service.ts](../apps/api/src/modules/donnees/donnees-layout.service.ts),
+  [applications-layout.service.ts](../apps/api/src/modules/urbanisation/applications-layout.service.ts),
+  [architecture-applicative-layout.service.ts](../apps/api/src/modules/architecture-applicative/architecture-applicative-layout.service.ts),
+  [technologie-layout.service.ts](../apps/api/src/modules/technologie/technologie-layout.service.ts)).
+  Chaque service lit les éléments de l'organisation, calcule une grille (ou des
+  couloirs par type pour l'archi applicative) et persiste `positionX/positionY`
+  en une transaction. Réponse commune
+  [DiagramLayoutResultEntity](../apps/api/src/common/entities/diagram-layout.entity.ts).
+- **Inférence de liens (diagramme de classe uniquement)** :
+  [donnees-relations.util.ts](../apps/api/src/modules/donnees/donnees-relations.util.ts)
+  déduit les `DataRelation` manquantes à partir des attributs de type clé
+  étrangère (`xId`, `x_id`, `idX`, `id_x`, `xRef` ; singulier/pluriel ;
+  insensible casse/accents ; pas de doublon avec une relation existante). Aucune
+  inférence pour les 3 autres diagrammes : leurs liens (échanges, flux,
+  déploiements) sont déjà des données de première classe.
+- **Frontend** : chaque `*-canevas.component.ts` appelle `generateLayout()`
+  automatiquement à la première ouverture quand aucune position n'est
+  enregistrée (`every(e => e.positionX == null)`), et expose un bouton
+  « Réorganiser le diagramme » (confirmation si des positions existent, comme
+  `/canevas`). L'appel est lancé **avant** `render()` pour ne pas être bloqué
+  par une exception de rendu Konva (canevas de taille 0 dans un onglet masqué).
+  Nouvelles méthodes de service `generateLayout()` + client API régénéré.
+
+### Vérifié
+
+- API : `nest build` propre ; `npm test` 540/540 (nouvelles suites
+  `diagram-layout.util`, `donnees-relations.util`, `*-layout.service`,
+  `*-layout` HTTP 200/403).
+- Frontend : `npm run typecheck` propre ; `npm run test:ci` 172/172.
+- Navigateur (org K&B) : ouverture d'un onglet diagramme sans positions
+  enregistrées → `POST .../generate-layout` automatique, positions persistées
+  (grille pour données/composants/déploiement, couloirs par type pour l'archi
+  applicative), aucune ré-exécution au rechargement ; bouton « Réorganiser »
+  fonctionnel sur les 4 diagrammes avec confirmation ; K&B n'ayant aucun
+  attribut de type clé étrangère, 0 relation déduite (pas de faux positif).
+  `/canevas` global et BPMN inchangés.
+
+## 2026-09-01 (suite 7) : revue de conformité des autres diagrammes
+
+Après le diagramme de déploiement (suite 6), passage en revue de tous les
+autres diagrammes contre leur norme.
+
+### Conformes, inchangés
+
+- **BPMN** (processus) : flux de séquence = trait plein + pointe pleine ;
+  passerelles au bon losange ; conforme BPMN 2.0 (déjà audité 08-24 et 09-01).
+- **ArchiMate** (métier / motivation) : Assignation (disque plein source +
+  flèche pleine cible), Composition (losange plein côté tout), Réalisation
+  (trait tireté + triangle creux), Association (trait nu) : conforme
+  ArchiMate 3.x (déjà audité 08-24).
+- **Diagramme d'architecture applicative** : diagramme en couches maison
+  (gabarit fourni), pas de norme graphique unique ; cohérent.
+- **Plan d'occupation des sols** (urbanisation) : cadastre à 5 couches façon
+  urbanisation du SI (Longépé) ; conforme à cette convention.
+- **Organigramme** (module Service) : arbre hiérarchique, pas une notation
+  normée.
+
+### 🟠 Écarts trouvés et corrigés
+
+- **Diagramme de classe** (données),
+  [donnees-canevas.component.ts](../apps/web/src/app/donnees/donnees-canevas.component.ts)
+  et [donnees.component.ts](../apps/web/src/app/donnees/donnees.component.ts) :
+  les cardinalités utilisaient « N » (notation entité-association de Chen) au
+  lieu de « * » (multiplicité UML), et les libellés contenaient un tiret
+  cadratin. Corrigé : extrémités `1` / `*`, libellés
+  « un à plusieurs (1..*) »... sans tiret cadratin.
+- **Diagramme de composants** (architecture système),
+  [applications-canevas.component.ts](../apps/web/src/app/architecture-systeme/applications-canevas.component.ts) :
+  les échanges étaient tracés en connecteur « boule / réceptacle » (interface
+  fournie / requise), avec la boule (fournie) côté source et le réceptacle
+  (requis) côté cible, soit l'inverse du sens naturel « la source appelle la
+  cible ». Surtout, le modèle ne nomme aucune interface : ce connecteur
+  affichait une précision inexistante. Remplacé par une **dépendance UML
+  orientée** : trait pointillé, pointe ouverte en V, source → cible.
+
+### Vérifié
+
+- `npm run typecheck` (frontend) propre ; tests web `donnees` 12/12,
+  `architecture-systeme` 9/9, `technologie` 7/7.
+- Revue de code du rendu Konva / SVG de chaque diagramme. Pas de contrôle
+  navigateur en direct (port 4201 occupé par une autre session).

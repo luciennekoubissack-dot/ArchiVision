@@ -6,6 +6,7 @@ import { RoleUtilisateur, TypeZone } from '@prisma/client';
 import { UrbanisationController } from './urbanisation.controller';
 import { UrbanisationService } from './urbanisation.service';
 import { UrbanisationViewService } from './urbanisation-view.service';
+import { ApplicationsLayoutService } from './applications-layout.service';
 
 describe('UrbanisationController (HTTP)', () => {
   let app: INestApplication;
@@ -103,7 +104,7 @@ describe('UrbanisationController (HTTP)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule],
       controllers: [UrbanisationController],
-      providers: [UrbanisationService, UrbanisationViewService],
+      providers: [UrbanisationService, UrbanisationViewService, ApplicationsLayoutService],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
@@ -143,6 +144,14 @@ describe('UrbanisationController (HTTP)', () => {
     expect(response.body.applicationCount).toBe(0);
     expect(response.body.echangeCount).toBe(0);
     expect(typeof response.body.svg).toBe('string');
+  });
+
+  it('un Architecte peut générer la disposition automatique du diagramme de composants (200)', async () => {
+    prismaMock.application.findMany.mockResolvedValue([]);
+    const response = await request(app.getHttpServer())
+      .post('/applications/generate-layout')
+      .expect(200);
+    expect(response.body).toEqual({ elements: [], count: 0 });
   });
 
   it('un Architecte peut consulter une application par identifiant (200)', async () => {

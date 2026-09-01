@@ -1,18 +1,33 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '@archivision/infrastructure';
 import { AdminService } from './admin.service';
+import { MailService } from '../mail/mail.service';
 
 describe('AdminService', () => {
   let service: AdminService;
   const ORG_ID = 'org-001';
 
-  const mockOrganisation = {
+  const completeOrg = {
     id: ORG_ID,
     nom: 'Entreprise Test',
+    secteur: 'Conseil',
+    pays: 'France',
+    ville: 'Paris',
+    vision: 'Digitaliser la gestion administrative',
     statut: 'EN_ATTENTE',
     createdAt: new Date('2026-08-01T10:00:00.000Z'),
     validatedAt: null,
+    users: [
+      {
+        id: 'user-001',
+        nom: 'Chef Entreprise',
+        email: 'admin@entreprise-test.local',
+        role: 'ADMINISTRATEUR',
+        createdAt: new Date('2026-08-01T10:00:00.000Z'),
+      },
+    ],
   };
 
   const prismaMock = {
@@ -30,21 +45,38 @@ describe('AdminService', () => {
     },
   };
 
+  const configMock = {
+    get: jest.fn((key: string) => (key === 'FRONTEND_ORIGIN' ? 'http://localhost:4201' : undefined)),
+  };
+
+  const mailMock = {
+    sendOrganisationValidee: jest.fn((to: string, _nom: string, loginUrl: string) =>
+      Promise.resolve({ to, subject: 'Bienvenue sur ArchiVision : votre organisation est validée', body: loginUrl }),
+    ),
+    sendOrganisationRejetee: jest.fn((to: string) =>
+      Promise.resolve({ to, subject: "ArchiVision : votre demande d'inscription", body: '' }),
+    ),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AdminService, { provide: PrismaService, useValue: prismaMock }],
+      providers: [
+        AdminService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: ConfigService, useValue: configMock },
+        { provide: MailService, useValue: mailMock },
+      ],
     }).compile();
 
     service = module.get(AdminService);
   });
 
   describe('valider', () => {
-    it('passe le statut à VALIDEE et renvoie un email simulé pour l\'administrateur', async () => {
-      prismaMock.organisation.findUnique.mockResolvedValue(mockOrganisation);
-      prismaMock.organisation.update.mockResolvedValue({ ...mockOrganisation, statut: 'VALIDEE' });
-      prismaMock.user.findFirst.mockResolvedValue({ email: 'admin@entreprise-test.local' });
+    it('passe le statut à VALIDEE et envoie l\'e-mail de connexion à l\'administrateur quand le dossier est complet', async () => {
+      prismaMock.organisation.findUnique.mockResolvedValue(completeOrg);
+      prismaMock.organisation.update.mockResolvedValue({ ...completeOrg, statut: 'VALIDEE' });
 
       const result = await service.valider(ORG_ID);
 
@@ -53,8 +85,28 @@ describe('AdminService', () => {
         data: { statut: 'VALIDEE', validatedAt: expect.any(Date) },
         include: { _count: { select: { users: true } } },
       });
+      expect(mailMock.sendOrganisationValidee).toHaveBeenCalledWith(
+        'admin@entreprise-test.local',
+        'Entreprise Test',
+        'http://localhost:4201/login',
+      );
       expect(result.email.to).toBe('admin@entreprise-test.local');
       expect(result.email.subject).toContain('validée');
+    });
+
+    it('lève BadRequestException si un champ de revue est manquant (ville)', async () => {
+      prismaMock.organisation.findUnique.mockResolvedValue({ ...completeOrg, ville: '  ' });
+
+      await expect(service.valider(ORG_ID)).rejects.toThrow(BadRequestException);
+      expect(prismaMock.organisation.update).not.toHaveBeenCalled();
+      expect(mailMock.sendOrganisationValidee).not.toHaveBeenCalled();
+    });
+
+    it("lève BadRequestException si l'organisation n'a pas de compte administrateur", async () => {
+      prismaMock.organisation.findUnique.mockResolvedValue({ ...completeOrg, users: [] });
+
+      await expect(service.valider(ORG_ID)).rejects.toThrow(BadRequestException);
+      expect(prismaMock.organisation.update).not.toHaveBeenCalled();
     });
 
     it('lève NotFoundException si l\'organisation est introuvable', async () => {
@@ -66,9 +118,9 @@ describe('AdminService', () => {
   });
 
   describe('rejeter', () => {
-    it('passe le statut à REJETEE et renvoie un email simulé', async () => {
-      prismaMock.organisation.findUnique.mockResolvedValue(mockOrganisation);
-      prismaMock.organisation.update.mockResolvedValue({ ...mockOrganisation, statut: 'REJETEE' });
+    it('passe le statut à REJETEE et envoie l\'e-mail de notification', async () => {
+      prismaMock.organisation.findUnique.mockResolvedValue(completeOrg);
+      prismaMock.organisation.update.mockResolvedValue({ ...completeOrg, statut: 'REJETEE' });
       prismaMock.user.findFirst.mockResolvedValue({ email: 'admin@entreprise-test.local' });
 
       const result = await service.rejeter(ORG_ID);
@@ -78,13 +130,17 @@ describe('AdminService', () => {
         data: { statut: 'REJETEE' },
         include: { _count: { select: { users: true } } },
       });
+      expect(mailMock.sendOrganisationRejetee).toHaveBeenCalledWith(
+        'admin@entreprise-test.local',
+        'Entreprise Test',
+      );
       expect(result.email.subject).not.toContain('validée');
     });
   });
 
   describe('remove', () => {
     it("supprime l'organisation existante", async () => {
-      prismaMock.organisation.findUnique.mockResolvedValue(mockOrganisation);
+      prismaMock.organisation.findUnique.mockResolvedValue(completeOrg);
 
       await service.remove(ORG_ID);
 

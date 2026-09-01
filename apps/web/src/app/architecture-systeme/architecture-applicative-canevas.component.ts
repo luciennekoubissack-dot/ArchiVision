@@ -132,12 +132,22 @@ interface Pos {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <p class="hint">
-      Glissez une icône de la palette sur le plan pour ajouter un élément. Pour créer un flux entre deux éléments :
-      survolez un élément, 4 points apparaissent sur ses bords, puis glissez depuis l'un de ces points jusqu'à
-      l'élément cible. Survolez un élément : cliquez sur le crayon pour le modifier, ou sur le « × » rouge pour le
-      supprimer.
-    </p>
+    <div class="page-header">
+      <p class="hint">
+        Glissez une icône de la palette sur le plan pour ajouter un élément. Pour créer un flux entre deux éléments :
+        survolez un élément, 4 points apparaissent sur ses bords, puis glissez depuis l'un de ces points jusqu'à
+        l'élément cible. Survolez un élément : cliquez sur le crayon pour le modifier, ou sur le « × » rouge pour le
+        supprimer.
+      </p>
+      <button
+        type="button"
+        class="btn btn-outline"
+        [disabled]="layingOut || elements.length === 0"
+        (click)="regenererDisposition()"
+      >
+        {{ layingOut ? 'Génération…' : 'Réorganiser le diagramme' }}
+      </button>
+    </div>
 
     <div class="canevas-layout">
       <aside class="palette">
@@ -215,7 +225,9 @@ interface Pos {
   `,
   styles: [
     `
-      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 1rem; }
+      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; }
+      .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+      .page-header .btn { flex-shrink: 0; }
       .canevas-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
       .palette {
         width: 210px;
@@ -268,6 +280,7 @@ export class ArchitectureApplicativeCanevasComponent implements AfterViewInit, O
   types = TYPES;
   typesFlux = TYPES_FLUX;
   loading = true;
+  layingOut = false;
   elements: ArchiApplicativeElement[] = [];
   flux: ArchiApplicativeFlux[] = [];
   pendingCreate: PendingCreate | null = null;
@@ -343,11 +356,52 @@ export class ArchitectureApplicativeCanevasComponent implements AfterViewInit, O
         this.elements = elements;
         this.flux = flux;
         this.loading = false;
+        this.maybeAutoLayout();
         this.render();
       },
       error: () => {
         this.loading = false;
         this.toast.error("Impossible de charger le diagramme d'architecture applicative.");
+      },
+    });
+  }
+
+  /** Première ouverture d'un diagramme jamais disposé : disposition automatique en couloirs. */
+  private maybeAutoLayout(): void {
+    if (this.layingOut || this.elements.length === 0) return;
+    if (this.elements.some((e) => e.positionX != null)) return;
+    this.layingOut = true;
+    this.service.generateLayout().subscribe({
+      next: () => {
+        this.layingOut = false;
+        this.load();
+      },
+      error: () => {
+        this.layingOut = false;
+      },
+    });
+  }
+
+  /** Bouton « Réorganiser le diagramme » : recalcule toute la disposition. */
+  async regenererDisposition(): Promise<void> {
+    if (this.layingOut) return;
+    if (this.elements.some((e) => e.positionX != null)) {
+      const ok = await this.confirmDialog.confirm(
+        'Réorganiser automatiquement tous les éléments écrasera leurs positions actuelles. Continuer ?',
+      );
+      if (!ok) return;
+    }
+    this.layingOut = true;
+    this.service.generateLayout().subscribe({
+      next: () => {
+        this.layingOut = false;
+        this.toast.success('Diagramme réorganisé.');
+        this.load();
+        this.changed.emit();
+      },
+      error: () => {
+        this.layingOut = false;
+        this.toast.error('Impossible de réorganiser le diagramme.');
       },
     });
   }

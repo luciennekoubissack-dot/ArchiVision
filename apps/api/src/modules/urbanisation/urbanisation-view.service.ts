@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
 import { TypeZone } from '@prisma/client';
 
-const MARGIN = 30;
 const GAP = 18;
-const ROOT_CELL_W = 340;
-const ROOT_CELL_H = 280;
 const HEADER_HEIGHT = 22;
 const INNER_PADDING = 10;
 const CHIP_HEIGHT = 16;
@@ -18,6 +15,55 @@ const STYLE_BY_TYPE: Record<TypeZone, { fill: string; stroke: string }> = {
   QUARTIER: { fill: '#F3E5F5', stroke: '#6A1B9A' },
   ILOT: { fill: '#FFFFFF', stroke: '#616161' },
 };
+
+// ─── Plan d'occupation des sols (POS) : gabarit à 5 couches ────────────────────
+// Rendu figé façon « cadastre » de l'urbanisation du SI (cf. pièce jointe de la
+// demande du 2026-09-01) : une bande Échange en haut, une bande Ressource &
+// Support en bas, deux colonnes transverses Pilotage & Contrôle / Données
+// transverses, et au centre l'Opération découpée en quartiers. Les couches sont
+// toujours toutes affichées ; l'application les remplit à partir des zones
+// existantes, rattachées automatiquement par mot-clé (voir POS_LAYER_KEYWORDS).
+
+type PosLayer = 'ECHANGE' | 'PILOTAGE' | 'OPERATION' | 'DONNEES' | 'RESSOURCE';
+
+const POS_MARGIN = 28;
+const POS_GAP = 14;
+const POS_TITLE_H = 26;
+const POS_BAND_H = 170;
+const POS_SIDE_W = 210;
+const POS_CENTER_H = 400;
+const POS_ANNOT_W = 24;
+const POS_WIDTH = 1200;
+
+const POS_LAYER_META: Record<PosLayer, { title: string; fill: string; stroke: string; ink: string }> = {
+  ECHANGE: { title: 'Échange', fill: '#E8F5E9', stroke: '#66BB6A', ink: '#2E7D32' },
+  PILOTAGE: { title: 'Pilotage & Contrôle', fill: '#FFEBEE', stroke: '#EF5350', ink: '#C62828' },
+  OPERATION: { title: 'Opération', fill: '#E3F2FD', stroke: '#42A5F5', ink: '#1565C0' },
+  DONNEES: { title: 'Données transverses', fill: '#FFFDE7', stroke: '#FFCA28', ink: '#F9A825' },
+  RESSOURCE: { title: 'Ressource & Support', fill: '#E3F2FD', stroke: '#1E88E5', ink: '#1565C0' },
+};
+
+/// Mots-clés (sans accent, en minuscules) qui rattachent une zone à une couche.
+/// Ordre important : la première couche dont un motif apparaît dans le nom de la
+/// zone l'emporte. Toute zone non reconnue tombe dans « Opération » (cœur métier).
+const POS_LAYER_KEYWORDS: { layer: PosLayer; pattern: RegExp }[] = [
+  {
+    layer: 'ECHANGE',
+    pattern: /echange|flux|interface|\bedi\b|\bapi\b|partenaire|externe|\bb2b\b|portail|integration|messagerie/,
+  },
+  {
+    layer: 'PILOTAGE',
+    pattern: /pilotage|pilot|controle|decision|\bbi\b|reporting|tableau de bord|\bkpi\b|strateg|gouvernance|supervision|audit/,
+  },
+  {
+    layer: 'DONNEES',
+    pattern: /donnee|referentiel|\bdata\b|\bmdm\b|master data|dictionnaire|archivage|\bged\b|document/,
+  },
+  {
+    layer: 'RESSOURCE',
+    pattern: /ressource|support|\brh\b|ressources humaines|\bpaie\b|comptab|finance|achat|logistique|infrastructure|technique|moyens generaux|juridique|helpdesk|maintenance/,
+  },
+];
 
 /// Constantes reprises telles quelles de l'éditeur interactif (applications-canevas.component.ts)
 /// pour que le diagramme généré ressemble exactement à ce que l'on voit et modifie dans l'éditeur.
@@ -133,20 +179,120 @@ export class UrbanisationViewService {
       };
     }
 
-    const cols = Math.ceil(Math.sqrt(roots.length));
-    const rows = Math.ceil(roots.length / cols);
-    const width = MARGIN * 2 + cols * ROOT_CELL_W + (cols - 1) * GAP;
-    const height = MARGIN * 2 + rows * ROOT_CELL_H + (rows - 1) * GAP;
+    // Répartition automatique des zones racines dans les 5 couches du POS.
+    const byLayer: Record<PosLayer, ZoneNode[]> = {
+      ECHANGE: [],
+      PILOTAGE: [],
+      OPERATION: [],
+      DONNEES: [],
+      RESSOURCE: [],
+    };
+    for (const root of roots) byLayer[this.layerForZone(root.nom)].push(root);
 
-    const cells = this.gridCells(roots.length, MARGIN, MARGIN, width - MARGIN * 2, height - MARGIN * 2);
-    const body = roots.map((root, i) => this.renderNode(root, cells[i])).join('\n');
+    const width = POS_WIDTH;
+    const contentX = POS_ANNOT_W + POS_MARGIN;
+    const contentW = width - contentX - POS_MARGIN - POS_ANNOT_W;
+    const height = POS_MARGIN * 2 + POS_BAND_H * 2 + POS_CENTER_H + POS_GAP * 2;
+
+    const midY = POS_MARGIN + POS_BAND_H + POS_GAP;
+    const topBand: Rect = { x: contentX, y: POS_MARGIN, w: contentW, h: POS_BAND_H };
+    const leftCol: Rect = { x: contentX, y: midY, w: POS_SIDE_W, h: POS_CENTER_H };
+    const rightCol: Rect = { x: contentX + contentW - POS_SIDE_W, y: midY, w: POS_SIDE_W, h: POS_CENTER_H };
+    const centerCol: Rect = {
+      x: leftCol.x + POS_SIDE_W + POS_GAP,
+      y: midY,
+      w: contentW - POS_SIDE_W * 2 - POS_GAP * 2,
+      h: POS_CENTER_H,
+    };
+    const bottomBand: Rect = { x: contentX, y: midY + POS_CENTER_H + POS_GAP, w: contentW, h: POS_BAND_H };
+
+    const layers = [
+      this.renderPosLayer('ECHANGE', topBand, byLayer.ECHANGE, 'row'),
+      this.renderPosLayer('PILOTAGE', leftCol, byLayer.PILOTAGE, 'col'),
+      this.renderPosLayer('OPERATION', centerCol, byLayer.OPERATION, 'quartiers'),
+      this.renderPosLayer('DONNEES', rightCol, byLayer.DONNEES, 'col'),
+      this.renderPosLayer('RESSOURCE', bottomBand, byLayer.RESSOURCE, 'row'),
+    ].join('\n');
+
+    const midX = width / 2;
+    const annotations = `  <text x="${POS_ANNOT_W - 4}" y="${height / 2}" transform="rotate(-90 ${POS_ANNOT_W - 4} ${height / 2})" text-anchor="middle" font-size="11" fill="#90A4AE">Vision transverse</text>
+  <text x="${width - POS_ANNOT_W + 4}" y="${height / 2}" transform="rotate(90 ${width - POS_ANNOT_W + 4} ${height / 2})" text-anchor="middle" font-size="11" fill="#90A4AE">Vision métier</text>
+  <text x="${midX}" y="${height - 6}" text-anchor="middle" font-size="10" fill="#B0BEC5">Zones du POS, décomposables en quartiers puis en îlots</text>`;
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="Arial, sans-serif">
   <rect x="0" y="0" width="${width}" height="${height}" fill="#FAFAFA" />
-${body}
+${layers}
+${annotations}
 </svg>`;
 
     return { svg, zoneCount, applicationCount };
+  }
+
+  /** Rattache une zone à une couche du POS d'après des mots-clés de son nom. */
+  private layerForZone(nom: string): PosLayer {
+    const normalized = nom
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase();
+    for (const { layer, pattern } of POS_LAYER_KEYWORDS) {
+      if (pattern.test(normalized)) return layer;
+    }
+    return 'OPERATION';
+  }
+
+  /**
+   * Dessine une couche du POS : son cadre coloré, son titre, puis les zones qui
+   * lui sont rattachées. `mode` fixe la disposition interne des zones : `row`
+   * pour les bandes horizontales (Échange, Ressource & Support), `col` pour les
+   * colonnes transverses (Pilotage & Contrôle, Données), `quartiers` pour
+   * l'Opération (zones numérotées comme des quartiers).
+   */
+  private renderPosLayer(layer: PosLayer, rect: Rect, zones: ZoneNode[], mode: 'row' | 'col' | 'quartiers'): string {
+    const meta = POS_LAYER_META[layer];
+    const frame = `<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" fill="${meta.fill}" stroke="${meta.stroke}" stroke-width="1.6" rx="6" />
+  <text x="${rect.x + 10}" y="${rect.y + 17}" font-size="12" font-weight="bold" fill="${meta.ink}">${this.escape(meta.title)}</text>`;
+
+    const innerX = rect.x + INNER_PADDING;
+    const innerY = rect.y + POS_TITLE_H;
+    const innerW = rect.w - INNER_PADDING * 2;
+    const innerH = rect.h - POS_TITLE_H - INNER_PADDING;
+
+    if (zones.length === 0) {
+      return `<g>\n${frame}\n  <text x="${innerX}" y="${innerY + 14}" font-size="10" font-style="italic" fill="#90A4AE">Aucune zone rattachée</text>\n</g>`;
+    }
+
+    let cells: Rect[];
+    if (mode === 'col') {
+      cells = this.stackCells(zones.length, innerX, innerY, innerW, innerH, 'col');
+    } else if (mode === 'row') {
+      cells = this.stackCells(zones.length, innerX, innerY, innerW, innerH, 'row');
+    } else {
+      cells =
+        zones.length <= 4
+          ? this.stackCells(zones.length, innerX, innerY, innerW, innerH, 'row')
+          : this.gridCells(zones.length, innerX, innerY, innerW, innerH);
+    }
+
+    const numbered = mode === 'quartiers';
+    const body = zones
+      .map((zone, i) =>
+        this.renderNode(numbered ? { ...zone, nom: `${i + 1}. ${zone.nom}` } : zone, cells[i]),
+      )
+      .join('\n');
+    return `<g>\n${frame}\n${body}\n</g>`;
+  }
+
+  /** Découpe un rectangle en `n` cases alignées en ligne (`row`) ou en colonne (`col`). */
+  private stackCells(n: number, x: number, y: number, w: number, h: number, dir: 'row' | 'col'): Rect[] {
+    const cells: Rect[] = [];
+    if (dir === 'row') {
+      const cellW = (w - (n - 1) * POS_GAP) / n;
+      for (let i = 0; i < n; i += 1) cells.push({ x: x + i * (cellW + POS_GAP), y, w: cellW, h });
+    } else {
+      const cellH = (h - (n - 1) * POS_GAP) / n;
+      for (let i = 0; i < n; i += 1) cells.push({ x, y: y + i * (cellH + POS_GAP), w, h: cellH });
+    }
+    return cells;
   }
 
   /** Diagramme de composants UML (applications + échanges), même notation que l'éditeur interactif. */

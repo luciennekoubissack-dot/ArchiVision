@@ -1,6 +1,7 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@archivision/infrastructure';
+import { organisationNonValideeError } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
@@ -14,7 +15,10 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { organisation: { select: { statut: true } } },
+    });
 
     // Temps constant même si l'utilisateur n'existe pas
     const hash = user?.passwordHash ?? '$2b$10$invalidhashfortimingprotection00000000000000';
@@ -22,6 +26,12 @@ export class AuthService {
 
     if (!user || !valid) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
+    }
+
+    // Un compte entreprise ne peut se connecter que si son organisation a été
+    // validée par le superadmin. Le SUPERADMIN (sans organisation) est exempté.
+    if (user.role !== RoleUtilisateur.SUPERADMIN && user.organisation?.statut !== 'VALIDEE') {
+      throw new ForbiddenException(organisationNonValideeError(user.organisation?.statut));
     }
 
     return this.buildAuthResponse(user);
@@ -35,7 +45,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    const { organisation, user } = await this.prisma.$transaction(async (tx) => {
+    const { organisation } = await this.prisma.$transaction(async (tx) => {
       const organisation = await tx.organisation.create({
         data: {
           nom: dto.organisationNom,
@@ -43,6 +53,7 @@ export class AuthService {
           secteur: dto.secteur,
           taille: dto.taille,
           pays: dto.pays,
+          ville: dto.ville,
           logoUrl: dto.logoUrl,
           vision: dto.vision,
           problemesResoudre: dto.problemesResoudre,
@@ -107,15 +118,17 @@ export class AuthService {
       return { organisation, user };
     });
 
-    // Connexion immédiate : l'organisation démarre en EN_ATTENTE (visible et
-    // gérable par le superadmin), mais ce statut ne bloque plus l'accès.
+    // Aucune session n'est ouverte : l'organisation démarre EN_ATTENTE et ne
+    // pourra se connecter qu'une fois validée par le superadmin, qui envoie
+    // alors le lien de connexion par e-mail.
     return {
-      ...this.buildAuthResponse(user),
       organisation: {
         id: organisation.id,
         nom: organisation.nom,
         statut: organisation.statut,
       },
+      message:
+        "Votre inscription a bien été enregistrée. Vous recevrez un e-mail contenant le lien de connexion dès que votre organisation aura été validée par l'équipe ArchiVision.",
     };
   }
 

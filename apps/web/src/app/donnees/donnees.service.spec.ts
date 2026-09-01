@@ -180,4 +180,16 @@ describe('DonneesService', () => {
 
     expect(completed).toBe(true);
   });
+
+  it('génère la disposition automatique du diagramme de classe', () => {
+    let result: unknown;
+    service.generateLayout().subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne('/api/v1/data-entities/generate-layout');
+    expect(req.request.method).toBe('POST');
+    const body = { elements: [], count: 0, relationsInfereesCount: 2 };
+    req.flush(body);
+
+    expect(result).toEqual(body);
+  });
 });

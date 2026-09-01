@@ -5,6 +5,7 @@ import { PrismaModule, PrismaService } from '@archivision/infrastructure';
 import { RoleUtilisateur, StatutElement, TypeTechComponent } from '@prisma/client';
 import { TechnologieController } from './technologie.controller';
 import { TechnologieService } from './technologie.service';
+import { TechnologieLayoutService } from './technologie-layout.service';
 
 describe('TechnologieController (HTTP)', () => {
   let app: INestApplication;
@@ -72,7 +73,7 @@ describe('TechnologieController (HTTP)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule],
       controllers: [TechnologieController],
-      providers: [TechnologieService],
+      providers: [TechnologieService, TechnologieLayoutService],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
@@ -202,5 +203,18 @@ describe('TechnologieController (HTTP)', () => {
     await request(app.getHttpServer())
       .delete(`/tech-components/${TECH_COMPONENT_ID}/applications/${APPLICATION_ID}`)
       .expect(403);
+  });
+
+  it('un Architecte peut générer la disposition automatique du diagramme de déploiement (200)', async () => {
+    prismaMock.techComponent.findMany.mockResolvedValue([]);
+    const response = await request(app.getHttpServer())
+      .post('/tech-components/generate-layout')
+      .expect(200);
+    expect(response.body).toEqual({ elements: [], count: 0 });
+  });
+
+  it('un Superadmin reçoit 403 en tentant de générer la disposition', async () => {
+    currentUser = superadmin;
+    await request(app.getHttpServer()).post('/tech-components/generate-layout').expect(403);
   });
 });

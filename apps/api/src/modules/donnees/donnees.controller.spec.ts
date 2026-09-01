@@ -5,6 +5,7 @@ import { PrismaModule, PrismaService } from '@archivision/infrastructure';
 import { RoleUtilisateur } from '@prisma/client';
 import { DonneesController } from './donnees.controller';
 import { DonneesService } from './donnees.service';
+import { DonneesLayoutService } from './donnees-layout.service';
 
 describe('DonneesController (HTTP)', () => {
   let app: INestApplication;
@@ -77,7 +78,7 @@ describe('DonneesController (HTTP)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [PrismaModule],
       controllers: [DonneesController],
-      providers: [DonneesService],
+      providers: [DonneesService, DonneesLayoutService],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
@@ -209,5 +210,18 @@ describe('DonneesController (HTTP)', () => {
   it('un Superadmin reçoit 403 en tentant de supprimer une relation', async () => {
     currentUser = superadmin;
     await request(app.getHttpServer()).delete(`/data-entities/relations/${mockRelation.id}`).expect(403);
+  });
+
+  it('un Architecte peut générer la disposition automatique du diagramme (200)', async () => {
+    prismaMock.dataEntity.findMany.mockResolvedValue([]);
+    const response = await request(app.getHttpServer())
+      .post('/data-entities/generate-layout')
+      .expect(200);
+    expect(response.body).toEqual({ elements: [], count: 0, relationsInfereesCount: 0 });
+  });
+
+  it('un Superadmin reçoit 403 en tentant de générer la disposition', async () => {
+    currentUser = superadmin;
+    await request(app.getHttpServer()).post('/data-entities/generate-layout').expect(403);
   });
 });

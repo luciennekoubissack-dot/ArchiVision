@@ -40,9 +40,12 @@ export class AuthResponseEntity {
   user!: AuthUserEntity;
 }
 
-/** Réponse renvoyée à l'inscription : jeton d'accès, profil utilisateur et
- * organisation nouvellement créée pour ce compte. */
-export class RegisterResponseEntity extends AuthResponseEntity {
-  @ApiProperty({ type: () => AuthOrganisationEntity, description: "Organisation nouvellement créée pour l'utilisateur inscrit." })
+/** Réponse renvoyée à l'inscription : l'inscription est enregistrée mais aucune
+ * session n'est ouverte tant que le superadmin n'a pas validé l'organisation. */
+export class RegisterResponseEntity {
+  @ApiProperty({ type: () => AuthOrganisationEntity, description: "Organisation nouvellement créée, au statut EN_ATTENTE." })
   organisation!: AuthOrganisationEntity;
+
+  @ApiProperty({ description: "Message de confirmation à afficher à l'utilisateur." })
+  message!: string;
 }

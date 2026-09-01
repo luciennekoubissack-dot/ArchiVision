@@ -5,6 +5,7 @@ import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { TechComponent, TechnologieService, TypeTechComponent } from './technologie.service';
 import { ToastService } from '../shared/toast.service';
+import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { downloadDataUrl } from '../shared/download.util';
 import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 
@@ -19,16 +20,23 @@ interface PendingCreate {
   description: string;
 }
 
-// Notation UML « déploiement » (norme UML2, voir OMG UML Superstructure §7.3.4/§18) :
-// - Le TechComponent est un Nœud (boîte 3D), stéréotypé «device» pour le matériel
-//   physique (serveur, réseau) ou «execution environment» pour un environnement
-//   d'exécution logique (cloud, SGBD, middleware) — « nœud » seul n'est pas un
-//   stéréotype valide, Node est déjà la métaclasse UML.
+// Notation UML « déploiement » (UML 2.5, OMG formal/2017-12-05, clause 19) :
+// - Le TechComponent est un Nœud (boîte 3D en perspective), stéréotypé «device»
+//   pour le matériel physique (serveur, équipement réseau) ou
+//   «executionEnvironment» (un seul mot, casse UML) pour un environnement
+//   d'exécution logiciel (cloud, SGBD, middleware). « nœud » seul n'est pas un
+//   stéréotype : Node est déjà la métaclasse UML, une boîte 3D sans mot-clé =
+//   un Nœud générique.
 // - Chaque application déployée est un Artefact (icône document à coin plié,
 //   PAS l'icône Composant à encoches) relié au nœud par une dépendance de
-//   déploiement : flèche pointillée à pointe ouverte, stéréotype «deploy».
-// Voir apps/web/src/assets/diagramme-deploiement-template.png pour l'inspiration
-// générale de mise en page (nœuds + artefacts reliés par des dépendances).
+//   déploiement : trait pointillé, pointe de flèche OUVERTE (en V, non pleine),
+//   orientée de l'Artefact VERS le Nœud (client → fournisseur, sens recommandé
+//   par UML 2.4+), mot-clé «deploy».
+// - Chemin de communication entre nœuds (association, trait plein éventuellement
+//   stéréotypé «TCP/IP»...) : non représenté ici, le modèle ne relie pas les
+//   composants entre eux.
+// Voir apps/web/src/assets/diagramme-deploiement-template.png pour la mise en
+// page générale (nœuds + artefacts reliés par des dépendances).
 const NODE_W = 150;
 const NODE_H = 64;
 const DEPTH = 14;
@@ -49,13 +57,13 @@ const TYPE_LABEL: Record<TypeTechComponent, string> = {
   MIDDLEWARE: 'Middleware',
 };
 
-/** «device» pour le matériel physique, «execution environment» pour un environnement logique. */
+/** «device» pour le matériel physique, «executionEnvironment» (mot-clé UML) pour un environnement logiciel. */
 const TYPE_STEREOTYPE: Record<TypeTechComponent, string> = {
   SERVEUR: '«device»',
   RESEAU: '«device»',
-  CLOUD: '«execution environment»',
-  BASE_DE_DONNEES: '«execution environment»',
-  MIDDLEWARE: '«execution environment»',
+  CLOUD: '«executionEnvironment»',
+  BASE_DE_DONNEES: '«executionEnvironment»',
+  MIDDLEWARE: '«executionEnvironment»',
 };
 
 const TYPE_COLOR: Record<TypeTechComponent, string> = {
@@ -86,7 +94,17 @@ interface Pos {
   template: `
     <div class="page-header">
       <p class="hint">Glissez un composant de la palette sur le plan pour l'ajouter. Glissez un nœud déjà placé pour le repositionner.</p>
-      <app-download-menu [formats]="pngFormat" [disabled]="components.length === 0" (download)="exportPng()" />
+      <div class="header-actions">
+        <button
+          type="button"
+          class="btn btn-outline"
+          [disabled]="layingOut || components.length === 0"
+          (click)="regenererDisposition()"
+        >
+          {{ layingOut ? 'Génération…' : 'Réorganiser le diagramme' }}
+        </button>
+        <app-download-menu [formats]="pngFormat" [disabled]="components.length === 0" (download)="exportPng()" />
+      </div>
     </div>
     <div class="tech-layout">
       <aside class="palette">
@@ -113,8 +131,8 @@ interface Pos {
           <input type="text" [value]="p.nom" (input)="p.nom = $any($event.target).value" required autofocus />
         </label>
         <label class="field">
-          Justification
-          <textarea placeholder="Pourquoi ce choix technologique ?" [value]="p.description" (input)="p.description = $any($event.target).value"></textarea>
+          Description
+          <textarea placeholder="Rôle du composant et justification du choix technologique." [value]="p.description" (input)="p.description = $any($event.target).value"></textarea>
         </label>
         <div class="pending-actions">
           <button type="button" class="btn btn-ghost" (click)="cancelCreate()">Annuler</button>
@@ -126,6 +144,7 @@ interface Pos {
   styles: [
     `
       .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; max-width: 640px; }
+      .header-actions { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
       .tech-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
       .palette {
         width: 210px;
@@ -175,6 +194,7 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
   types = TYPES;
   pngFormat = PNG_FORMAT;
   loading = true;
+  layingOut = false;
   components: TechComponent[] = [];
   pendingCreate: PendingCreate | null = null;
 
@@ -186,6 +206,7 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
   constructor(
     private readonly technologieService: TechnologieService,
     private readonly toast: ToastService,
+    private readonly confirmDialog: ConfirmDialogService,
   ) {}
 
   ngAfterViewInit(): void {
@@ -217,11 +238,52 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
       next: (components) => {
         this.components = components;
         this.loading = false;
+        this.maybeAutoLayout();
         this.render();
       },
       error: () => {
         this.loading = false;
         this.toast.error('Impossible de charger les composants techniques.');
+      },
+    });
+  }
+
+  /** Première ouverture d'un diagramme jamais disposé : disposition automatique. */
+  private maybeAutoLayout(): void {
+    if (this.layingOut || this.components.length === 0) return;
+    if (this.components.some((c) => c.positionX != null)) return;
+    this.layingOut = true;
+    this.technologieService.generateLayout().subscribe({
+      next: () => {
+        this.layingOut = false;
+        this.load();
+      },
+      error: () => {
+        this.layingOut = false;
+      },
+    });
+  }
+
+  /** Bouton « Réorganiser le diagramme » : recalcule toute la disposition. */
+  async regenererDisposition(): Promise<void> {
+    if (this.layingOut) return;
+    if (this.components.some((c) => c.positionX != null)) {
+      const ok = await this.confirmDialog.confirm(
+        'Réorganiser automatiquement tous les composants écrasera leurs positions actuelles. Continuer ?',
+      );
+      if (!ok) return;
+    }
+    this.layingOut = true;
+    this.technologieService.generateLayout().subscribe({
+      next: () => {
+        this.layingOut = false;
+        this.toast.success('Diagramme réorganisé.');
+        this.load();
+        this.changed.emit();
+      },
+      error: () => {
+        this.layingOut = false;
+        this.toast.error('Impossible de réorganiser le diagramme.');
       },
     });
   }
@@ -317,19 +379,9 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
       const compX = nodeRightX + NODE_TO_COMP_GAP;
       const midY = compY + COMP_H / 2;
 
-      // Dépendance de déploiement UML : flèche pointillée à pointe ouverte,
-      // du Nœud vers l'Artefact qu'il héberge, étiquetée «deploy».
-      group.add(
-        new Konva.Arrow({
-          points: [nodeRightX, midY, compX, midY],
-          stroke: '#5b6478',
-          fill: '#5b6478',
-          strokeWidth: 1.2,
-          dash: [5, 4],
-          pointerLength: 7,
-          pointerWidth: 6,
-        }),
-      );
+      // Dépendance de déploiement UML : trait pointillé, pointe ouverte,
+      // orientée de l'Artefact vers le Nœud (client → fournisseur), «deploy».
+      group.add(this.buildDeployDependency(compX, midY, nodeRightX, midY));
       group.add(
         new Konva.Text({
           x: nodeRightX,
@@ -418,6 +470,43 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
       }),
     );
     return icon;
+  }
+
+  /**
+   * Dépendance UML (trait pointillé + pointe de flèche OUVERTE en V, non
+   * pleine) matérialisant la relation «deploy». `from` = bord de l'Artefact,
+   * `to` = bord du Nœud : la flèche pointe vers le fournisseur (le Nœud).
+   */
+  private buildDeployDependency(fromX: number, fromY: number, toX: number, toY: number): Konva.Group {
+    const g = new Konva.Group({ listening: false });
+    g.add(
+      new Konva.Line({
+        points: [fromX, fromY, toX, toY],
+        stroke: '#5b6478',
+        strokeWidth: 1.2,
+        dash: [5, 4],
+      }),
+    );
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    const len = 9;
+    const spread = Math.PI / 7;
+    g.add(
+      new Konva.Line({
+        points: [
+          toX - len * Math.cos(angle - spread),
+          toY - len * Math.sin(angle - spread),
+          toX,
+          toY,
+          toX - len * Math.cos(angle + spread),
+          toY - len * Math.sin(angle + spread),
+        ],
+        stroke: '#5b6478',
+        strokeWidth: 1.2,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }),
+    );
+    return g;
   }
 
   private savePosition(id: string, x: number, y: number): void {

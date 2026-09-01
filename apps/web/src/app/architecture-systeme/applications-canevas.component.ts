@@ -40,11 +40,21 @@ interface PendingCreate {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <p class="hint">
-      Glissez « Application » depuis la palette sur le plan pour en créer une nouvelle. Glissez une application
-      existante pour la repositionner. Survolez une application : glissez depuis l'un des 4 points sur ses bords
-      vers une autre application pour créer un échange, ou cliquez sur le « × » rouge pour la supprimer.
-    </p>
+    <div class="page-header">
+      <p class="hint">
+        Glissez « Application » depuis la palette sur le plan pour en créer une nouvelle. Glissez une application
+        existante pour la repositionner. Survolez une application : glissez depuis l'un des 4 points sur ses bords
+        vers une autre application pour créer un échange, ou cliquez sur le « × » rouge pour la supprimer.
+      </p>
+      <button
+        type="button"
+        class="btn btn-outline"
+        [disabled]="layingOut || applications.length === 0"
+        (click)="regenererDisposition()"
+      >
+        {{ layingOut ? 'Génération…' : 'Réorganiser le diagramme' }}
+      </button>
+    </div>
 
     <div class="app-layout">
       <aside class="palette">
@@ -102,7 +112,9 @@ interface PendingCreate {
   `,
   styles: [
     `
-      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 1rem; }
+      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; }
+      .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+      .page-header .btn { flex-shrink: 0; }
       .app-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
       .palette {
         width: 210px;
@@ -151,6 +163,7 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
   @ViewChild('stageHost') stageHost!: ElementRef<HTMLDivElement>;
 
   loading = true;
+  layingOut = false;
   applications: Application[] = [];
   echanges: ApplicationEchange[] = [];
   pendingEchange: PendingEchange | null = null;
@@ -265,6 +278,7 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
           next: (echanges) => {
             this.echanges = echanges;
             this.loading = false;
+            this.maybeAutoLayout();
             this.render();
           },
           error: () => {
@@ -276,6 +290,46 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
       error: () => {
         this.loading = false;
         this.toast.error('Impossible de charger les applications.');
+      },
+    });
+  }
+
+  /** Première ouverture d'un diagramme jamais disposé : disposition automatique. */
+  private maybeAutoLayout(): void {
+    if (this.layingOut || this.applications.length === 0) return;
+    if (this.applications.some((a) => a.positionX != null)) return;
+    this.layingOut = true;
+    this.urbanisationService.generateApplicationsLayout().subscribe({
+      next: () => {
+        this.layingOut = false;
+        this.load();
+      },
+      error: () => {
+        this.layingOut = false;
+      },
+    });
+  }
+
+  /** Bouton « Réorganiser le diagramme » : recalcule toute la disposition. */
+  async regenererDisposition(): Promise<void> {
+    if (this.layingOut) return;
+    if (this.applications.some((a) => a.positionX != null)) {
+      const ok = await this.confirmDialog.confirm(
+        'Réorganiser automatiquement toutes les applications écrasera leurs positions actuelles. Continuer ?',
+      );
+      if (!ok) return;
+    }
+    this.layingOut = true;
+    this.urbanisationService.generateApplicationsLayout().subscribe({
+      next: () => {
+        this.layingOut = false;
+        this.toast.success('Diagramme réorganisé.');
+        this.load();
+        this.changed.emit();
+      },
+      error: () => {
+        this.layingOut = false;
+        this.toast.error('Impossible de réorganiser le diagramme.');
       },
     });
   }
@@ -508,9 +562,11 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Notation UML « interface fournie / requise » : un disque plein (lollipop)
-   * du côté source, un arc ouvert (socket) du côté cible — au lieu d'une
-   * flèche pleine — voir apps/web/src/assets/diagramme-de-composant.png.
+   * Échange applicatif = dépendance UML orientée entre composants : trait
+   * pointillé, pointe de flèche OUVERTE (en V), de la source vers la cible
+   * (sens de l'échange déclaré). On ne dessine pas de connecteur
+   * « boule / réceptacle » (interface fournie / requise) : le modèle ne nomme
+   * aucune interface, ce serait une précision que la donnée n'a pas.
    */
   private buildRelation(echange: ApplicationEchange): Konva.Group | null {
     const from = this.positionsById.get(echange.sourceId);
@@ -519,39 +575,33 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
 
     const start = this.borderPoint(from, to);
     const end = this.borderPoint(to, from);
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
-    const INTERFACE_R = 5;
-
-    const lollipopPos = { x: start.x + ux * INTERFACE_R, y: start.y + uy * INTERFACE_R };
-    const socketPos = { x: end.x - ux * INTERFACE_R * 2, y: end.y - uy * INTERFACE_R * 2 };
-    const angle = Math.atan2(dy, dx);
 
     const group = new Konva.Group();
     group.add(
       new Konva.Line({
-        points: [lollipopPos.x, lollipopPos.y, socketPos.x, socketPos.y],
+        points: [start.x, start.y, end.x, end.y],
         stroke: '#1F3BB3',
         strokeWidth: 1.4,
+        dash: [5, 4],
       }),
     );
+    const angle = Math.atan2(end.y - start.y, end.x - start.x);
+    const headLen = 10;
+    const headSpread = Math.PI / 7;
     group.add(
-      new Konva.Circle({ x: lollipopPos.x, y: lollipopPos.y, radius: INTERFACE_R, fill: '#1F3BB3' }),
-    );
-    group.add(
-      new Konva.Shape({
-        x: socketPos.x,
-        y: socketPos.y,
+      new Konva.Line({
+        points: [
+          end.x - headLen * Math.cos(angle - headSpread),
+          end.y - headLen * Math.sin(angle - headSpread),
+          end.x,
+          end.y,
+          end.x - headLen * Math.cos(angle + headSpread),
+          end.y - headLen * Math.sin(angle + headSpread),
+        ],
         stroke: '#1F3BB3',
         strokeWidth: 1.4,
-        sceneFunc: (ctx, shape) => {
-          ctx.beginPath();
-          ctx.arc(0, 0, INTERFACE_R, angle - Math.PI / 2, angle + Math.PI / 2, false);
-          ctx.strokeShape(shape);
-        },
+        lineCap: 'round',
+        lineJoin: 'round',
       }),
     );
 

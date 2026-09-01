@@ -65,6 +65,7 @@ model Organisation {
   secteur           String?            @map("sector")
   taille            String?            @map("size")
   pays              String?            @map("country")
+  ville             String?            @map("city")
   statut            StatutOrganisation @default(EN_ATTENTE)
   validatedAt       DateTime?          @map("validated_at")
   /// Vision d'architecture (étape 1 de l'assistant TOGAF ADM — phase préliminaire).
@@ -498,6 +499,11 @@ model BpmnProcessus {
   id             String        @id @default(uuid())
   nom            String
   description    String?
+  /// Étapes du processus en langage naturel, une par ligne. Sert de source à la
+  /// génération d'une proposition de diagramme (événement début/fin, une tâche
+  /// ou passerelle par étape, flux séquentiels) que l'utilisateur ajuste
+  /// ensuite dans l'éditeur. Conservé pour permettre une régénération.
+  etapes         String?       @db.Text
   type           TypeProcessus @default(METIER)
   bpmnXml        String?       @map("bpmn_xml") @db.Text
   organisationId String

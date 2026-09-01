@@ -20,6 +20,8 @@ import {
 } from '@nestjs/swagger';
 import { UrbanisationService } from './urbanisation.service';
 import { UrbanisationViewService } from './urbanisation-view.service';
+import { ApplicationsLayoutService } from './applications-layout.service';
+import { DiagramLayoutResultEntity } from '../../common/entities/diagram-layout.entity';
 import { TypeZone } from '@prisma/client';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
@@ -42,6 +44,7 @@ export class UrbanisationController {
   constructor(
     private readonly service: UrbanisationService,
     private readonly viewService: UrbanisationViewService,
+    private readonly applicationsLayoutService: ApplicationsLayoutService,
   ) {}
 
   // ── Applications ──────────────────────────────────────────────────────────
@@ -71,6 +74,18 @@ export class UrbanisationController {
   @ApiOkResponse({ type: ComponentsVueEntity })
   generateComponentsVue(@CurrentUser() user: AuthUser) {
     return this.viewService.generateComponents(requireOrganisationId(user));
+  }
+
+  @ApiOperation({
+    summary: 'Générer une disposition automatique du diagramme de composants',
+    description:
+      "Place les applications en grille et persiste positionX/positionY. À appeler notamment à la première ouverture de l'éditeur.",
+  })
+  @Post('applications/generate-layout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: DiagramLayoutResultEntity })
+  generateApplicationsLayout(@CurrentUser() user: AuthUser) {
+    return this.applicationsLayoutService.generateAndPersist(requireOrganisationId(user));
   }
 
   @ApiOperation({ summary: 'Récupérer une application par son identifiant' })

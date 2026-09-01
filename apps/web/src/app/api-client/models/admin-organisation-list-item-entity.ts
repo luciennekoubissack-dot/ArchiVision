@@ -48,4 +48,9 @@ export interface AdminOrganisationListItemEntity {
    * Date de validation par le superadmin.
    */
   validatedAt?: string | null;
+
+  /**
+   * Ville du siège social.
+   */
+  ville?: string | null;
 }

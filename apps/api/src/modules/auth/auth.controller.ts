@@ -14,7 +14,7 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
-import { CurrentUser, AuthUser, Public, clearAuthCookies, setAuthCookies } from '@archivision/shared';
+import { AllowPendingOrganisation, CurrentUser, AuthUser, Public, clearAuthCookies, setAuthCookies } from '@archivision/shared';
 import { AuthResponseEntity, RegisterResponseEntity } from './entities/auth-response.entity';
 import { MeEntity } from './entities/me.entity';
 
@@ -44,10 +44,10 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   @HttpCode(HttpStatus.CREATED)
   @ApiCreatedResponse({ type: RegisterResponseEntity })
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.register(dto);
-    setAuthCookies(res, result.accessToken);
-    return result;
+  async register(@Body() dto: RegisterDto) {
+    // Pas de session à l'inscription : l'organisation démarre EN_ATTENTE et
+    // ne peut accéder à l'application qu'une fois validée par le superadmin.
+    return this.authService.register(dto);
   }
 
   @ApiOperation({ summary: 'Connecte un utilisateur avec son e-mail et son mot de passe.' })
@@ -74,6 +74,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Récupère le profil de l\'utilisateur courant.' })
   @ApiBearerAuth('access-token')
   @Get('me')
+  @AllowPendingOrganisation()
   @ApiOkResponse({ type: MeEntity })
   me(@CurrentUser() user: AuthUser) {
     return this.authService.me(user.sub);

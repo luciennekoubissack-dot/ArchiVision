@@ -2,7 +2,7 @@ import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrganisationService } from './organisation.service';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
-import { AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
+import { AllowPendingOrganisation, AuthUser, CurrentUser, requireOrganisationId, Roles, RolesGuard } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
 import { OrganisationEntity } from './entities/organisation.entity';
 import { OrganisationExportEntity } from './entities/organisation-export.entity';
@@ -15,6 +15,7 @@ export class OrganisationController {
 
   @ApiOperation({ summary: "Récupérer l'organisation de l'utilisateur courant." })
   @Get('me')
+  @AllowPendingOrganisation()
   @ApiOkResponse({ type: OrganisationEntity })
   findMine(@CurrentUser() user: AuthUser) {
     return this.organisationService.findMine(requireOrganisationId(user));

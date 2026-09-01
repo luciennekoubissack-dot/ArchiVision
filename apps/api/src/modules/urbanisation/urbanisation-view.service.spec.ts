@@ -51,6 +51,40 @@ describe('UrbanisationViewService', () => {
     expect(result.svg).toContain('SIRH');
   });
 
+  it('affiche toujours les 5 couches du gabarit POS', async () => {
+    prismaMock.zoneUrbanisation.findMany.mockResolvedValue([zone]);
+
+    const result = await service.generate('org-001');
+
+    for (const titre of ['Échange', 'Pilotage &amp; Contrôle', 'Opération', 'Données transverses', 'Ressource &amp; Support']) {
+      expect(result.svg).toContain(`>${titre}</text>`);
+    }
+  });
+
+  it('rattache chaque zone racine à la couche déduite de son nom', async () => {
+    const mk = (nom: string) => ({ id: nom, nom, type: TypeZone.ZONE, applications: [], enfants: [] });
+    prismaMock.zoneUrbanisation.findMany.mockResolvedValue([
+      mk('Zone Échanges partenaires'),
+      mk('Zone Décisionnelle'),
+      mk('Référentiel Tiers'),
+      mk('Support informatique'),
+      mk('Ventes'),
+    ]);
+
+    const result = await service.generate('org-001');
+    const at = (needle: string) => result.svg.indexOf(needle);
+
+    // Chaque zone apparaît après le titre de sa couche et avant le titre de la suivante.
+    expect(at('Zone Échanges partenaires')).toBeGreaterThan(at('>Échange</text>'));
+    expect(at('Zone Échanges partenaires')).toBeLessThan(at('>Pilotage &amp; Contrôle</text>'));
+    expect(at('Zone Décisionnelle')).toBeGreaterThan(at('>Pilotage &amp; Contrôle</text>'));
+    expect(at('Référentiel Tiers')).toBeGreaterThan(at('>Données transverses</text>'));
+    expect(at('Support informatique')).toBeGreaterThan(at('>Ressource &amp; Support</text>'));
+    // « Ventes » n'a aucun mot-clé : il tombe dans Opération, numéroté comme un quartier.
+    expect(result.svg).toContain('1. Ventes');
+    expect(result.svg).not.toContain('Aucune zone rattachée');
+  });
+
   it("n'affiche que les 4 premières applications d'un îlot et indique le reste", async () => {
     const apps = Array.from({ length: 6 }, (_, i) => ({
       application: { id: `app-${i}`, nom: `App ${i}` },

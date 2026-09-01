@@ -133,11 +133,13 @@ const ICONS: Record<string, string> = {
       </div>
 
       <!-- ── Étapes 2 à 7 : modules embarqués ─────────────────────────────── -->
-      <app-bpmn *ngIf="current.key === 'bpmn'"></app-bpmn>
-      <app-architecture-metier *ngIf="current.key === 'metier'"></app-architecture-metier>
-      <app-donnees *ngIf="current.key === 'donnees'"></app-donnees>
-      <app-applications *ngIf="current.key === 'applicatif'"></app-applications>
-      <app-technologie *ngIf="current.key === 'techno'"></app-technologie>
+      <!-- hideDiagram : dans l'assistant on ne montre que les listes/formulaires,
+           les diagrammes restent sur les pages dédiées. -->
+      <app-bpmn *ngIf="current.key === 'bpmn'" [hideDiagram]="true"></app-bpmn>
+      <app-architecture-metier *ngIf="current.key === 'metier'" [hideDiagram]="true"></app-architecture-metier>
+      <app-donnees *ngIf="current.key === 'donnees'" [hideDiagram]="true"></app-donnees>
+      <app-applications *ngIf="current.key === 'applicatif'" [hideDiagram]="true"></app-applications>
+      <app-technologie *ngIf="current.key === 'techno'" [hideDiagram]="true"></app-technologie>
       <app-roadmap *ngIf="current.key === 'roadmap'"></app-roadmap>
 
       <!-- ── Étape 8 : Synthèse ───────────────────────────────────────────── -->

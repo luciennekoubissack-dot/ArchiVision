@@ -1,17 +1,30 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@archivision/infrastructure';
+import { requireFrontendOrigin } from '@archivision/shared';
 import { RoleUtilisateur, StatutOrganisation } from '@prisma/client';
 import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
+import { MailService, SentEmail } from '../mail/mail.service';
 
-export interface SimulatedEmail {
-  to: string;
-  subject: string;
-  body: string;
-}
+/** Champs de l'organisation que le superadmin doit contrôler avant de valider. */
+const CHAMPS_REQUIS_VALIDATION = ['nom', 'secteur', 'pays', 'ville', 'vision'] as const;
+
+const CHAMP_LABELS: Record<string, string> = {
+  nom: 'Nom',
+  secteur: 'Secteur',
+  pays: 'Pays',
+  ville: 'Ville',
+  vision: 'Objectif',
+  administrateur: 'Compte administrateur',
+};
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly mail: MailService,
+  ) {}
 
   listOrganisations(statut?: StatutOrganisation, pagination?: PaginationQueryDto) {
     return paginateFindMany(
@@ -25,6 +38,7 @@ export class AdminService {
           secteur: true,
           taille: true,
           pays: true,
+          ville: true,
           statut: true,
           createdAt: true,
           validatedAt: true,
@@ -49,27 +63,49 @@ export class AdminService {
     return organisation;
   }
 
-  async valider(id: string): Promise<{ organisation: unknown; email: SimulatedEmail }> {
-    await this.assertExists(id);
+  async valider(id: string): Promise<{ organisation: unknown; email: SentEmail }> {
+    const existante = await this.getOrganisation(id);
+
+    // Contrôle de complétude : le superadmin ne peut valider qu'un dossier
+    // dont toutes les informations de revue sont présentes.
+    const manquants: string[] = CHAMPS_REQUIS_VALIDATION.filter(
+      (champ) => !String(existante[champ] ?? '').trim(),
+    );
+    const admin = existante.users.find((u) => u.role === RoleUtilisateur.ADMINISTRATEUR);
+    if (!admin) manquants.push('administrateur');
+    if (manquants.length > 0 || !admin) {
+      throw new BadRequestException(
+        `Champs obligatoires incomplets : ${manquants.map((c) => CHAMP_LABELS[c] ?? c).join(', ')}`,
+      );
+    }
+
     const organisation = await this.prisma.organisation.update({
       where: { id },
       data: { statut: StatutOrganisation.VALIDEE, validatedAt: new Date() },
       include: { _count: { select: { users: true } } },
     });
-    const email = await this.buildEmail(id, organisation.nom, 'VALIDEE');
-    this.logSimulatedEmail(email);
+
+    const loginUrl = `${requireFrontendOrigin(this.config)}/login`;
+    const email = await this.mail.sendOrganisationValidee(admin.email, organisation.nom, loginUrl);
     return { organisation, email };
   }
 
-  async rejeter(id: string): Promise<{ organisation: unknown; email: SimulatedEmail }> {
+  async rejeter(id: string): Promise<{ organisation: unknown; email: SentEmail }> {
     await this.assertExists(id);
     const organisation = await this.prisma.organisation.update({
       where: { id },
       data: { statut: StatutOrganisation.REJETEE },
       include: { _count: { select: { users: true } } },
     });
-    const email = await this.buildEmail(id, organisation.nom, 'REJETEE');
-    this.logSimulatedEmail(email);
+
+    const admin = await this.prisma.user.findFirst({
+      where: { organisationId: id, role: RoleUtilisateur.ADMINISTRATEUR },
+      select: { email: true },
+    });
+    const email = await this.mail.sendOrganisationRejetee(
+      admin?.email ?? '(destinataire introuvable)',
+      organisation.nom,
+    );
     return { organisation, email };
   }
 
@@ -114,34 +150,5 @@ export class AdminService {
     const organisation = await this.prisma.organisation.findUnique({ where: { id } });
     if (!organisation) throw new NotFoundException(`Organisation ${id} introuvable`);
     return organisation;
-  }
-
-  private async buildEmail(
-    organisationId: string,
-    organisationNom: string,
-    statut: 'VALIDEE' | 'REJETEE',
-  ): Promise<SimulatedEmail> {
-    const admin = await this.prisma.user.findFirst({
-      where: { organisationId, role: RoleUtilisateur.ADMINISTRATEUR },
-      select: { email: true },
-    });
-    const to = admin?.email ?? '(destinataire introuvable)';
-
-    if (statut === 'VALIDEE') {
-      return {
-        to,
-        subject: 'Bienvenue sur ArchiVision — votre organisation est validée',
-        body: `Bonjour,\n\nVotre organisation « ${organisationNom} » a été validée par notre équipe. Vous pouvez désormais vous connecter à ArchiVision.\n\nÀ bientôt !`,
-      };
-    }
-    return {
-      to,
-      subject: "ArchiVision — votre demande d'inscription",
-      body: `Bonjour,\n\nNous ne sommes pas en mesure de donner suite à l'inscription de « ${organisationNom} » pour le moment.\n\nCordialement.`,
-    };
-  }
-
-  private logSimulatedEmail(email: SimulatedEmail): void {
-    console.log(`[MAIL:SIMULÉ] À: ${email.to} | Sujet: ${email.subject}\n${email.body}`);
   }
 }

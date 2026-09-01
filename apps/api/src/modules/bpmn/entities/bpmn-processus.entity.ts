@@ -12,6 +12,13 @@ export class BpmnProcessusEntity {
   @ApiPropertyOptional({ description: 'Description du processus.', nullable: true, type: String })
   description?: string | null;
 
+  @ApiPropertyOptional({
+    description: "Étapes du processus en langage naturel, une par ligne (source de la génération de diagramme).",
+    nullable: true,
+    type: String,
+  })
+  etapes?: string | null;
+
   @ApiProperty({
     enum: TypeProcessus,
     description: 'Classification du processus dans la cartographie (métier, support ou pilotage).',

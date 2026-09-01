@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Application, ComponentsView, UrbanisationService } from '../urbanisation/urbanisation.service';
@@ -36,14 +36,14 @@ const ICONS: Record<string, string> = {
   template: `
     <p class="muted step-question">Quelles applications supportent les processus métier ?</p>
 
-    <div class="tabs">
+    <div class="tabs" *ngIf="!hideDiagram">
       <button class="tab" [class.active]="tab === 'portefeuille'" (click)="tab = 'portefeuille'">Portefeuille</button>
       <button class="tab" [class.active]="tab === 'diagramme'" (click)="selectTab('diagramme')">Diagramme de composants</button>
       <button class="tab" [class.active]="tab === 'archi-applicative'" (click)="selectTab('archi-applicative')">Diagramme d'architecture applicative</button>
     </div>
 
     <!-- ── Diagramme de composants : éditeur + diagramme généré fusionnés ──── -->
-    <section *ngIf="tab === 'diagramme'">
+    <section *ngIf="tab === 'diagramme' && !hideDiagram">
       <app-applications-canevas (changed)="onDiagChanged()" />
 
       <section class="card diagram-preview">
@@ -62,7 +62,7 @@ const ICONS: Record<string, string> = {
     </section>
 
     <!-- ── Architecture applicative : éditeur + diagramme généré fusionnés ─── -->
-    <section *ngIf="tab === 'archi-applicative'">
+    <section *ngIf="tab === 'archi-applicative' && !hideDiagram">
       <app-architecture-applicative-canevas (changed)="onArchiChanged()" />
 
       <section class="card diagram-preview">
@@ -231,6 +231,9 @@ const ICONS: Record<string, string> = {
   ],
 })
 export class ApplicationsComponent implements OnInit {
+  /** Masque les onglets et aperçus de diagramme (utilisé dans l'assistant « Révision »). */
+  @Input() hideDiagram = false;
+
   tab: Tab = 'portefeuille';
   svgPngFormats = SVG_PNG_FORMATS;
   diagSvg = '';
@@ -264,8 +267,10 @@ export class ApplicationsComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    this.generateDiagramme();
-    this.generateArchi();
+    if (!this.hideDiagram) {
+      this.generateDiagramme();
+      this.generateArchi();
+    }
   }
 
   icon(name: string): SafeHtml {

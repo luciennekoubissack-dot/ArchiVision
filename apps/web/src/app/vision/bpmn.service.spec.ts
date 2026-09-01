@@ -85,6 +85,18 @@ describe('BpmnService', () => {
     expect(result).toEqual({ elementCount: 3, flowCount: 2, svg: '<svg></svg>' });
   });
 
+  it('génère une proposition de diagramme depuis les étapes', () => {
+    let result: unknown;
+    const mockDetail: BpmnProcessusDetail = { ...mockProcessus, elements: [mockElement] };
+    service.generateDiagramme(mockProcessus.id).subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne(`/api/v1/bpmn-processus/${mockProcessus.id}/generer-diagramme`);
+    expect(req.request.method).toBe('POST');
+    req.flush(mockDetail);
+
+    expect(result).toEqual(mockDetail);
+  });
+
   it('crée un processus BPMN', () => {
     let result: unknown;
     service.create({ nom: mockProcessus.nom }).subscribe((r) => (result = r));

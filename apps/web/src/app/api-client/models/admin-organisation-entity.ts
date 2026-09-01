@@ -70,7 +70,12 @@ export interface AdminOrganisationEntity {
   validatedAt?: string | null;
 
   /**
-   * Vision d'architecture (étape 1 de l'assistant TOGAF ADM).
+   * Ville du siège social.
+   */
+  ville?: string | null;
+
+  /**
+   * Objectif principal / vision de l'organisation.
    */
   vision?: string | null;
 }

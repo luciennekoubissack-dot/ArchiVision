@@ -26,6 +26,17 @@ export class AuthInterceptor implements HttpInterceptor {
           this.auth.logout();
           this.router.navigate(['/login']);
         }
+        // Organisation passée EN_ATTENTE / REJETEE alors qu'une session était
+        // ouverte : l'accès est révoqué, on déconnecte proprement.
+        if (
+          !isAuthRoute &&
+          error instanceof HttpErrorResponse &&
+          error.status === 403 &&
+          error.error?.code === 'ORGANISATION_NON_VALIDEE'
+        ) {
+          this.auth.logout();
+          this.router.navigate(['/login']);
+        }
         return throwError(() => error);
       }),
     );

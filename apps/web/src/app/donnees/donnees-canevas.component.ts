@@ -18,15 +18,18 @@ const PADDING = 8;
 const GAP_X = 40;
 const ROW_Y = 60;
 
+// Multiplicités UML (diagramme de classe) : « 1 » et « * », placées à chaque
+// extrémité de l'association, près de la classe concernée. « * » et non « N »,
+// qui relève de la notation entité-association de Chen, pas d'UML.
 const CARDINALITE_ENDS: Record<TypeCardinalite, [string, string]> = {
   UN_A_UN: ['1', '1'],
-  UN_A_PLUSIEURS: ['1', 'N'],
-  PLUSIEURS_A_PLUSIEURS: ['N', 'N'],
+  UN_A_PLUSIEURS: ['1', '*'],
+  PLUSIEURS_A_PLUSIEURS: ['*', '*'],
 };
 const CARDINALITE_LABEL: Record<TypeCardinalite, string> = {
-  UN_A_UN: '1 — 1',
-  UN_A_PLUSIEURS: '1 — N',
-  PLUSIEURS_A_PLUSIEURS: 'N — N',
+  UN_A_UN: 'un à un (1..1)',
+  UN_A_PLUSIEURS: 'un à plusieurs (1..*)',
+  PLUSIEURS_A_PLUSIEURS: 'plusieurs à plusieurs (*..*)',
 };
 const CARDINALITES: TypeCardinalite[] = ['UN_A_UN', 'UN_A_PLUSIEURS', 'PLUSIEURS_A_PLUSIEURS'];
 
@@ -63,7 +66,17 @@ interface PendingCreate {
         pour la repositionner. Survolez une entité : glissez depuis l'un des 4 points sur ses bords vers une autre
         entité pour créer une relation, ou cliquez sur le « × » rouge pour la supprimer.
       </p>
-      <app-download-menu [formats]="pngFormat" [disabled]="entities.length === 0" (download)="exportPng()" />
+      <div class="header-actions">
+        <button
+          type="button"
+          class="btn btn-outline"
+          [disabled]="layingOut || entities.length === 0"
+          (click)="regenererDisposition()"
+        >
+          {{ layingOut ? 'Génération…' : 'Réorganiser le diagramme' }}
+        </button>
+        <app-download-menu [formats]="pngFormat" [disabled]="entities.length === 0" (download)="exportPng()" />
+      </div>
     </div>
 
     <div class="donnees-layout">
@@ -129,6 +142,7 @@ interface PendingCreate {
   styles: [
     `
       .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; max-width: 640px; }
+      .header-actions { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
       .donnees-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
       .palette {
         width: 210px;
@@ -179,6 +193,7 @@ export class DonneesCanevasComponent implements AfterViewInit, OnDestroy {
   cardinalites = CARDINALITES;
   pngFormat = PNG_FORMAT;
   loading = true;
+  layingOut = false;
   entities: DataEntity[] = [];
   relations: DataRelation[] = [];
   pendingRelation: PendingRelation | null = null;
@@ -310,6 +325,7 @@ export class DonneesCanevasComponent implements AfterViewInit, OnDestroy {
           next: (relations) => {
             this.relations = relations;
             this.loading = false;
+            this.maybeAutoLayout();
             this.render();
           },
           error: () => {
@@ -321,6 +337,59 @@ export class DonneesCanevasComponent implements AfterViewInit, OnDestroy {
       error: () => {
         this.loading = false;
         this.toast.error('Impossible de charger les entités.');
+      },
+    });
+  }
+
+  /**
+   * Première ouverture d'un diagramme jamais disposé : on génère
+   * automatiquement une disposition (grille + relations clé étrangère déduites).
+   */
+  private maybeAutoLayout(): void {
+    if (this.layingOut || this.entities.length === 0) return;
+    if (this.entities.some((e) => e.positionX != null)) return;
+    this.layingOut = true;
+    this.donneesService.generateLayout().subscribe({
+      next: (result) => {
+        this.layingOut = false;
+        if (result.relationsInfereesCount) {
+          this.toast.success(
+            `Diagramme généré : ${result.relationsInfereesCount} relation(s) déduite(s) des clés étrangères.`,
+          );
+        }
+        this.load();
+        this.changed.emit();
+      },
+      error: () => {
+        this.layingOut = false;
+      },
+    });
+  }
+
+  /** Bouton « Réorganiser le diagramme » : recalcule toute la disposition. */
+  async regenererDisposition(): Promise<void> {
+    if (this.layingOut) return;
+    if (this.entities.some((e) => e.positionX != null)) {
+      const ok = await this.confirmDialog.confirm(
+        'Réorganiser automatiquement toutes les entités écrasera leurs positions actuelles. Continuer ?',
+      );
+      if (!ok) return;
+    }
+    this.layingOut = true;
+    this.donneesService.generateLayout().subscribe({
+      next: (result) => {
+        this.layingOut = false;
+        this.toast.success(
+          result.relationsInfereesCount
+            ? `Diagramme réorganisé : ${result.relationsInfereesCount} relation(s) déduite(s).`
+            : 'Diagramme réorganisé.',
+        );
+        this.load();
+        this.changed.emit();
+      },
+      error: () => {
+        this.layingOut = false;
+        this.toast.error('Impossible de réorganiser le diagramme.');
       },
     });
   }

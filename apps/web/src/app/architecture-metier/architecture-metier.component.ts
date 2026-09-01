@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
@@ -64,24 +64,24 @@ const ICONS: Record<string, string> = {
   template: `
     <p class="muted step-question">Comment l'entreprise crée-t-elle de la valeur ? Quels sont ses processus, acteurs, rôles, services et capacités métier ?</p>
 
-    <div class="tabs">
+    <div class="tabs" *ngIf="!hideDiagram">
       <button class="tab" [class.active]="mainTab === 'bpmn'" (click)="mainTab = 'bpmn'">Diagrammes BPMN</button>
       <button class="tab" [class.active]="mainTab === 'archimate'" (click)="mainTab = 'archimate'">Diagramme ArchiMate</button>
     </div>
 
     <!-- ── Diagrammes BPMN ───────────────────────────────────────────────── -->
-    <app-bpmn-vues *ngIf="mainTab === 'bpmn'" />
+    <app-bpmn-vues *ngIf="mainTab === 'bpmn' && !hideDiagram" />
 
     <!-- ── Diagramme ArchiMate (sous-onglets) ─────────────────────────────── -->
     <div class="tabs sub-tabs" *ngIf="mainTab === 'archimate'">
       <button class="tab" [class.active]="tab === 'capacites'" (click)="tab = 'capacites'">Capacités</button>
       <button class="tab" [class.active]="tab === 'elements'" (click)="tab = 'elements'">Éléments</button>
       <button class="tab" [class.active]="tab === 'relations'" (click)="tab = 'relations'">Relations</button>
-      <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme</button>
+      <button class="tab" *ngIf="!hideDiagram" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme</button>
     </div>
 
     <!-- ── Diagramme (SVG) ───────────────────────────────────────────────── -->
-    <section class="card" *ngIf="mainTab === 'archimate' && tab === 'diagramme'">
+    <section class="card" *ngIf="mainTab === 'archimate' && tab === 'diagramme' && !hideDiagram">
       <div class="page-header">
         <p class="summary">{{ diagrammeSummary || (diagrammeLoading ? 'Génération de la vue…' : '') }}</p>
         <div class="actions">
@@ -426,6 +426,9 @@ const ICONS: Record<string, string> = {
   ],
 })
 export class ArchitectureMetierComponent implements OnInit {
+  /** Masque les onglets et aperçus de diagramme (utilisé dans l'assistant « Révision »). */
+  @Input() hideDiagram = false;
+
   mainTab: MainTab = 'bpmn';
   tab: Tab = 'capacites';
   svgPngFormats = SVG_PNG_FORMATS;
@@ -523,12 +526,16 @@ export class ArchitectureMetierComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // Dans l'assistant « Révision », pas de diagramme : on démarre sur les
+    // sous-onglets ArchiMate (le mainTab BPMN par défaut est masqué).
+    if (this.hideDiagram) this.mainTab = 'archimate';
+
     this.loadCapacites();
     this.loadCapacitesAll();
     this.loadElements();
     this.loadElementsAll();
     this.loadRelations();
-    this.generateDiagramme();
+    if (!this.hideDiagram) this.generateDiagramme();
   }
 
   typeElementLabel(type: TypeElement): string {

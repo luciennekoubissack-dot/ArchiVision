@@ -58,6 +58,20 @@ export class BpmnController {
     return this.viewService.generate(id, requireOrganisationId(user));
   }
 
+  @ApiOperation({
+    summary: "Generer une proposition de diagramme BPMN a partir des etapes du processus",
+    description:
+      "Cree un evenement de debut/fin, une tache (ou passerelle) par etape et les flux sequentiels. Refuse si le diagramme contient deja des elements.",
+  })
+  @Post(':id/generer-diagramme')
+  @UseGuards(RolesGuard)
+  @Roles(RoleUtilisateur.ADMINISTRATEUR, RoleUtilisateur.ARCHITECTE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: BpmnProcessusDetailEntity })
+  genererDiagramme(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.bpmnService.genererDiagramme(id, requireOrganisationId(user));
+  }
+
   @ApiOperation({ summary: 'Creer un nouveau processus BPMN' })
   @Post()
   @UseGuards(RolesGuard)

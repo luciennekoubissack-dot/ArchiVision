@@ -23,6 +23,7 @@ describe('BpmnController (HTTP)', () => {
     id: 'processus-001',
     nom: 'Traitement de commande',
     description: null,
+    etapes: null,
     bpmnXml: null,
     organisationId: 'org-001',
   };
@@ -62,7 +63,9 @@ describe('BpmnController (HTTP)', () => {
       findUnique: jest.fn(),
       delete: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
+  prismaMock.$transaction.mockImplementation((callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock));
 
   const fakeAuthGuard = {
     canActivate: (context: ExecutionContext) => {
@@ -125,6 +128,40 @@ describe('BpmnController (HTTP)', () => {
       .send({ nom: mockProcessus.nom })
       .expect(201);
     expect(response.body.nom).toBe(mockProcessus.nom);
+  });
+
+  it('un Architecte peut generer une proposition de diagramme depuis les etapes (200)', async () => {
+    prismaMock.bpmnProcessus.findUnique
+      .mockResolvedValueOnce({ ...mockProcessus, etapes: 'Recevoir la demande\nValider la demande', elements: [] })
+      .mockResolvedValueOnce({ ...mockProcessus, elements: [] });
+    prismaMock.bpmnElement.create.mockImplementation(({ data }: { data: { nom: string } }) =>
+      Promise.resolve({ id: `el-${data.nom}`, ...data }),
+    );
+    prismaMock.bpmnFlow.create.mockResolvedValue({ id: 'flow-001' });
+
+    await request(app.getHttpServer())
+      .post(`/bpmn-processus/${mockProcessus.id}/generer-diagramme`)
+      .expect(200);
+
+    expect(prismaMock.bpmnElement.create).toHaveBeenCalledTimes(4);
+  });
+
+  it('renvoie 400 en generant un diagramme deja peuple', async () => {
+    prismaMock.bpmnProcessus.findUnique.mockResolvedValue({
+      ...mockProcessus,
+      etapes: 'Une etape',
+      elements: [{ id: 'el-001' }],
+    });
+    await request(app.getHttpServer())
+      .post(`/bpmn-processus/${mockProcessus.id}/generer-diagramme`)
+      .expect(400);
+  });
+
+  it('un Superadmin reçoit 403 en tentant de generer un diagramme', async () => {
+    currentUser = superadmin;
+    await request(app.getHttpServer())
+      .post(`/bpmn-processus/${mockProcessus.id}/generer-diagramme`)
+      .expect(403);
   });
 
   it('un Superadmin reçoit 403 en tentant de creer un processus BPMN', async () => {

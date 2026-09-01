@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { DataEntity, DataRelation, DonneesService, TypeCardinalite } from './donnees.service';
@@ -11,9 +11,9 @@ import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 type Tab = 'entites' | 'relations' | 'diagramme';
 
 const CARDINALITE_LABEL: Record<TypeCardinalite, string> = {
-  UN_A_UN: '1 — 1',
-  UN_A_PLUSIEURS: '1 — N',
-  PLUSIEURS_A_PLUSIEURS: 'N — N',
+  UN_A_UN: 'un à un (1..1)',
+  UN_A_PLUSIEURS: 'un à plusieurs (1..*)',
+  PLUSIEURS_A_PLUSIEURS: 'plusieurs à plusieurs (*..*)',
 };
 const CARDINALITES: TypeCardinalite[] = Object.keys(CARDINALITE_LABEL) as TypeCardinalite[];
 
@@ -36,7 +36,7 @@ const ICONS: Record<string, string> = {
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'entites'" (click)="tab = 'entites'">Entités</button>
       <button class="tab" [class.active]="tab === 'relations'" (click)="tab = 'relations'">Relations</button>
-      <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme de classe</button>
+      <button class="tab" *ngIf="!hideDiagram" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme de classe</button>
     </div>
 
     <section *ngIf="tab === 'entites'">
@@ -123,7 +123,7 @@ const ICONS: Record<string, string> = {
       </section>
     </section>
 
-    <section *ngIf="tab === 'diagramme'">
+    <section *ngIf="tab === 'diagramme' && !hideDiagram">
       <app-donnees-canevas (changed)="loadEntities(); loadRelations()" />
     </section>
 
@@ -242,6 +242,9 @@ const ICONS: Record<string, string> = {
   ],
 })
 export class DonneesComponent implements OnInit {
+  /** Masque l'onglet et l'aperçu du diagramme (utilisé dans l'assistant « Révision »). */
+  @Input() hideDiagram = false;
+
   tab: Tab = 'entites';
   cardinalites = CARDINALITES;
 

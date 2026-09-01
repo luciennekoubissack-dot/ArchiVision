@@ -373,6 +373,11 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
     }
   }
 
+  /** Recharge éléments et flux depuis le backend (ex. après régénération de la proposition). */
+  reload(): void {
+    if (this.stage) this.load();
+  }
+
   ngAfterViewInit(): void {
     this.stage = new Konva.Stage({
       container: this.stageHost.nativeElement,

@@ -24,13 +24,16 @@ export class SuperAdminOrganisationEntity {
   @ApiPropertyOptional({ description: 'Pays.', nullable: true, type: String })
   pays?: string | null;
 
+  @ApiPropertyOptional({ description: 'Ville du siège social.', nullable: true, type: String })
+  ville?: string | null;
+
   @ApiProperty({ enum: StatutOrganisation, description: "Statut de validation de l'organisation." })
   statut!: StatutOrganisation;
 
   @ApiPropertyOptional({ description: 'Date de validation par le superadmin.', type: String, format: 'date-time', nullable: true })
   validatedAt?: Date | null;
 
-  @ApiPropertyOptional({ description: "Vision d'architecture (étape 1 de l'assistant TOGAF ADM).", nullable: true, type: String })
+  @ApiPropertyOptional({ description: "Objectif principal / vision de l'organisation.", nullable: true, type: String })
   vision?: string | null;
 
   @ApiPropertyOptional({ description: 'Problèmes à résoudre par cette organisation.', nullable: true, type: String })
@@ -94,6 +97,9 @@ export class AdminOrganisationListItemEntity {
 
   @ApiPropertyOptional({ description: 'Pays.', nullable: true, type: String })
   pays?: string | null;
+
+  @ApiPropertyOptional({ description: 'Ville du siège social.', nullable: true, type: String })
+  ville?: string | null;
 
   @ApiProperty({ enum: StatutOrganisation, description: "Statut de validation de l'organisation." })
   statut!: StatutOrganisation;

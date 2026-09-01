@@ -1,72 +1,126 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { Application, TypeZone, UrbanisationService, ZoneUrbanisation } from './urbanisation.service';
+import {
+  Application,
+  TypeZone,
+  UrbanisationService,
+  UrbanisationView,
+  ZoneUrbanisation,
+} from './urbanisation.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
+import { downloadPng, downloadSvg } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
+
+type Tab = 'zones' | 'affectations' | 'pos';
+
+const SVG_PNG_FORMATS: DownloadFormatOption[] = [
+  { value: 'svg', label: 'SVG' },
+  { value: 'png', label: 'PNG' },
+];
 
 const ICONS: Record<string, string> = {
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  trash:
+    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
 };
 
 @Component({
   selector: 'app-urbanisation',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DownloadMenuComponent],
   template: `
-    <div class="page-header">
-      <h3>Hiérarchie Zone &gt; Quartier &gt; Îlot</h3>
-      <button type="button" class="btn btn-primary" (click)="openCreateZone()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
-        Ajouter une zone
-      </button>
+    <p class="muted step-question">
+      Comment le système d'information est-il découpé en zones, quartiers et îlots, et quelles
+      applications occupent chaque îlot du plan d'occupation des sols ?
+    </p>
+
+    <div class="tabs">
+      <button class="tab" [class.active]="tab === 'zones'" (click)="selectTab('zones')">Zones</button>
+      <button class="tab" [class.active]="tab === 'affectations'" (click)="selectTab('affectations')">Affectations</button>
+      <button class="tab" [class.active]="tab === 'pos'" (click)="selectTab('pos')">Plan d'occupation des sols</button>
     </div>
 
-    <section class="card">
-      <div class="empty-state" *ngIf="zones.length === 0">Aucune zone définie.</div>
-      <ul class="tree" *ngIf="zones.length > 0">
-        <ng-container *ngFor="let root of zones">
-          <ng-container *ngTemplateOutlet="zoneNode; context: { $implicit: root }"></ng-container>
-        </ng-container>
-      </ul>
-      <ng-template #zoneNode let-node>
-        <li>
-          <div class="node-row">
-            <span class="node-nom">{{ node.nom }}</span>
-            <span class="badge badge-neutral">{{ node.type }}</span>
-            <span class="badge badge-neutral" *ngIf="node.type === 'ILOT'">{{ node._count?.applications || 0 }} application(s)</span>
-            <button class="btn btn-ghost" (click)="removeZone(node)">Supprimer</button>
-          </div>
-          <ul *ngIf="node.enfants?.length">
-            <ng-container *ngFor="let child of node.enfants">
-              <ng-container *ngTemplateOutlet="zoneNode; context: { $implicit: child }"></ng-container>
-            </ng-container>
-          </ul>
-        </li>
-      </ng-template>
-    </section>
-
-    <form class="card form-card" (submit)="affecter($event)">
-      <h3>Affecter une application à un îlot</h3>
-      <div class="grid-2">
-        <label class="field">
-          Application
-          <select [value]="affectation.applicationId" (change)="affectation.applicationId = $any($event.target).value">
-            <option value="" disabled>Choisir une application</option>
-            <option *ngFor="let app of applications" [value]="app.id">{{ app.nom }}</option>
-          </select>
-        </label>
-        <label class="field">
-          Îlot
-          <select [value]="affectation.zoneId" (change)="affectation.zoneId = $any($event.target).value">
-            <option value="" disabled>Choisir un îlot</option>
-            <option *ngFor="let ilot of ilots" [value]="ilot.id">{{ ilot.nom }}</option>
-          </select>
-        </label>
+    <!-- ── Onglet : hiérarchie des zones ─────────────────────────────────── -->
+    <ng-container *ngIf="tab === 'zones'">
+      <div class="page-header">
+        <h3>Hiérarchie Zone &gt; Quartier &gt; Îlot</h3>
+        <button type="button" class="btn btn-primary" (click)="openCreateZone()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
+          Ajouter une zone
+        </button>
       </div>
-      <button type="submit" class="btn btn-primary" [disabled]="affecting">Affecter</button>
-    </form>
+
+      <section class="card">
+        <div class="empty-state" *ngIf="zones.length === 0">Aucune zone définie.</div>
+        <ul class="tree" *ngIf="zones.length > 0">
+          <ng-container *ngFor="let root of zones">
+            <ng-container *ngTemplateOutlet="zoneNode; context: { $implicit: root }"></ng-container>
+          </ng-container>
+        </ul>
+        <ng-template #zoneNode let-node>
+          <li>
+            <div class="node-row">
+              <span class="node-nom">{{ node.nom }}</span>
+              <span class="badge badge-neutral">{{ node.type }}</span>
+              <span class="badge badge-neutral" *ngIf="node.type === 'ILOT'">{{ node._count?.applications || 0 }} application(s)</span>
+              <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeZone(node)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+              </button>
+            </div>
+            <ul *ngIf="node.enfants?.length">
+              <ng-container *ngFor="let child of node.enfants">
+                <ng-container *ngTemplateOutlet="zoneNode; context: { $implicit: child }"></ng-container>
+              </ng-container>
+            </ul>
+          </li>
+        </ng-template>
+      </section>
+    </ng-container>
+
+    <!-- ── Onglet : affectation des applications aux îlots ───────────────── -->
+    <ng-container *ngIf="tab === 'affectations'">
+      <form class="card form-card" (submit)="affecter($event)">
+        <h3>Affecter une application à un îlot</h3>
+        <div class="grid-2">
+          <label class="field">
+            Application
+            <select [value]="affectation.applicationId" (change)="affectation.applicationId = $any($event.target).value">
+              <option value="" disabled>Choisir une application</option>
+              <option *ngFor="let app of applications" [value]="app.id">{{ app.nom }}</option>
+            </select>
+          </label>
+          <label class="field">
+            Îlot
+            <select [value]="affectation.zoneId" (change)="affectation.zoneId = $any($event.target).value">
+              <option value="" disabled>Choisir un îlot</option>
+              <option *ngFor="let ilot of ilots" [value]="ilot.id">{{ ilot.nom }}</option>
+            </select>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary" [disabled]="affecting">Affecter</button>
+      </form>
+    </ng-container>
+
+    <!-- ── Onglet : plan d'occupation des sols (diagramme généré) ────────── -->
+    <ng-container *ngIf="tab === 'pos'">
+      <section class="card">
+        <div class="page-header">
+          <p class="summary">{{ posSummary }}</p>
+          <div class="actions">
+            <button type="button" class="icon-btn" title="Rafraîchir le plan" [disabled]="posLoading" (click)="generatePos()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+            </button>
+            <app-download-menu [formats]="svgPngFormats" [disabled]="!posSvg" (download)="exportPos($event)" />
+          </div>
+        </div>
+        <div class="empty-state" *ngIf="posLoading && !posSvg">Génération du plan d'occupation des sols…</div>
+        <div class="svg-container" *ngIf="posTrustedSvg" [innerHTML]="posTrustedSvg"></div>
+      </section>
+    </ng-container>
 
     <!-- ── Popover : ajouter une zone ────────────────────────────────────── -->
     <div class="popover-backdrop" *ngIf="createZonePopover" (click)="closeCreateZone()">
@@ -111,10 +165,17 @@ const ICONS: Record<string, string> = {
       .tree li { margin-bottom: 0.6rem; }
       .node-row { display: flex; align-items: center; gap: 0.6rem; }
       .node-nom { font-weight: 700; }
+      .summary { color: var(--color-text-muted); }
+      .actions { display: flex; gap: 0.5rem; }
+      .svg-container { overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; }
+      .svg-container ::ng-deep svg { max-width: 100%; height: auto; }
     `,
   ],
 })
 export class UrbanisationComponent implements OnInit {
+  tab: Tab = 'zones';
+  svgPngFormats = SVG_PNG_FORMATS;
+
   zones: ZoneUrbanisation[] = [];
   flatZones: ZoneUrbanisation[] = [];
   applications: Application[] = [];
@@ -126,6 +187,12 @@ export class UrbanisationComponent implements OnInit {
   affectation: { applicationId: string; zoneId: string } = { applicationId: '', zoneId: '' };
   affecting = false;
 
+  posSvg = '';
+  posTrustedSvg: SafeHtml | null = null;
+  posLoading = false;
+  posLoaded = false;
+  posSummary = '';
+
   constructor(
     private urbanisationService: UrbanisationService,
     private toast: ToastService,
@@ -135,6 +202,11 @@ export class UrbanisationComponent implements OnInit {
 
   icon(name: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
+  }
+
+  selectTab(tab: Tab): void {
+    this.tab = tab;
+    if (tab === 'pos' && !this.posLoaded && !this.posLoading) this.generatePos();
   }
 
   openCreateZone(): void {
@@ -207,6 +279,7 @@ export class UrbanisationComponent implements OnInit {
         this.creatingZone = false;
         this.closeCreateZone();
         this.loadZones();
+        this.invalidatePos();
         this.toast.success('Zone créée.');
       },
       error: () => {
@@ -224,6 +297,7 @@ export class UrbanisationComponent implements OnInit {
     this.urbanisationService.deleteZone(zone.id).subscribe({
       next: () => {
         this.loadZones();
+        this.invalidatePos();
         this.toast.success('Zone supprimée.');
       },
       error: () => this.toast.error('Impossible de supprimer cette zone.'),
@@ -239,6 +313,7 @@ export class UrbanisationComponent implements OnInit {
         this.affecting = false;
         this.affectation = { applicationId: '', zoneId: '' };
         this.loadZones();
+        this.invalidatePos();
         this.toast.success('Application affectée.');
       },
       error: (err) => {
@@ -248,5 +323,37 @@ export class UrbanisationComponent implements OnInit {
         else this.toast.error("Impossible d'affecter cette application.");
       },
     });
+  }
+
+  // ── Plan d'occupation des sols ────────────────────────────────────────────
+
+  /** Marque le plan comme périmé : il sera régénéré au prochain passage sur l'onglet. */
+  private invalidatePos(): void {
+    this.posLoaded = false;
+    if (this.tab === 'pos') this.generatePos();
+  }
+
+  generatePos(): void {
+    this.posLoading = true;
+    this.urbanisationService.generateView().subscribe({
+      next: (view: UrbanisationView) => {
+        this.posSvg = view.svg;
+        this.posTrustedSvg = this.sanitizer.bypassSecurityTrustHtml(view.svg);
+        this.posSummary = `${view.zoneCount} zone(s) · ${view.applicationCount} affectation(s)`;
+        this.posLoading = false;
+        this.posLoaded = true;
+      },
+      error: () => {
+        this.posLoading = false;
+        this.toast.error("Impossible de générer le plan d'occupation des sols.");
+      },
+    });
+  }
+
+  exportPos(format: string): void {
+    if (!this.posSvg) return;
+    const filename = `plan-occupation-des-sols.${format}`;
+    if (format === 'svg') downloadSvg(this.posSvg, filename);
+    else downloadPng(this.posSvg, filename);
   }
 }

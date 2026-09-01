@@ -57,24 +57,48 @@ const STATUT_BADGE: Record<StatutOrganisation, string> = {
               <td>{{ org.createdAt | date: 'dd/MM/yyyy' }}</td>
               <td class="actions">
                 <button class="btn btn-ghost" (click)="toggleDetail(org)">
-                  {{ expandedId === org.id ? 'Masquer' : 'Détails' }}
+                  {{ expandedId === org.id ? 'Masquer' : org.statut === 'EN_ATTENTE' ? 'Vérifier' : 'Détails' }}
                 </button>
-                <button class="btn btn-outline" *ngIf="org.statut === 'EN_ATTENTE'" (click)="valider(org)">Valider</button>
-                <button class="btn btn-ghost" *ngIf="org.statut === 'EN_ATTENTE'" (click)="rejeter(org)">Rejeter</button>
                 <button class="btn btn-danger" (click)="remove(org)">Supprimer</button>
               </td>
             </tr>
             <tr *ngIf="expandedId === org.id">
               <td colspan="7" class="detail-row">
                 <div class="empty-state" *ngIf="!detail">Chargement…</div>
-                <div *ngIf="detail">
-                  <h4>Employés ({{ detail.users.length }})</h4>
-                  <ul class="employee-list" *ngIf="detail.users.length > 0">
-                    <li *ngFor="let u of detail.users">
-                      <strong>{{ u.nom }}</strong> — {{ u.email }} — <span class="badge badge-neutral">{{ u.role }}</span>
-                    </li>
-                  </ul>
-                  <p class="muted" *ngIf="detail.users.length === 0">Aucun employé pour l'instant.</p>
+                <div class="review" *ngIf="detail">
+                  <div class="review-grid">
+                    <div><span class="review-label">Nom</span><strong>{{ detail.nom }}</strong></div>
+                    <div><span class="review-label">Localisation</span><strong>{{ localisation(detail) }}</strong></div>
+                    <div><span class="review-label">Secteur</span><strong>{{ detail.secteur || 'Non renseigné' }}</strong></div>
+                    <div><span class="review-label">Responsable</span><strong>{{ responsableLabel(detail) }}</strong></div>
+                    <div class="review-full"><span class="review-label">Objectif</span><strong>{{ detail.vision || 'Non renseigné' }}</strong></div>
+                  </div>
+
+                  <p class="review-warning" *ngIf="champsManquants(detail).length > 0">
+                    Informations incomplètes : {{ champsManquants(detail).join(', ') }}. La validation reste bloquée tant que ces champs ne sont pas remplis.
+                  </p>
+
+                  <div class="review-actions" *ngIf="detail.statut === 'EN_ATTENTE'">
+                    <button
+                      class="btn btn-outline"
+                      [disabled]="champsManquants(detail).length > 0"
+                      [title]="champsManquants(detail).length > 0 ? 'Champs obligatoires incomplets' : 'Valider cette organisation'"
+                      (click)="valider(detail)"
+                    >
+                      Valider
+                    </button>
+                    <button class="btn btn-ghost" (click)="rejeter(detail)">Rejeter</button>
+                  </div>
+
+                  <details class="employees">
+                    <summary>Employés ({{ detail.users.length }})</summary>
+                    <ul class="employee-list" *ngIf="detail.users.length > 0">
+                      <li *ngFor="let u of detail.users">
+                        <strong>{{ u.nom }}</strong>, {{ u.email }} <span class="badge badge-neutral">{{ u.role }}</span>
+                      </li>
+                    </ul>
+                    <p class="muted" *ngIf="detail.users.length === 0">Aucun employé pour l'instant.</p>
+                  </details>
                 </div>
               </td>
             </tr>
@@ -91,9 +115,18 @@ const STATUT_BADGE: Record<StatutOrganisation, string> = {
       .table td { padding: 0.75rem; border-bottom: 1px solid var(--color-border); font-size: 0.92rem; }
       .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
       .detail-row { background: var(--color-surface); }
+      .review { display: grid; gap: 1rem; padding: 0.5rem 0; }
+      .review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1.5rem; }
+      .review-grid > div { display: flex; flex-direction: column; gap: 0.15rem; }
+      .review-grid .review-full { grid-column: 1 / -1; }
+      .review-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+      .review-warning { color: var(--color-danger); font-size: 0.85rem; background: var(--color-danger-light, rgba(220, 38, 38, 0.08)); padding: 0.6rem 0.75rem; border-radius: 8px; }
+      .review-actions { display: flex; gap: 0.5rem; }
+      .employees { font-size: 0.9rem; }
+      .employees summary { cursor: pointer; color: var(--color-text-muted); }
       .employee-list { list-style: none; display: grid; gap: 0.5rem; margin-top: 0.5rem; }
-      h4 { font-size: 0.95rem; }
       .muted { color: var(--color-text-muted); margin-top: 0.5rem; }
+      @media (max-width: 640px) { .review-grid { grid-template-columns: 1fr; } }
     `,
   ],
 })
@@ -160,24 +193,54 @@ export class AdminOrganisationsComponent implements OnInit {
     });
   }
 
-  valider(org: OrganisationAdmin): void {
+  localisation(detail: OrganisationDetailAdmin): string {
+    const parts = [detail.ville, detail.pays].filter((p) => !!p && p.trim());
+    return parts.length ? parts.join(', ') : 'Non renseignée';
+  }
+
+  responsableLabel(detail: OrganisationDetailAdmin): string {
+    const admin = detail.users.find((u) => u.role === 'ADMINISTRATEUR');
+    return admin ? `${admin.nom} (${admin.email})` : 'Aucun compte administrateur';
+  }
+
+  champsManquants(detail: OrganisationDetailAdmin): string[] {
+    const manquants: string[] = [];
+    if (!detail.nom?.trim()) manquants.push('Nom');
+    if (!detail.secteur?.trim()) manquants.push('Secteur');
+    if (!detail.pays?.trim()) manquants.push('Pays');
+    if (!detail.ville?.trim()) manquants.push('Ville');
+    if (!detail.vision?.trim()) manquants.push('Objectif');
+    if (!detail.users.some((u) => u.role === 'ADMINISTRATEUR')) manquants.push('Compte administrateur');
+    return manquants;
+  }
+
+  valider(org: { id: string }): void {
     this.adminService.valider(org.id).subscribe({
       next: ({ email }) => {
-        this.toast.success(`Organisation validée. Email simulé envoyé à ${email.to}.`);
+        this.toast.success(`Organisation validée. E-mail de connexion envoyé à ${email.to}.`);
+        this.collapse();
         this.load();
       },
-      error: () => this.toast.error("Impossible de valider cette organisation."),
+      error: (err) =>
+        this.toast.error(err?.error?.message ?? "Impossible de valider cette organisation."),
     });
   }
 
-  rejeter(org: OrganisationAdmin): void {
+  rejeter(org: { id: string }): void {
     this.adminService.rejeter(org.id).subscribe({
       next: ({ email }) => {
-        this.toast.success(`Organisation rejetée. Email simulé envoyé à ${email.to}.`);
+        this.toast.success(`Organisation rejetée. E-mail de notification envoyé à ${email.to}.`);
+        this.collapse();
         this.load();
       },
-      error: () => this.toast.error("Impossible de rejeter cette organisation."),
+      error: (err) =>
+        this.toast.error(err?.error?.message ?? "Impossible de rejeter cette organisation."),
     });
+  }
+
+  private collapse(): void {
+    this.expandedId = null;
+    this.detail = null;
   }
 
   async remove(org: OrganisationAdmin): Promise<void> {

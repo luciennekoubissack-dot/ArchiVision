@@ -16,6 +16,14 @@ export class UpdateBpmnProcessusDto {
   @MaxLength(2000)
   description?: string;
 
+  @ApiPropertyOptional({
+    description: "Étapes du processus en langage naturel, une par ligne (source de la génération de diagramme).",
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(5000)
+  etapes?: string;
+
   @ApiPropertyOptional({ enum: TypeProcessus, description: 'Type du processus BPMN' })
   @IsEnum(TypeProcessus)
   @IsOptional()

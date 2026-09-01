@@ -25,6 +25,11 @@ export interface BpmnProcessusDetailEntity {
   elements: Array<BpmnElementWithFlowsEntity>;
 
   /**
+   * Étapes du processus en langage naturel, une par ligne (source de la génération de diagramme).
+   */
+  etapes?: string | null;
+
+  /**
    * Identifiant du processus BPMN.
    */
   id: string;

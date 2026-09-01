@@ -36,3 +36,6 @@ prisma/migrations/*.sql.bak
 
 # TypeScript incremental
 *.tsbuildinfo
+
+# Guide interne personnel, pas destiné au dépôt partagé
+/GUIDE_INTERNE.md

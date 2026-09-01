@@ -21,6 +21,10 @@ export const routes: Routes = [
     canActivate: [GuestGuard],
   },
   {
+    path: 'inscription-recue',
+    loadComponent: () => import('../auth/inscription-recue.component').then((m) => m.InscriptionRecueComponent),
+  },
+  {
     path: '',
     component: AppShellComponent,
     canActivate: [AuthGuard],

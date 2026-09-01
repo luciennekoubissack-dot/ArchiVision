@@ -16,6 +16,7 @@ describe('SolutionService', () => {
     commentaireSuivi: null,
     planMiseOeuvre: null,
     scores: [],
+    gaps: [],
     organisationId: 'org-001',
     createdAt: '2026-07-01T10:00:00.000Z',
     updatedAt: '2026-07-01T10:00:00.000Z',
@@ -89,6 +90,31 @@ describe('SolutionService', () => {
     req.flush(mockSolution);
 
     expect(result).toEqual(mockSolution);
+  });
+
+  it('met à jour les écarts adressés par une solution', () => {
+    let result: unknown;
+    const items = [{ domaine: 'OBJECTIF' as const, elementId: 'objectif-001', elementNom: 'Digitaliser la gestion' }];
+    service.updateGaps(mockSolution.id, items).subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne(`/api/v1/solutions/${mockSolution.id}/gaps`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ items });
+    req.flush(mockSolution);
+
+    expect(result).toEqual(mockSolution);
+  });
+
+  it('liste tous les écarts adressés', () => {
+    let result: unknown;
+    const gap = { id: 'gap-001', solutionId: mockSolution.id, domaine: 'OBJECTIF', elementId: 'objectif-001', elementNom: 'Digitaliser la gestion', createdAt: '2026-07-01T10:00:00.000Z', solution: { id: mockSolution.id, nom: mockSolution.nom } };
+    service.listGaps().subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne('/api/v1/solutions/gaps');
+    expect(req.request.method).toBe('GET');
+    req.flush([gap]);
+
+    expect(result).toEqual([gap]);
   });
 
   it('supprime une solution', () => {

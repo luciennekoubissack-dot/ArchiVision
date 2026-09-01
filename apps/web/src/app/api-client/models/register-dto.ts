@@ -77,9 +77,9 @@ export interface RegisterDto {
   password: string;
 
   /**
-   * Pays de l'organisation.
+   * Pays du siège social de l'organisation.
    */
-  pays?: string;
+  pays: string;
 
   /**
    * Problèmes que l'organisation cherche à résoudre.
@@ -89,7 +89,7 @@ export interface RegisterDto {
   /**
    * Secteur d'activité de l'organisation.
    */
-  secteur?: string;
+  secteur: string;
 
   /**
    * Taille de l'organisation.
@@ -102,7 +102,12 @@ export interface RegisterDto {
   techComponents?: Array<TechComponentItemDto>;
 
   /**
-   * Vision de l'organisation.
+   * Ville du siège social de l'organisation.
    */
-  vision?: string;
+  ville: string;
+
+  /**
+   * Objectif principal / vision de l'organisation (sert à la revue du superadmin).
+   */
+  vision: string;
 }

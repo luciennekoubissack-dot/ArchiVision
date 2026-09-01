@@ -3,13 +3,12 @@ import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Observable } from 'rxjs';
 import { ArchimateService } from '../architecture-metier/archimate.service';
-import { UrbanisationService } from '../urbanisation/urbanisation.service';
 import { ServiceEntrepriseService } from '../organisation/service-entreprise.service';
 import { ToastService } from '../shared/toast.service';
 import { downloadPng, downloadSvg } from '../shared/download.util';
 import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 
-type VueTab = 'archimate' | 'organigramme' | 'pos';
+type VueTab = 'archimate' | 'organigramme';
 
 const SVG_PNG_FORMATS: DownloadFormatOption[] = [
   { value: 'svg', label: 'SVG' },
@@ -40,7 +39,6 @@ const ICONS: Record<string, string> = {
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'archimate'" (click)="select('archimate')">Vue ArchiMate</button>
       <button class="tab" [class.active]="tab === 'organigramme'" (click)="select('organigramme')">Organigramme</button>
-      <button class="tab" [class.active]="tab === 'pos'" (click)="select('pos')">POS (urbanisation)</button>
     </div>
 
     <section class="card">
@@ -73,12 +71,10 @@ export class VuesComponent implements OnInit {
   states: Record<VueTab, VueState> = {
     archimate: emptyState(),
     organigramme: emptyState(),
-    pos: emptyState(),
   };
 
   constructor(
     private archimateService: ArchimateService,
-    private urbanisationService: UrbanisationService,
     private serviceEntrepriseService: ServiceEntrepriseService,
     private toast: ToastService,
     private sanitizer: DomSanitizer,
@@ -108,9 +104,7 @@ export class VuesComponent implements OnInit {
     const request$: Observable<any> =
       tab === 'archimate'
         ? this.archimateService.generateView()
-        : tab === 'organigramme'
-          ? this.serviceEntrepriseService.generateView()
-          : this.urbanisationService.generateView();
+        : this.serviceEntrepriseService.generateView();
 
     request$.subscribe({
       next: (view: any) => {
@@ -129,8 +123,7 @@ export class VuesComponent implements OnInit {
 
   private summaryFor(tab: VueTab, view: any): string {
     if (tab === 'archimate') return `${view.elementCount} élément(s) — ${view.relationCount} relation(s)`;
-    if (tab === 'organigramme') return `${view.serviceCount} service(s) — ${view.membreCount} membre(s)`;
-    return `${view.zoneCount} zone(s) — ${view.applicationCount} affectation(s)`;
+    return `${view.serviceCount} service(s) — ${view.membreCount} membre(s)`;
   }
 
   export(format: string): void {

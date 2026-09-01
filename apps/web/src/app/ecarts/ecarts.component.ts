@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BpmnElement, BpmnProcessus, BpmnService, TypeBpmn, TypeProcessus } from '../vision/bpmn.service';
-import { DomainTab, DOMAIN_LABEL, GapAnalysisService, GapRow } from './gap-analysis.service';
+import { DomainTab, DOMAIN_LABEL, DOMAIN_TO_DOMAINE_ECART, GapAnalysisService, GapRow } from './gap-analysis.service';
+import { SolutionGap, SolutionService } from '../opportunites/solution.service';
 import { ToastService } from '../shared/toast.service';
 
 type MainTab = 'processus' | DomainTab;
@@ -89,6 +90,10 @@ interface GapElement extends BpmnElement {
           <span class="stat-value">{{ currentDomain.nouveaux.length }}</span>
           <span class="stat-label">Nouveaux</span>
         </div>
+        <div class="stat">
+          <span class="stat-value">{{ nonAdressesCount }}</span>
+          <span class="stat-label">Non adressés par une solution</span>
+        </div>
       </div>
 
       <div class="empty-state" *ngIf="!currentDomain.loaded">Chargement…</div>
@@ -105,12 +110,16 @@ interface GapElement extends BpmnElement {
         </p>
         <div class="table-scroll">
           <table class="table">
-            <thead><tr><th>Baseline (AS-IS)</th><th>Target (TO-BE)</th><th>État</th></tr></thead>
+            <thead><tr><th>Baseline (AS-IS)</th><th>Target (TO-BE)</th><th>État</th><th>Solution</th></tr></thead>
             <tbody>
               <tr *ngFor="let row of currentDomain.rows">
                 <td>{{ row.asIs?.nom ?? '—' }}</td>
                 <td>{{ row.toBe.length > 0 ? namesOf(row.toBe) : '—' }}</td>
                 <td><span class="badge" [class]="etatBadge(row.etat)">{{ row.etat }}</span></td>
+                <td>
+                  <span class="badge badge-success" *ngIf="isAddressed(row)">Adressé</span>
+                  <span class="badge badge-warning" *ngIf="!isAddressed(row)">Non adressé</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -251,9 +260,12 @@ export class EcartsComponent implements OnInit {
     technologique: emptyGapState(),
   };
 
+  private allGaps: SolutionGap[] = [];
+
   constructor(
     private bpmnService: BpmnService,
     private gapAnalysisService: GapAnalysisService,
+    private solutionService: SolutionService,
     private toast: ToastService,
   ) {}
 
@@ -261,6 +273,10 @@ export class EcartsComponent implements OnInit {
     this.bpmnService.list().subscribe({
       next: (processus) => (this.processus = processus),
       error: () => this.toast.error('Impossible de charger les processus.'),
+    });
+    this.solutionService.listGaps().subscribe({
+      next: (gaps) => (this.allGaps = gaps),
+      error: () => this.toast.error('Impossible de charger les écarts adressés par les solutions.'),
     });
   }
 
@@ -285,6 +301,17 @@ export class EcartsComponent implements OnInit {
     if (etat === 'Éliminé') return 'badge-danger';
     if (etat === 'Modifié') return 'badge-warning';
     return 'badge-success';
+  }
+
+  /** Un écart est « adressé » si au moins un de ses éléments cibles (TO-BE, ou AS-IS seul pour un écart Éliminé) figure dans une solution. */
+  isAddressed(row: GapRow): boolean {
+    const domaine = DOMAIN_TO_DOMAINE_ECART[this.mainTab as DomainTab];
+    const targets = row.toBe.length > 0 ? row.toBe : row.asIs ? [row.asIs] : [];
+    return targets.some((t) => this.allGaps.some((g) => g.domaine === domaine && g.elementId === t.id));
+  }
+
+  get nonAdressesCount(): number {
+    return this.currentDomain.rows.filter((row) => !this.isAddressed(row)).length;
   }
 
   selectDomain(tab: DomainTab): void {

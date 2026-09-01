@@ -16,6 +16,8 @@ import { technologieControllerUpdate } from '../api-client/fn/tech-components/te
 import { technologieControllerRemove } from '../api-client/fn/tech-components/technologie-controller-remove';
 import { technologieControllerDeployer } from '../api-client/fn/tech-components/technologie-controller-deployer';
 import { technologieControllerUndeployer } from '../api-client/fn/tech-components/technologie-controller-undeployer';
+import { technologieControllerGenerateLayout } from '../api-client/fn/tech-components/technologie-controller-generate-layout';
+import { DiagramLayoutResultEntity } from '../api-client/models/diagram-layout-result-entity';
 
 export type TypeTechComponent = 'SERVEUR' | 'RESEAU' | 'CLOUD' | 'BASE_DE_DONNEES' | 'MIDDLEWARE';
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
@@ -74,5 +76,10 @@ export class TechnologieService {
     return technologieControllerUndeployer(this.http, this.config.rootUrl, { techComponentId, applicationId }).pipe(
       map(() => undefined),
     );
+  }
+
+  /** Dispose automatiquement les composants du diagramme de déploiement en grille. */
+  generateLayout(): Observable<DiagramLayoutResultEntity> {
+    return technologieControllerGenerateLayout(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 }

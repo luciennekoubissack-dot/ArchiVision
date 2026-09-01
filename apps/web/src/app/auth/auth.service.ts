@@ -51,10 +51,14 @@ export class AuthService {
     );
   }
 
+  /**
+   * Inscription : n'ouvre aucune session. L'organisation démarre EN_ATTENTE et
+   * ne pourra se connecter qu'après validation par le superadmin (lien de
+   * connexion envoyé par e-mail).
+   */
   register(payload: RegisterPayload): Observable<RegisterResponse> {
     return authControllerRegister(this.http, this.config.rootUrl, { body: payload }).pipe(
       map((r) => r.body),
-      tap((response) => this.storeSession(response)),
     );
   }
 

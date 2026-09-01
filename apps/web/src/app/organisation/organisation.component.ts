@@ -255,7 +255,11 @@ const ICONS: Record<string, string> = {
               <tr *ngFor="let p of partiesPrenantes">
                 <td>{{ p.nom }}</td>
                 <td>{{ p.role || '—' }}</td>
-                <td class="row-actions"><button class="btn btn-ghost" (click)="removePartiePrenante(p)">Retirer</button></td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-danger" title="Retirer" (click)="removePartiePrenante(p)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -448,7 +452,9 @@ const ICONS: Record<string, string> = {
             <div class="node-row">
               <span class="node-nom">{{ node.nom }}</span>
               <span class="badge badge-neutral">{{ node._count?.membres || 0 }} membre(s)</span>
-              <button class="btn btn-ghost" (click)="removeService(node)">Supprimer</button>
+              <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeService(node)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+              </button>
             </div>
             <ul *ngIf="node.enfants?.length">
               <ng-container *ngFor="let child of node.enfants">

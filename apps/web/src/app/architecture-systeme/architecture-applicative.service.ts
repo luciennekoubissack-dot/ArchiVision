@@ -17,6 +17,8 @@ import { architectureApplicativeControllerFindAllFlux } from '../api-client/fn/a
 import { architectureApplicativeControllerCreateFlux } from '../api-client/fn/architecture-applicative/architecture-applicative-controller-create-flux';
 import { architectureApplicativeControllerRemoveFlux } from '../api-client/fn/architecture-applicative/architecture-applicative-controller-remove-flux';
 import { architectureApplicativeControllerGenerateVue } from '../api-client/fn/architecture-applicative/architecture-applicative-controller-generate-vue';
+import { architectureApplicativeControllerGenerateLayout } from '../api-client/fn/architecture-applicative/architecture-applicative-controller-generate-layout';
+import { DiagramLayoutResultEntity } from '../api-client/models/diagram-layout-result-entity';
 
 export type TypeElementArchiApplicative =
   | 'UTILISATEUR_INTERNE'
@@ -89,5 +91,10 @@ export class ArchitectureApplicativeService {
 
   generateView(): Observable<ArchiApplicativeView> {
     return architectureApplicativeControllerGenerateVue(this.http, this.config.rootUrl).pipe(map((r) => r.body));
+  }
+
+  /** Dispose automatiquement les éléments en couloirs par type. */
+  generateLayout(): Observable<DiagramLayoutResultEntity> {
+    return architectureApplicativeControllerGenerateLayout(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 }

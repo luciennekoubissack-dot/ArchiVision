@@ -22,8 +22,20 @@ describe('AuthController (HTTP)', () => {
     nom: 'Admin',
     organisationId: 'org-001',
     role: RoleUtilisateur.ADMINISTRATEUR,
+    organisation: { statut: 'VALIDEE' as const },
     createdAt: new Date('2026-07-01T10:00:00.000Z'),
     updatedAt: new Date('2026-07-01T10:00:00.000Z'),
+  };
+
+  const registerPayload = {
+    organisationNom: 'Nouvelle Entreprise',
+    secteur: 'Conseil',
+    pays: 'France',
+    ville: 'Lyon',
+    vision: 'Digitaliser la gestion administrative',
+    email: 'fondateur@nouvelle-entreprise.local',
+    password: 'MotDePasse123!',
+    nom: 'Fondateur',
   };
 
   const txMock = {
@@ -74,13 +86,23 @@ describe('AuthController (HTTP)', () => {
   });
 
   describe('POST /auth/register', () => {
-    it("est accessible sans authentification, crée une organisation en attente + un Administrateur, et connecte immédiatement", async () => {
+    it("est accessible sans authentification, crée une organisation EN_ATTENTE + un Administrateur, sans ouvrir de session", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
-      const createdOrg = { id: 'org-002', nom: 'Nouvelle Entreprise', description: null, secteur: null, taille: null, pays: null, logoUrl: null, statut: 'EN_ATTENTE' };
+      const createdOrg = {
+        id: 'org-002',
+        nom: registerPayload.organisationNom,
+        description: null,
+        secteur: registerPayload.secteur,
+        taille: null,
+        pays: registerPayload.pays,
+        ville: registerPayload.ville,
+        logoUrl: null,
+        statut: 'EN_ATTENTE',
+      };
       const createdUser = {
         id: 'user-002',
-        email: 'fondateur@nouvelle-entreprise.local',
-        nom: 'Fondateur',
+        email: registerPayload.email,
+        nom: registerPayload.nom,
         organisationId: createdOrg.id,
         role: RoleUtilisateur.ADMINISTRATEUR,
       };
@@ -89,23 +111,13 @@ describe('AuthController (HTTP)', () => {
 
       const response = await request(app.getHttpServer())
         .post('/auth/register')
-        .send({
-          organisationNom: createdOrg.nom,
-          email: createdUser.email,
-          password: 'MotDePasse123!',
-          nom: createdUser.nom,
-        })
+        .send(registerPayload)
         .expect(201);
 
-      expect(response.body).toHaveProperty('accessToken');
-      expect(response.body.user).toEqual({
-        id: createdUser.id,
-        email: createdUser.email,
-        nom: createdUser.nom,
-        avatarUrl: null,
-        role: createdUser.role,
-      });
+      expect(response.body).not.toHaveProperty('accessToken');
+      expect(response.body).not.toHaveProperty('user');
       expect(response.body.organisation).toEqual({ id: createdOrg.id, nom: createdOrg.nom, statut: 'EN_ATTENTE' });
+      expect(typeof response.body.message).toBe('string');
     });
 
     it('retourne 409 si l\'email est déjà utilisé', async () => {
@@ -113,20 +125,20 @@ describe('AuthController (HTTP)', () => {
 
       await request(app.getHttpServer())
         .post('/auth/register')
-        .send({
-          organisationNom: 'Autre Entreprise',
-          email: mockUser.email,
-          password: 'MotDePasse123!',
-          nom: 'Quelqu\'un',
-        })
+        .send({ ...registerPayload, organisationNom: 'Autre Entreprise' })
         .expect(409);
     });
 
     it('retourne 400 si le mot de passe est trop court', async () => {
       await request(app.getHttpServer())
         .post('/auth/register')
-        .send({ organisationNom: 'X', email: 'x@x.local', password: 'short', nom: 'X' })
+        .send({ ...registerPayload, password: 'short' })
         .expect(400);
+    });
+
+    it('retourne 400 si un champ de revue obligatoire est absent (ville)', async () => {
+      const { ville: _ville, ...sansVille } = registerPayload;
+      await request(app.getHttpServer()).post('/auth/register').send(sansVille).expect(400);
     });
   });
 
@@ -172,13 +184,18 @@ describe('AuthController (HTTP)', () => {
         .expect(400);
     });
 
-    it("retourne 200 même si l'organisation est en attente de validation (plus de blocage à la connexion)", async () => {
-      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+    it("retourne 403 si l'organisation est en attente de validation", async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organisation: { statut: 'EN_ATTENTE' },
+      });
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post('/auth/login')
         .send({ email: mockUser.email, password: 'Admin123!' })
-        .expect(200);
+        .expect(403);
+
+      expect(response.body.code).toBe('ORGANISATION_NON_VALIDEE');
     });
   });
 
