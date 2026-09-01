@@ -123,16 +123,23 @@ model Service {
 // ─── Objectif stratégique (version allégée) ────────────────────────────────────
 
 model Objectif {
-  id             String       @id @default(uuid())
+  id             String        @id @default(uuid())
   nom            String
   description    String?
-  sousObjectif   String?      @map("sous_objectif")
+  sousObjectif   String?       @map("sous_objectif")
+  statut         StatutElement @default(LES_DEUX)
+  // Objectif AS-IS dont cet objectif TO-BE est l'évolution (analyse des écarts).
+  // Null pour un objectif AS-IS ou un objectif LES_DEUX (inchangé, pas d'évolution à comparer).
+  objectifAsIsId String?       @map("objectif_as_is_id")
+  objectifAsIs   Objectif?     @relation("ObjectifEvolution", fields: [objectifAsIsId], references: [id], onDelete: SetNull)
+  objectifsToBe  Objectif[]    @relation("ObjectifEvolution")
   organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([organisationId])
+  @@index([objectifAsIsId])
 }
 
 // ─── CapaciteMetier ───────────────────────────────────────────────────────────
@@ -731,10 +738,43 @@ model Solution {
   organisation      Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   scores            EvaluationScore[]
   conformites       ConformiteSolution[]
+  gaps              SolutionGap[]
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
   @@index([organisationId])
+}
+
+/// Domaine architectural d'où provient un écart (analyse des écarts) référencé
+/// par une solution — reflète les 5 onglets du module Analyse des écarts.
+enum DomaineEcart {
+  OBJECTIF
+  METIER
+  DONNEES
+  APPLICATIF
+  TECHNOLOGIQUE
+}
+
+/// Lien entre une solution et l'écart (élément AS-IS/TO-BE d'un domaine
+/// architectural) qu'elle est censée combler — trace la solution jusqu'au
+/// besoin identifié en analyse des écarts (phase E de l'ADM TOGAF).
+/// Référence par identifiant + libellé plutôt que par relation Prisma stricte
+/// (l'élément source peut provenir de 5 tables différentes selon `domaine`,
+/// et Prisma ne modélise pas les relations polymorphes) : la suppression de
+/// l'élément d'origine ne supprime donc pas ce lien, qui devient orphelin
+/// (assumé, cas rare, pas de nettoyage automatique pour l'instant).
+model SolutionGap {
+  id         String       @id @default(uuid())
+  solutionId String
+  solution   Solution     @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  domaine    DomaineEcart
+  elementId  String       @map("element_id")
+  elementNom String       @map("element_nom")
+  createdAt  DateTime     @default(now())
+
+  @@unique([solutionId, domaine, elementId])
+  @@index([solutionId])
+  @@index([domaine, elementId])
 }
 
 /// Critère de comparaison utilisé dans la matrice d'évaluation des solutions

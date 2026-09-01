@@ -4,6 +4,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { BpmnProcessus, BpmnService, TypeProcessus } from '../vision/bpmn.service';
 import { ToastService } from '../shared/toast.service';
 import { downloadPng, downloadSvg } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 
 const TYPE_PROCESSUS_ORDER: TypeProcessus[] = ['PILOTAGE', 'METIER', 'SUPPORT'];
 const TYPE_PROCESSUS_LABEL: Record<TypeProcessus, string> = {
@@ -11,17 +12,19 @@ const TYPE_PROCESSUS_LABEL: Record<TypeProcessus, string> = {
   METIER: 'Processus métier',
   SUPPORT: 'Processus support',
 };
+const SVG_PNG_FORMATS: DownloadFormatOption[] = [
+  { value: 'svg', label: 'SVG' },
+  { value: 'png', label: 'PNG' },
+];
 
 const ICONS: Record<string, string> = {
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
-  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
-  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
 };
 
 @Component({
   selector: 'app-bpmn-vues',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DownloadMenuComponent],
   template: `
     <p class="muted intro">
       Chaque processus défini dans le module Vision dispose ici de son diagramme BPMN généré  sélectionnez un
@@ -58,23 +61,14 @@ const ICONS: Record<string, string> = {
         <div class="page-header">
           <h3>{{ selected.nom }}</h3>
           <div class="actions">
-            <button type="button" class="icon-btn" title="Générer" [disabled]="loading" (click)="generate()">
+            <button type="button" class="icon-btn" title="Rafraîchir le diagramme" [disabled]="loading" (click)="generate()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
             </button>
-            <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="svg" (click)="clear()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
-            </button>
-            <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="svg" (click)="export('svg')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-            </button>
-            <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="svg" (click)="export('png')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-            </button>
+            <app-download-menu [formats]="svgPngFormats" [disabled]="!svg" (download)="export($event)" />
           </div>
         </div>
         <p class="summary" *ngIf="summary">{{ summary }}</p>
-        <div class="empty-state" *ngIf="loading">Génération du diagramme…</div>
-        <div class="empty-state" *ngIf="!loading && !svg">Cliquez sur « Générer » pour afficher ce diagramme.</div>
+        <div class="empty-state" *ngIf="loading && !svg">Génération du diagramme…</div>
         <div class="svg-container" *ngIf="trustedSvg" [innerHTML]="trustedSvg"></div>
       </section>
     </div>
@@ -102,6 +96,7 @@ const ICONS: Record<string, string> = {
 })
 export class BpmnVuesComponent implements OnInit {
   typesProcessus = TYPE_PROCESSUS_ORDER;
+  svgPngFormats = SVG_PNG_FORMATS;
   processus: BpmnProcessus[] = [];
   selected: BpmnProcessus | null = null;
 
@@ -137,7 +132,10 @@ export class BpmnVuesComponent implements OnInit {
 
   select(p: BpmnProcessus): void {
     this.selected = p;
-    this.clear();
+    this.svg = '';
+    this.trustedSvg = null;
+    this.summary = '';
+    this.generate();
   }
 
   generate(): void {
@@ -157,13 +155,7 @@ export class BpmnVuesComponent implements OnInit {
     });
   }
 
-  clear(): void {
-    this.svg = '';
-    this.trustedSvg = null;
-    this.summary = '';
-  }
-
-  export(format: 'svg' | 'png'): void {
+  export(format: string): void {
     if (!this.svg || !this.selected) return;
     const filename = `bpmn-${this.selected.nom}.${format}`;
     if (format === 'svg') downloadSvg(this.svg, filename);

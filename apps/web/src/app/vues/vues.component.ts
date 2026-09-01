@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Observable } from 'rxjs';
@@ -7,8 +7,14 @@ import { UrbanisationService } from '../urbanisation/urbanisation.service';
 import { ServiceEntrepriseService } from '../organisation/service-entreprise.service';
 import { ToastService } from '../shared/toast.service';
 import { downloadPng, downloadSvg } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 
 type VueTab = 'archimate' | 'organigramme' | 'pos';
+
+const SVG_PNG_FORMATS: DownloadFormatOption[] = [
+  { value: 'svg', label: 'SVG' },
+  { value: 'png', label: 'PNG' },
+];
 
 interface VueState {
   svg: string;
@@ -24,14 +30,12 @@ function emptyState(): VueState {
 
 const ICONS: Record<string, string> = {
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
-  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
-  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
 };
 
 @Component({
   selector: 'app-vues',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DownloadMenuComponent],
   template: `
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'archimate'" (click)="select('archimate')">Vue ArchiMate</button>
@@ -43,22 +47,13 @@ const ICONS: Record<string, string> = {
       <div class="page-header">
         <p class="summary">{{ current.summary }}</p>
         <div class="actions">
-          <button type="button" class="icon-btn" title="Générer" [disabled]="current.loading" (click)="generate(tab)">
+          <button type="button" class="icon-btn" title="Rafraîchir la vue" [disabled]="current.loading" (click)="generate(tab)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
           </button>
-          <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="current.svg" (click)="clear(tab)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
-          </button>
-          <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="current.svg" (click)="export('svg')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-          </button>
-          <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="current.svg" (click)="export('png')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-          </button>
+          <app-download-menu [formats]="svgPngFormats" [disabled]="!current.svg" (download)="export($event)" />
         </div>
       </div>
-      <div class="empty-state" *ngIf="current.loading">Génération de la vue…</div>
-      <div class="empty-state" *ngIf="!current.loading && !current.svg">Cliquez sur « Générer » pour afficher cette vue.</div>
+      <div class="empty-state" *ngIf="current.loading && !current.svg">Génération de la vue…</div>
       <div class="svg-container" *ngIf="current.trustedSvg" [innerHTML]="current.trustedSvg"></div>
     </section>
   `,
@@ -71,8 +66,9 @@ const ICONS: Record<string, string> = {
     `,
   ],
 })
-export class VuesComponent {
+export class VuesComponent implements OnInit {
   tab: VueTab = 'archimate';
+  svgPngFormats = SVG_PNG_FORMATS;
 
   states: Record<VueTab, VueState> = {
     archimate: emptyState(),
@@ -88,6 +84,10 @@ export class VuesComponent {
     private sanitizer: DomSanitizer,
   ) {}
 
+  ngOnInit(): void {
+    this.generate(this.tab);
+  }
+
   get current(): VueState {
     return this.states[this.tab];
   }
@@ -98,6 +98,7 @@ export class VuesComponent {
 
   select(tab: VueTab): void {
     this.tab = tab;
+    if (!this.states[tab].loaded && !this.states[tab].loading) this.generate(tab);
   }
 
   generate(tab: VueTab): void {
@@ -126,17 +127,13 @@ export class VuesComponent {
     });
   }
 
-  clear(tab: VueTab): void {
-    this.states[tab] = emptyState();
-  }
-
   private summaryFor(tab: VueTab, view: any): string {
     if (tab === 'archimate') return `${view.elementCount} élément(s) — ${view.relationCount} relation(s)`;
     if (tab === 'organigramme') return `${view.serviceCount} service(s) — ${view.membreCount} membre(s)`;
     return `${view.zoneCount} zone(s) — ${view.applicationCount} affectation(s)`;
   }
 
-  export(format: 'svg' | 'png'): void {
+  export(format: string): void {
     const state = this.current;
     if (!state.svg) return;
     const filename = `${this.tab}.${format}`;

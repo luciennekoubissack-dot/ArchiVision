@@ -37,7 +37,7 @@ const ICONS: Record<string, string> = {
       <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme de déploiement</button>
     </div>
 
-    <app-technologie-canevas *ngIf="tab === 'diagramme'" />
+    <app-technologie-canevas *ngIf="tab === 'diagramme'" (changed)="loadComponents()" />
 
     <ng-container *ngIf="tab === 'composants'">
     <div class="page-header">

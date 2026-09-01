@@ -84,6 +84,28 @@ describe('ObjectifController (HTTP)', () => {
     expect(response.body.nom).toBe(mockObjectif.nom);
   });
 
+  it('un Architecte peut créer un objectif TO-BE relié à un objectif AS-IS (201)', async () => {
+    const asIs = { ...mockObjectif, id: '22222222-2222-2222-8222-222222222222', statut: 'AS_IS' };
+    prismaMock.objectif.findUnique.mockResolvedValue(asIs);
+    prismaMock.objectif.create.mockResolvedValue({ ...mockObjectif, statut: 'TO_BE', objectifAsIsId: asIs.id });
+
+    const response = await request(app.getHttpServer())
+      .post('/objectifs')
+      .send({ nom: 'Gestion numérique', statut: 'TO_BE', objectifAsIsId: asIs.id })
+      .expect(201);
+
+    expect(response.body.objectifAsIsId).toBe(asIs.id);
+  });
+
+  it('un Architecte reçoit 400 si l\'objectif AS-IS d\'origine est introuvable', async () => {
+    prismaMock.objectif.findUnique.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/objectifs')
+      .send({ nom: 'X', statut: 'TO_BE', objectifAsIsId: '11111111-1111-1111-8111-111111111111' })
+      .expect(400);
+  });
+
   it('un Superadmin reçoit 403 en tentant de créer un objectif', async () => {
     currentUser = superadmin;
 

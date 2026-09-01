@@ -8,11 +8,16 @@ import { ArchiApplicativeView, ArchitectureApplicativeService } from './architec
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { downloadPng, downloadSvg } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 import { PaginationComponent } from '../shared/pagination.component';
 import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
 type Tab = 'portefeuille' | 'diagramme' | 'archi-applicative';
-type SubTab = 'editeur' | 'diagramme';
+
+const SVG_PNG_FORMATS: DownloadFormatOption[] = [
+  { value: 'svg', label: 'SVG' },
+  { value: 'png', label: 'PNG' },
+];
 
 const ICONS: Record<string, string> = {
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
@@ -22,87 +27,57 @@ const ICONS: Record<string, string> = {
   trash:
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
-  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
-  download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
 };
 
 @Component({
   selector: 'app-applications',
   standalone: true,
-  imports: [CommonModule, ApplicationsCanevasComponent, ArchitectureApplicativeCanevasComponent, PaginationComponent],
+  imports: [CommonModule, ApplicationsCanevasComponent, ArchitectureApplicativeCanevasComponent, DownloadMenuComponent, PaginationComponent],
   template: `
     <p class="muted step-question">Quelles applications supportent les processus métier ?</p>
 
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'portefeuille'" (click)="tab = 'portefeuille'">Portefeuille</button>
-      <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme de composants</button>
-      <button class="tab" [class.active]="tab === 'archi-applicative'" (click)="tab = 'archi-applicative'">Diagramme d'architecture applicative</button>
+      <button class="tab" [class.active]="tab === 'diagramme'" (click)="selectTab('diagramme')">Diagramme de composants</button>
+      <button class="tab" [class.active]="tab === 'archi-applicative'" (click)="selectTab('archi-applicative')">Diagramme d'architecture applicative</button>
     </div>
 
-    <!-- ── Diagramme de composants (sous-onglets) ─────────────────────────── -->
-    <div class="tabs sub-tabs" *ngIf="tab === 'diagramme'">
-      <button class="tab" [class.active]="diagSubTab === 'editeur'" (click)="diagSubTab = 'editeur'">Éditeur</button>
-      <button class="tab" [class.active]="diagSubTab === 'diagramme'" (click)="diagSubTab = 'diagramme'">Diagramme généré</button>
-    </div>
+    <!-- ── Diagramme de composants : éditeur + diagramme généré fusionnés ──── -->
+    <section *ngIf="tab === 'diagramme'">
+      <app-applications-canevas (changed)="onDiagChanged()" />
 
-    <section *ngIf="tab === 'diagramme' && diagSubTab === 'editeur'">
-      <app-applications-canevas (changed)="load()" />
-    </section>
-
-    <section class="card" *ngIf="tab === 'diagramme' && diagSubTab === 'diagramme'">
-      <div class="page-header">
-        <p class="summary">{{ diagSummary }}</p>
-        <div class="actions">
-          <button type="button" class="icon-btn" title="Générer" [disabled]="diagLoading" (click)="generateDiagramme()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
-          </button>
-          <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="diagSvg" (click)="clearDiagramme()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
-          </button>
-          <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="diagSvg" (click)="exportDiagramme('svg')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-          </button>
-          <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="diagSvg" (click)="exportDiagramme('png')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-          </button>
+      <section class="card diagram-preview">
+        <div class="page-header">
+          <p class="summary">{{ diagSummary || (diagLoading ? 'Génération de la vue…' : '') }}</p>
+          <div class="actions">
+            <button type="button" class="icon-btn" title="Rafraîchir le diagramme" [disabled]="diagLoading" (click)="generateDiagramme()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+            </button>
+            <app-download-menu [formats]="svgPngFormats" [disabled]="!diagSvg" (download)="exportDiagramme($event)" />
+          </div>
         </div>
-      </div>
-      <div class="empty-state" *ngIf="diagLoading">Génération de la vue…</div>
-      <div class="empty-state" *ngIf="!diagLoading && !diagSvg">Cliquez sur « Générer » pour afficher le diagramme.</div>
-      <div class="svg-container" *ngIf="diagTrustedSvg" [innerHTML]="diagTrustedSvg"></div>
+        <div class="empty-state" *ngIf="diagLoading && !diagSvg">Génération de la vue…</div>
+        <div class="svg-container" *ngIf="diagTrustedSvg" [innerHTML]="diagTrustedSvg"></div>
+      </section>
     </section>
 
-    <!-- ── Architecture applicative (sous-onglets) ───────────────────────── -->
-    <div class="tabs sub-tabs" *ngIf="tab === 'archi-applicative'">
-      <button class="tab" [class.active]="archiSubTab === 'editeur'" (click)="archiSubTab = 'editeur'">Éditeur</button>
-      <button class="tab" [class.active]="archiSubTab === 'diagramme'" (click)="archiSubTab = 'diagramme'">Diagramme généré</button>
-    </div>
+    <!-- ── Architecture applicative : éditeur + diagramme généré fusionnés ─── -->
+    <section *ngIf="tab === 'archi-applicative'">
+      <app-architecture-applicative-canevas (changed)="onArchiChanged()" />
 
-    <section *ngIf="tab === 'archi-applicative' && archiSubTab === 'editeur'">
-      <app-architecture-applicative-canevas />
-    </section>
-
-    <section class="card" *ngIf="tab === 'archi-applicative' && archiSubTab === 'diagramme'">
-      <div class="page-header">
-        <p class="summary">{{ archiSummary }}</p>
-        <div class="actions">
-          <button type="button" class="icon-btn" title="Générer" [disabled]="archiLoading" (click)="generateArchi()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
-          </button>
-          <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="archiSvg" (click)="clearArchi()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
-          </button>
-          <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="archiSvg" (click)="exportArchi('svg')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-          </button>
-          <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="archiSvg" (click)="exportArchi('png')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-          </button>
+      <section class="card diagram-preview">
+        <div class="page-header">
+          <p class="summary">{{ archiSummary || (archiLoading ? 'Génération de la vue…' : '') }}</p>
+          <div class="actions">
+            <button type="button" class="icon-btn" title="Rafraîchir le diagramme" [disabled]="archiLoading" (click)="generateArchi()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+            </button>
+            <app-download-menu [formats]="svgPngFormats" [disabled]="!archiSvg" (download)="exportArchi($event)" />
+          </div>
         </div>
-      </div>
-      <div class="empty-state" *ngIf="archiLoading">Génération de la vue…</div>
-      <div class="empty-state" *ngIf="!archiLoading && !archiSvg">Cliquez sur « Générer » pour afficher le diagramme.</div>
-      <div class="svg-container" *ngIf="archiTrustedSvg" [innerHTML]="archiTrustedSvg"></div>
+        <div class="empty-state" *ngIf="archiLoading && !archiSvg">Génération de la vue…</div>
+        <div class="svg-container" *ngIf="archiTrustedSvg" [innerHTML]="archiTrustedSvg"></div>
+      </section>
     </section>
 
     <section *ngIf="tab === 'portefeuille'">
@@ -118,14 +93,11 @@ const ICONS: Record<string, string> = {
         <div class="empty-state" *ngIf="applications.length === 0">Aucune application dans le portefeuille.</div>
         <div class="table-scroll" *ngIf="applications.length > 0">
           <table class="table">
-            <thead><tr><th>Nom</th><th>Description</th><th>Services</th><th>Liens</th><th>Affectations</th><th></th></tr></thead>
+            <thead><tr><th>Nom</th><th>Description</th><th></th></tr></thead>
             <tbody>
               <tr *ngFor="let app of applications">
                 <td>{{ app.nom }}</td>
                 <td>{{ app.description || '—' }}</td>
-                <td>{{ app._count?.services || 0 }}</td>
-                <td>{{ linkCount(app) }}</td>
-                <td>{{ app._count?.zones || 0 }}</td>
                 <td class="row-actions">
                   <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openView(app)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('eye')"></svg>
@@ -250,6 +222,7 @@ const ICONS: Record<string, string> = {
       .inline-form { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
       .inline-form input { padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; flex: 1; min-width: 140px; }
       .sub-tabs { margin: 1rem 0 1.25rem; }
+      .diagram-preview { margin-top: 1.25rem; }
       .summary { color: var(--color-text-muted); }
       .actions { display: flex; gap: 0.5rem; }
       .svg-container { overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; }
@@ -259,12 +232,11 @@ const ICONS: Record<string, string> = {
 })
 export class ApplicationsComponent implements OnInit {
   tab: Tab = 'portefeuille';
-  diagSubTab: SubTab = 'editeur';
+  svgPngFormats = SVG_PNG_FORMATS;
   diagSvg = '';
   diagTrustedSvg: SafeHtml | null = null;
   diagSummary = '';
   diagLoading = false;
-  archiSubTab: SubTab = 'editeur';
   archiSvg = '';
   archiTrustedSvg: SafeHtml | null = null;
   archiSummary = '';
@@ -292,10 +264,16 @@ export class ApplicationsComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.generateDiagramme();
+    this.generateArchi();
   }
 
   icon(name: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
+  }
+
+  selectTab(tab: Tab): void {
+    this.tab = tab;
   }
 
   openCreate(): void {
@@ -305,10 +283,6 @@ export class ApplicationsComponent implements OnInit {
 
   closeCreate(): void {
     this.createPopover = false;
-  }
-
-  linkCount(app: Application): number {
-    return (app._count?.echangesSource ?? 0) + (app._count?.echangesTarget ?? 0);
   }
 
   /** Fusionne échangesSource/échangesTarget en une liste unique orientée depuis `app`. */
@@ -476,6 +450,11 @@ export class ApplicationsComponent implements OnInit {
 
   // ── Diagramme de composants : diagramme généré ──────────────────────────
 
+  onDiagChanged(): void {
+    this.load();
+    this.generateDiagramme();
+  }
+
   generateDiagramme(): void {
     this.diagLoading = true;
     this.urbanisationService.generateComponentsView().subscribe({
@@ -492,20 +471,18 @@ export class ApplicationsComponent implements OnInit {
     });
   }
 
-  clearDiagramme(): void {
-    this.diagSvg = '';
-    this.diagTrustedSvg = null;
-    this.diagSummary = '';
-  }
-
-  exportDiagramme(format: 'svg' | 'png'): void {
+  exportDiagramme(format: string): void {
     if (!this.diagSvg) return;
-    const filename = 'diagramme-de-composants';
+    const filename = `diagramme-de-composants.${format}`;
     if (format === 'svg') downloadSvg(this.diagSvg, filename);
     else downloadPng(this.diagSvg, filename);
   }
 
   // ── Architecture applicative : diagramme généré ─────────────────────────
+
+  onArchiChanged(): void {
+    this.generateArchi();
+  }
 
   generateArchi(): void {
     this.archiLoading = true;
@@ -523,15 +500,9 @@ export class ApplicationsComponent implements OnInit {
     });
   }
 
-  clearArchi(): void {
-    this.archiSvg = '';
-    this.archiTrustedSvg = null;
-    this.archiSummary = '';
-  }
-
-  exportArchi(format: 'svg' | 'png'): void {
+  exportArchi(format: string): void {
     if (!this.archiSvg) return;
-    const filename = 'architecture-applicative';
+    const filename = `architecture-applicative.${format}`;
     if (format === 'svg') downloadSvg(this.archiSvg, filename);
     else downloadPng(this.archiSvg, filename);
   }

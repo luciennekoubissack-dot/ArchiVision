@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AvancementSolution, StatutSolution } from '@prisma/client';
 import { EvaluationScoreEntity } from './evaluation-score.entity';
+import { SolutionGapEntity } from './solution-gap.entity';
 
 export class SolutionEntity {
   @ApiProperty({ description: 'Identifiant de la solution.' })
@@ -33,6 +34,12 @@ export class SolutionEntity {
       "Scores d'évaluation de la solution (le critère détaillé n'est inclus que pour le détail d'une solution).",
   })
   scores!: EvaluationScoreEntity[];
+
+  @ApiProperty({
+    type: () => [SolutionGapEntity],
+    description: "Écarts (Analyse des écarts) que cette solution est censée combler.",
+  })
+  gaps!: SolutionGapEntity[];
 
   @ApiProperty({ description: 'Date de création.', type: String, format: 'date-time' })
   createdAt!: Date;

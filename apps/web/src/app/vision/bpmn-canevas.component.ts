@@ -17,6 +17,10 @@ import { debounceTime } from 'rxjs/operators';
 import { BpmnElement, BpmnFlow, BpmnService, DeclencheurEvenement, StatutElement, TypeBpmn, TypeTache } from './bpmn.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
+import { downloadDataUrl } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
+
+const PNG_FORMAT: DownloadFormatOption[] = [{ value: 'png', label: 'PNG' }];
 
 interface ShapeSize {
   w: number;
@@ -158,19 +162,24 @@ interface Pos {
 @Component({
   selector: 'app-bpmn-canevas',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DownloadMenuComponent],
   template: `
-    <p class="hint">
-      Glissez une icône de la palette sur le plan pour ajouter une étape. Pour relier deux étapes : survolez une
-      étape , 4 points apparaissent sur ses bords  puis glissez depuis l'un de ces points jusqu'à l'étape cible.
-      Survolez une étape : cliquez sur le crayon pour la modifier (nom, AS-IS/TO-BE), ou sur le « × » rouge pour la
-      supprimer.
-    </p>
-    <p class="hint legend">
-      <span class="legend-dot" style="background:#9AA1BA"></span> AS-IS (état actuel)
-      <span class="legend-dot" style="background:#1F3BB3"></span> TO-BE (cible)
-      <span class="legend-dot legend-dot-outline"></span> Les deux (inchangé, sans repère)
-    </p>
+    <div class="page-header">
+      <div>
+        <p class="hint">
+          Glissez une icône de la palette sur le plan pour ajouter une étape. Pour relier deux étapes : survolez une
+          étape , 4 points apparaissent sur ses bords  puis glissez depuis l'un de ces points jusqu'à l'étape cible.
+          Survolez une étape : cliquez sur le crayon pour la modifier (nom, AS-IS/TO-BE), ou sur le « × » rouge pour la
+          supprimer.
+        </p>
+        <p class="hint legend">
+          <span class="legend-dot" style="background:#9AA1BA"></span> AS-IS (état actuel)
+          <span class="legend-dot" style="background:#1F3BB3"></span> TO-BE (cible)
+          <span class="legend-dot legend-dot-outline"></span> Les deux (inchangé, sans repère)
+        </p>
+      </div>
+      <app-download-menu [formats]="pngFormat" [disabled]="elements.length === 0" (download)="exportPng()" />
+    </div>
 
     <div class="bpmn-layout">
       <aside class="palette">
@@ -329,6 +338,7 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
   @ViewChild('stageHost') stageHost!: ElementRef<HTMLDivElement>;
 
   types = TYPES;
+  pngFormat = PNG_FORMAT;
   statuts = STATUTS;
   declencheurs = DECLENCHEURS;
   typeTaches = TYPE_TACHES;
@@ -400,6 +410,16 @@ export class BpmnCanevasComponent implements AfterViewInit, OnChanges, OnDestroy
 
   paletteIcon(type: TypeBpmn): string {
     return PALETTE_ICON[type];
+  }
+
+  /**
+   * Export direct du rendu Konva de cet éditeur. Le même processus peut aussi
+   * être exporté en SVG/PNG depuis Architecture métier ▸ Diagrammes BPMN (vue
+   * générée côté backend) ; ceci couvre le cas où l'utilisateur veut exporter
+   * sans quitter l'écran d'édition.
+   */
+  exportPng(): void {
+    downloadDataUrl(this.stage.toDataURL({ pixelRatio: 2 }), 'diagramme-bpmn.png');
   }
 
   declencheurLabel(declencheur: DeclencheurEvenement): string {

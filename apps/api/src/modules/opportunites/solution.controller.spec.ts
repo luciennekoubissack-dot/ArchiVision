@@ -37,6 +37,7 @@ describe('SolutionController (HTTP)', () => {
     },
     critereEvaluation: { count: jest.fn() },
     evaluationScore: { upsert: jest.fn() },
+    solutionGap: { deleteMany: jest.fn(), createMany: jest.fn(), findMany: jest.fn() },
     $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   };
 
@@ -98,6 +99,27 @@ describe('SolutionController (HTTP)', () => {
       .patch(`/solutions/${mockSolution.id}/scores`)
       .send({ items: [{ critereId: '11111111-1111-4111-8111-111111111111', score: 4 }] })
       .expect(200);
+  });
+
+  it('un Architecte peut mettre à jour les écarts adressés par une solution (200)', async () => {
+    prismaMock.solution.count.mockResolvedValue(1);
+    prismaMock.solution.findUnique.mockResolvedValue({ ...mockSolution, gaps: [] });
+
+    await request(app.getHttpServer())
+      .patch(`/solutions/${mockSolution.id}/gaps`)
+      .send({ items: [{ domaine: 'OBJECTIF', elementId: 'objectif-001', elementNom: 'Digitaliser la gestion' }] })
+      .expect(200);
+
+    expect(prismaMock.solutionGap.deleteMany).toHaveBeenCalledWith({ where: { solutionId: mockSolution.id } });
+  });
+
+  it('un Architecte peut lister tous les écarts adressés (200), route "gaps" non masquée par ":id"', async () => {
+    prismaMock.solutionGap.findMany.mockResolvedValue([]);
+
+    const response = await request(app.getHttpServer()).get('/solutions/gaps').expect(200);
+
+    expect(response.body).toEqual([]);
+    expect(prismaMock.solution.findUnique).not.toHaveBeenCalled();
   });
 
   it('un Superadmin reçoit 403 en tentant de créer une solution', async () => {

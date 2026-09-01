@@ -1766,3 +1766,446 @@ racine (voir entrée du 2026-08-26), seulement contourné ici.
   `npm run build` : tout propre.
 - `/api/v1/auth/login` : 401 sur identifiants invalides (confirmé
   après correctif, sur l'instance sans `--watch`).
+
+## 2026-08-31 (suite 4) : refonte UX des écrans de diagramme
+
+Demande utilisateur en 8 points sur l'ergonomie des modules de diagramme
+(assistant renommé, boutons de téléchargement, export du diagramme de
+vision, affichage automatique, fusion éditeur/diagramme, diagramme de
+déploiement). Traité directement, sans plan intermédiaire, avec
+vérification navigateur à chaque étape.
+
+### 1. Renommage « Assistant d'architecture » → « Révision »
+
+`apps/web/src/app/core/app-shell.component.ts` : libellé de navigation
+changé, icône `wand` (baguette) remplacée par `search` (loupe, déjà
+présente dans le jeu d'icônes). Le fil d'Ariane utilise le même libellé
+que la nav, donc corrigé du même coup. Route et composant (`/assistant`,
+`WizardComponent`) inchangés. Vérifié en navigateur, connecté.
+
+### 2 et 4. Un seul bouton de téléchargement, diagramme affiché sans clic
+
+Nouveau composant partagé `apps/web/src/app/shared/download-menu.component.ts`
+(`<app-download-menu [formats]="..." (download)="...">`) : un bouton
+unique avec menu déroulant de formats, remplace partout la paire
+« Exporter SVG » / « Exporter PNG ». Appliqué aux 5 écrans identifiés
+avec ce doublon (recherche exhaustive faite au préalable, voir
+ci-dessous) :
+- `architecture-systeme/applications.component.ts` : diagramme de
+  composants ET diagramme d'architecture applicative.
+- `architecture-metier/architecture-metier.component.ts` : diagramme
+  ArchiMate.
+- `architecture-metier/bpmn-vues.component.ts` : viewer BPMN (en plus,
+  `select()` génère maintenant le diagramme immédiatement au lieu
+  d'effacer l'affichage).
+- `vues/vues.component.ts` : ses 3 onglets (ArchiMate/Organigramme/POS).
+
+Sur ces 5 écrans, la génération se déclenche désormais automatiquement
+(`ngOnInit`, ou à la sélection d'un processus/onglet) : le bouton
+« Générer » devient « Rafraîchir le diagramme » et ne sert plus qu'à
+recalculer après une modification. Les boutons « Effacer » ont été
+retirés (plus de sens dans un modèle où le diagramme est toujours
+affiché). Petit nettoyage au passage : les noms de fichiers exportés
+n'avaient pas tous d'extension (`'diagramme-de-composants'` sans
+`.svg`/`.png`) — uniformisé partout.
+
+**Pas touché, volontairement** : `donnees-canevas.component.ts` et
+`technologie-canevas.component.ts` (canevas Konva déjà « live », sans
+bouton Générer ni export car aucune génération SVG backend n'y est
+câblée) ; `canevas/canevas.component.ts` (déjà un seul bouton PNG,
+implémentation propre à lui, pas le doublon visé par la demande).
+
+### 3. Export du diagramme de vision (PDF/CSV/Excel)
+
+Constat en explorant `vision/vision.component.ts` : l'onglet
+« Diagramme de vision » n'est pas un diagramme SVG mais une grille de
+8 blocs de texte (façon Business Model Canvas) — il n'avait
+strictement aucun export, ni bouton de téléchargement. Ajouté :
+- `downloadCsv()` et `downloadPdf()` dans `shared/download.util.ts`
+  (le PDF utilise la nouvelle dépendance `jspdf@^4.2.1`, texte simple
+  avec retour à la ligne automatique, pas de mise en page graphique).
+- `VisionComponent.exportVision(format)` : PDF via `downloadPdf`, CSV
+  via `downloadCsv`, Excel via `exportToExcel` (déjà utilisé ailleurs
+  dans ce même fichier pour les exigences).
+- Le même `<app-download-menu>` que les diagrammes SVG, configuré
+  avec les formats `pdf`/`csv`/`excel` au lieu de `svg`/`png`.
+
+### 5. « Diagramme UML » → « Diagramme de classe »
+
+`apps/web/src/app/donnees/donnees.component.ts` : simple renommage de
+libellé d'onglet. Recherche faite pour les autres mentions de UML dans
+le code (`archimate`/`urbanisation`/`technologie`) : ce sont des
+commentaires décrivant d'autres types de diagrammes (composants,
+déploiement), sans rapport, non touchés.
+
+### 6. Champs du formulaire « Ajouter une application » vs colonnes de la liste
+
+Ambiguïté initiale : le formulaire de création
+(`architecture-systeme/applications.component.ts`) n'a que
+Nom/Description ; les 3 colonnes supplémentaires de la liste
+(Services, Liens, Affectations) sont des compteurs de relations gérés
+depuis d'autres écrans (fiche application, canevas de composants,
+module urbanisation), donc structurellement impossibles à renseigner
+à la création. Question posée à l'utilisateur plutôt que deviné :
+réponse = simplifier la liste plutôt qu'enrichir le formulaire.
+
+Colonnes « Services », « Liens » et « Affectations » retirées du
+tableau du Portefeuille : ne restent que Nom/Description, identiques
+au formulaire de création/modification. Ces informations restent
+consultables en détail depuis la fiche application (bouton
+« Consulter »), qui les affichait déjà explicitement. `linkCount()`
+supprimé (méthode devenue sans appelant).
+
+### 7. Fusion éditeur/diagramme généré
+
+Recherche exhaustive (agent dédié) : le couple exact de sous-onglets
+« Éditeur » / « Diagramme généré » n'existe que dans
+`applications.component.ts` (diagramme de composants et architecture
+applicative) ; les autres modules soit n'ont pas d'éditeur canevas
+(ArchiMate : 3 onglets CRUD formulaire), soit sont déjà un canevas
+unique sans onglet séparé (données, déploiement technologique, BPMN
+dans le module Vision).
+
+Pour les deux paires concernées : sous-onglets supprimés, l'éditeur
+(canevas Konva, avec ou sans palette) s'affiche désormais directement,
+suivi en dessous d'une section « diagramme généré » qui se charge
+automatiquement (point 4) et se rafraîchit à chaque modification du
+canevas (`(changed)` déjà émis par les deux composants canevas,
+maintenant câblé pour déclencher `generateDiagramme()`/`generateArchi()`
+en plus du rechargement de la liste).
+
+### 8. Conformité UML du diagramme de déploiement
+
+`technologie/technologie-canevas.component.ts` (rendu Konva
+entièrement frontend, aucune génération SVG backend pour ce module) :
+trois écarts identifiés par rapport à la norme UML2 (OMG UML
+Superstructure) et corrigés :
+- **Stéréotype de nœud invalide** : « nœud » seul n'est pas un
+  stéréotype UML valide (Node est déjà la métaclasse). Remplacé par
+  «device» pour le matériel physique (Serveur, Réseau) et
+  «execution environment» pour un environnement d'exécution logique
+  (Cloud, Base de données, Middleware).
+- **Mauvaise métaclasse pour les applications déployées** : elles
+  étaient dessinées comme des Composants (icône à deux encoches,
+  stéréotype «component» implicite). Un livrable déployé sur un nœud
+  est un Artefact en UML2 : nouvelle icône (rectangle à coin plié,
+  façon document) et stéréotype «artifact» explicite.
+- **Relation nœud→artefact non conforme** : simple trait pointillé
+  sans sémantique. Remplacé par une dépendance de déploiement en
+  bonne et due forme : flèche pointillée à pointe ouverte, étiquetée
+  «deploy».
+- **Non traité, nécessite un changement backend** : les vrais chemins
+  de communication UML (association entre deux Nœuds, représentant
+  une liaison réseau/physique) sont absents du diagramme — aucune
+  relation nœud-à-nœud n'est modélisée aujourd'hui. Une piste
+  existante mais non exploitée : dériver ces chemins des échanges
+  applicatifs (`ApplicationEchange`) entre applications hébergées sur
+  des nœuds différents ; nécessite de charger le détail complet de
+  chaque application déployée (`échangesSource`/`échangesTarget`),
+  actuellement absent de `GET /applications` (liste) et disponible
+  seulement via `GET /applications/:id` (N+1 non souhaitable sans un
+  nouvel endpoint d'agrégat). Laissé de côté, à traiter séparément si
+  le besoin se confirme.
+
+### Vérifié
+
+- Frontend : `npm run typecheck`, `npm run build` (avertissements
+  CommonJS de `jspdf`/`html2canvas`/`canvg`, attendus et sans
+  gravité), `npm run test:ci` : 161/161, inchangé.
+- Navigateur (connecté en admin de test) : nav « Révision » avec loupe
+  confirmée par inspection du DOM ; diagramme de composants et
+  d'architecture applicative affichés sans clic sur Générer, un seul
+  bouton de téléchargement (menu SVG/PNG vérifié) ; diagramme
+  ArchiMate et diagrammes BPMN idem ; export vision PDF/CSV/Excel
+  déclenché sans erreur console ; diagramme de déploiement : stéréotypes
+  et flèches «deploy» confirmés en inspectant l'arbre d'objets Konva
+  directement (`Konva.stages[0].find(...)`), captures d'écran non
+  disponibles dans cet environnement (pane navigateur non composité).
+
+## 2026-08-31 (suite 5) : bouton de téléchargement hors du diagramme de vision, palette sur tous les canevas
+
+Deux retours utilisateur après la refonte précédente.
+
+### Bouton de téléchargement du diagramme de vision mal placé
+
+Il était dans `.vc-header` (le bandeau sombre des questions de
+motivation), donc visuellement à l'intérieur de la carte du diagramme.
+Déplacé dans un `.page-header` classique au-dessus de la section `.vc`,
+même emplacement que le bouton d'export Excel de l'onglet Exigences du
+même composant. Vérifié : `app-download-menu` n'est plus contenu dans
+`section.vc`.
+
+### Palette de glisser-déposer manquante sur 3 canevas
+
+Demande : toutes les entrées à ajouter avec un diagramme doivent
+suivre le même modèle que la palette « Étapes BPMN » (glisser une
+icône typée depuis un panneau latéral). Deux canevas l'avaient déjà
+(`architecture-applicative-canevas.component.ts`,
+`vision/bpmn-canevas.component.ts`) ; trois ne l'avaient pas et
+créaient leurs éléments uniquement via un popover-formulaire sur un
+onglet séparé :
+
+- `architecture-systeme/applications-canevas.component.ts` (diagramme
+  de composants) : palette à une seule entrée « Application » (pas de
+  sous-type dans ce domaine), glisser-déposer ouvre un formulaire
+  Nom/Description puis crée via `createApplication` avec la position
+  du dépôt.
+- `donnees/donnees-canevas.component.ts` (diagramme de classe) :
+  palette à une entrée « Entité de données », formulaire
+  Nom/Description/Propriétaire.
+- `technologie/technologie-canevas.component.ts` (diagramme de
+  déploiement) : palette à 5 entrées (les `TypeTechComponent`
+  existants : Serveur/Réseau/Cloud/Base de données/Middleware, un
+  swatch de couleur reprenant `TYPE_COLOR` au lieu d'une icône dédiée),
+  formulaire Nom/Justification.
+
+Les trois suivent le même schéma que la palette BPMN déjà en place :
+`dragstart` pose un type dans `DataTransfer`, `drop` calcule la
+position dans les coordonnées du stage (en tenant compte du zoom/pan
+Konva) et ouvre un petit formulaire modal ; la confirmation crée
+l'élément avec `positionX`/`positionY` déjà corrects, sans étape de
+repositionnement manuel après coup.
+
+**Bugs trouvés et corrigés pendant l'implémentation** (avant tout
+affichage, via vérification navigateur systématique) :
+- `donnees.service.ts`/`technologie.service.ts` : la route de création
+  ne fait pas d'`include` (`attributs`, `deploiements` respectivement),
+  contrairement à la route de liste. Le rendu Konva de ces deux
+  canevas accède directement à `entity.attributs.length` /
+  `comp.deploiements.forEach(...)` sans optional chaining : créer un
+  élément depuis la palette aurait fait planter le rendu juste après
+  la création (`Cannot read properties of undefined`). Corrigé côté
+  frontend en normalisant la réponse de création (`attributs: created.attributs ?? []`,
+  `deploiements: created.deploiements ?? []`) plutôt que de modifier
+  le contrat backend.
+- `technologie-canevas.component.ts` n'avait pas de `@Output() changed`
+  (contrairement à `applications-canevas`/`donnees-canevas`, déjà
+  câblés vers leurs onglets CRUD voisins) : créer un composant depuis
+  la palette du canevas laissait l'onglet « Composants » affiché avec
+  une liste périmée (chargée une seule fois à l'initialisation du
+  composant parent, jamais rafraîchie en changeant d'onglet). Ajouté
+  `@Output() changed` + émission après création, câblé côté
+  `technologie.component.ts` vers `loadComponents()`. Vérifié en
+  navigateur : création d'un composant test depuis le canevas, retour
+  sur l'onglet Composants sans recharger la page, le nouveau composant
+  y apparaît immédiatement ; testé et nettoyé (élément de test
+  supprimé après vérification).
+
+**Non traité, signalé pour arbitrage** : le module ArchiMate
+(`architecture-metier.component.ts`) a un onglet « Diagramme » (SVG
+généré) mais pas de canevas interactif du tout : ses éléments
+(capacités, éléments, relations) se créent via 3 onglets de listes
+CRUD classiques, pas de glisser-déposer. Les éléments ArchiMate
+existent bien sur un canevas ailleurs (module générique `/canevas`,
+qui les gère en même temps que d'autres couches), mais pas depuis
+`architecture-metier` lui-même. Convertir ce module en éditeur canevas
+serait une refonte structurelle bien plus large (remplacer 3 écrans
+de listes fonctionnels par un éditeur graphique) que les 3 ajouts de
+palette faits ici : laissé de côté tant que ce n'est pas explicitement
+demandé.
+
+### Vérifié
+
+- `npm run typecheck`, `npm run build`, `npm run test:ci` (161/161) :
+  tout propre.
+- Navigateur : les 3 nouvelles palettes affichent bien leurs entrées
+  (« Application », « Entité de données », les 5 types de composants
+  technologiques) ; glisser-déposer simulé par dispatch de vrais
+  `DragEvent`/`DataTransfer` (le clic seul ne déclenche pas le drag
+  HTML5 natif) sur le diagramme de déploiement : formulaire modal
+  ouvert avec le bon type, création confirmée, nouveau nœud visible
+  dans l'arbre Konva, synchronisation avec l'onglet Composants
+  vérifiée, élément de test supprimé après coup.
+
+## 2026-08-31 (suite 6) : téléchargement sur tous les diagrammes
+
+Demande explicite : plus aucun écran de diagramme ne doit être sans
+export. Trois canevas Konva purement « live » (pas de génération SVG
+backend, le canevas EST le diagramme) n'avaient toujours aucun bouton
+de téléchargement après les deux passes précédentes :
+`donnees-canevas.component.ts`, `technologie-canevas.component.ts`,
+`vision/bpmn-canevas.component.ts` (l'éditeur BPMN lui-même, distinct
+du visualiseur `bpmn-vues.component.ts` qui, lui, avait déjà son export
+SVG/PNG backend depuis la suite précédente).
+
+Ajouté : nouvel utilitaire `downloadDataUrl(dataUrl, filename)` dans
+`shared/download.util.ts` (déclenche le téléchargement d'une data URL,
+typiquement `stage.toDataURL()` d'un canevas Konva ; même mécanique
+que celle déjà utilisée par `canevas/canevas.component.ts`, non
+touché ici car il permettait déjà le téléchargement, juste avec sa
+propre implémentation). Sur les 3 écrans concernés : `<app-download-menu>`
+avec un seul format (PNG, seul format qu'un canevas Konva peut
+produire nativement, pas de vrai export SVG possible sans un rendu
+serveur dédié), placé dans un `.page-header` au-dessus du canevas,
+export via `this.stage.toDataURL({ pixelRatio: 2 })`.
+
+Note sur le doublon volontaire : le processus BPMN édité dans
+`vision/bpmn-canevas.component.ts` peut aussi être exporté en SVG/PNG
+depuis Architecture métier ▸ Diagrammes BPMN (le rendu backend du même
+processus), sur un écran différent. Ajouter l'export directement sur
+l'écran d'édition évite d'obliger l'utilisateur à changer de module
+juste pour télécharger ce qu'il est en train de modifier.
+
+### Vérifié
+
+- `npm run typecheck`, `npm run build`, `npm run test:ci` (161/161) :
+  tout propre.
+- Navigateur : les 3 nouveaux boutons de téléchargement déclenchent un
+  export PNG sans erreur console, sur le diagramme de classe, le
+  diagramme de déploiement et l'éditeur de processus BPMN (testé sur
+  le processus « Traitement de commande »).
+
+## 2026-08-31 (suite 7) : conformité TOGAF de l'analyse des écarts (objectifs AS-IS/TO-BE)
+
+Demande explicite : pouvoir définir un objectif TO-BE en fonction d'un
+objectif AS-IS, pour permettre une vraie comparaison dans le module
+Analyse des écarts. Avant ce travail, `Objectif` (module Préparation de
+l'organisation) n'avait aucune notion d'AS-IS/TO-BE : ni statut, ni
+lien d'évolution, contrairement à quasiment toutes les autres entités
+architecturales du projet (BPMN, ArchiMate, données, applications, qui
+ont toutes un champ `statut: StatutElement`).
+
+### Modèle de données
+
+Migration `20260831153905_add_objectif_statut_as_is_to_be` : ajout sur
+`Objectif` de `statut StatutElement @default(LES_DEUX)` (réutilise
+l'enum déjà existant, cohérent avec le reste du schéma) et d'une
+auto-relation `objectifAsIsId` (nullable, `onDelete: SetNull`) reliant
+un objectif TO-BE à l'objectif AS-IS dont il est l'évolution.
+
+### Backend (`objectif.service.ts`, DTOs, entité)
+
+- `CreateObjectifDto`/`UpdateObjectifDto` : `statut` et `objectifAsIsId`
+  optionnels.
+- Validation métier (`assertValidEvolution`) : un lien `objectifAsIsId`
+  n'est accepté que si (1) l'objectif courant est bien TO_BE, (2) la
+  cible n'est pas lui-même, (3) l'objectif AS-IS référencé existe, dans
+  la même organisation, et est lui-même de statut AS_IS (pas TO_BE, pas
+  LES_DEUX). Toute violation → 400.
+- `update()` : si le statut change et n'est plus TO_BE, `objectifAsIsId`
+  est automatiquement remis à `null` (évite un objectif AS-IS ou
+  LES_DEUX avec un lien d'évolution obsolète en base).
+- `findAll`/`findOne`/`create`/`update` incluent désormais
+  `objectifAsIs`/`objectifsToBe` (référence légère : id/nom/statut) en
+  une seule requête, pour que le frontend construise sa matrice sans
+  N+1.
+- 7 nouveaux tests (service + contrôleur), y compris les cas de rejet
+  (lien sur un TO-BE, lien vers un objectif introuvable, lien vers une
+  source qui n'est pas AS-IS).
+
+### Frontend
+
+- `organisation/objectifs.component.ts` : formulaires de création/édition
+  avec sélecteur de statut (Les deux/AS-IS/TO-BE) et, uniquement quand
+  statut = TO-BE, un second sélecteur « Objectif AS-IS d'origine »
+  alimenté par la liste complète des objectifs AS-IS existants (pas
+  seulement la page courante). Colonne Statut ajoutée à la liste et à
+  l'export Excel.
+- `ecarts/ecarts.component.ts` : nouvel onglet « Objectifs », matrice
+  d'écarts au format TOGAF classique (Baseline AS-IS / Target TO-BE /
+  État), calculée ainsi :
+  - AS-IS avec évolution(s) déclarée(s) → **Modifié** (Target = les
+    objectifs TO-BE liés).
+  - AS-IS sans évolution → **Éliminé**.
+  - LES_DEUX → **Conservé** (affiché des deux côtés : c'est le même
+    élément, inchangé).
+  - TO-BE sans origine déclarée → **Nouveau**.
+  4 compteurs de synthèse (Conservés/Éliminés/Modifiés/Nouveaux), en
+  plus de l'onglet Processus existant (BPMN, inchangé).
+
+### Vérifié
+
+- Backend : `npm run typecheck`, `npx jest --silent` (57 suites, 470
+  tests, +7 vs la suite précédente), `npm run build` : tout propre.
+- Frontend : `npm run typecheck`, `npm run build`, `npm run test:ci`
+  (161/161) : tout propre.
+- Bug de tooling rencontré et résolu en cours de route : après
+  régénération du client OpenAPI (nouveaux champs `statut`/`objectifAsIs`/
+  `objectifsToBe`), le serveur `ng serve` de prévisualisation gardait une
+  build en mémoire ne reconnaissant pas ces champs (`ObjectifEntity` vue
+  comme son ancienne forme), malgré des fichiers sur disque à jour et un
+  `ng build` ponctuel propre en parallèle. Résolu en redémarrant le
+  serveur de dev (`preview_stop`/`preview_start`) plutôt qu'en cherchant
+  à forcer un rechargement, cause exacte non identifiée (probablement
+  un cache webpack incremental qui n'invalide pas un fichier déjà suivi
+  dont seul le contenu change via un outil externe).
+- Navigateur (bout en bout, avec nettoyage des données de test après
+  coup) : création d'un objectif AS-IS « Gestion papier des dossiers »,
+  puis d'un objectif TO-BE « Gestion numérique des dossiers » relié à
+  lui via le sélecteur d'origine ; vérifié que la liste affiche bien
+  « ← Gestion papier des dossiers » sur la ligne TO-BE ; matrice
+  d'écarts confirmée : la paire apparaît en **Modifié**, l'objectif
+  LES_DEUX préexistant en **Conservé** (affiché des deux côtés après
+  le correctif ci-dessus), compteurs de synthèse corrects (1 Conservé,
+  0 Éliminé, 1 Modifié, 0 Nouveau).
+
+## 2026-08-31 (suite 8) : couverture de l'analyse des écarts sur les 4 autres domaines
+
+Suite à l'échange sur la conformité TOGAF de ce module (l'analyse des
+écarts porte normalement sur les phases B/C/D, pas uniquement sur les
+processus et les objectifs) : extension de la même matrice d'écarts
+aux 4 domaines qui portent déjà un champ `statut` (AS_IS/TO_BE/LES_DEUX)
+mais n'étaient couverts par aucun écran de comparaison : Architecture
+métier (éléments ArchiMate), Données (entités), Applicatif
+(applications), Technologique (composants). Aucune migration ni
+changement backend nécessaire : le champ existait déjà partout, seul
+manquait l'écran de comparaison.
+
+### Généralisation du code (`ecarts.component.ts`)
+
+Le type `GapRow` (créé pour les Objectifs) a été généralisé de
+`{ asIs: Objectif | null; toBe: Objectif[] }` vers `{ asIs: GapItem | null;
+toBe: GapItem[] }` avec `GapItem = { id: string; nom: string }`, pour
+être réutilisable par n'importe quel domaine. Un état par domaine
+(`GapDomainState`) remplace les 6 propriétés à plat qui n'existaient
+auparavant que pour les objectifs ; `domains: Record<DomainTab,
+GapDomainState>` centralise l'état des 5 onglets domaines (Processus
+reste à part, structurellement différent : comparaison par processus
+sélectionné, pas une matrice globale).
+
+Deux constructeurs de lignes :
+- `buildObjectifRows()` (inchangé) : le seul domaine avec un lien
+  d'évolution explicite (`objectifAsIsId`), donc le seul capable de
+  produire l'état **Modifié**.
+- `buildSimpleGapRows()` (nouveau, générique) : pour les 4 domaines
+  sans lien d'évolution entre un élément AS-IS précis et son
+  successeur TO-BE — LES_DEUX → Conservé, AS_IS → Éliminé, TO_BE →
+  Nouveau. **Modifié** n'est structurellement pas déductible pour ces
+  domaines sans données de correspondance (voir plus bas).
+
+Le template affiche une seule section générique pilotée par
+`currentDomain`/`domainLabel`/`emptyMessage` (getters basés sur
+`mainTab`), au lieu de dupliquer 5 fois un bloc de matrice quasi
+identique.
+
+### Limite assumée, pas corrigée ici
+
+Contrairement aux Objectifs, les éléments ArchiMate, entités de
+données, applications et composants technologiques n'ont **aucune**
+auto-relation « évolue depuis » en base : deux enregistrements AS_IS
+et TO_BE portant des noms différents ne peuvent pas être associés
+automatiquement, même s'ils représentent conceptuellement le même
+élément qui change de forme. Ces 4 domaines ne produiront donc jamais
+de ligne « Modifié », seulement Conservé/Éliminé/Nouveau — ce qui reste
+pleinement conforme à la matrice d'écarts TOGAF classique (qui n'a que
+ces 3 états dans sa version de base ; « Modifié » est un enrichissement
+propre aux objectifs, ajouté dans l'entrée précédente). Ajouter la même
+auto-relation à ces 4 entités serait cohérent mais représente un
+changement de schéma bien plus large (4 migrations, 4 formulaires à
+enrichir) : laissé de côté tant que ce n'est pas demandé explicitement.
+
+### Vérifié
+
+- `npm run typecheck`, `npm run build`, `npm run test:ci` (161/161) :
+  tout propre.
+- Navigateur : les 4 nouveaux onglets chargent et affichent leur
+  matrice sans erreur (Architecture métier : 43 éléments, tous
+  Conservés ; Données : 5 entités ; Applicatif : 6 applications ;
+  Technologique : 6 composants, tous Conservés dans le jeu de données
+  de démonstration actuel, qui ne contient encore aucun AS_IS/TO_BE
+  explicite sur ces domaines). Des erreurs 500 historiques sur
+  `/api/v1/capacites-metier` et `/api/v1/elements-archimate` sont
+  restées dans l'historique de la console du navigateur depuis une
+  session de test antérieure (avant un redémarrage backend) ; confirmé
+  qu'elles ne se reproduisent pas maintenant (contenu affiché correct,
+  et `curl` direct sur les mêmes routes répond normalement).

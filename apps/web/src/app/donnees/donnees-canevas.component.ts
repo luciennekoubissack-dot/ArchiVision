@@ -6,6 +6,10 @@ import { debounceTime } from 'rxjs/operators';
 import { DataEntity, DataRelation, DonneesService, TypeCardinalite } from './donnees.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
+import { downloadDataUrl } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
+
+const PNG_FORMAT: DownloadFormatOption[] = [{ value: 'png', label: 'PNG' }];
 
 const BOX_W = 190;
 const HEADER_H = 30;
@@ -40,21 +44,43 @@ interface PendingRelation {
   label: string;
 }
 
+interface PendingCreate {
+  x: number;
+  y: number;
+  nom: string;
+  description: string;
+  proprietaire: string;
+}
+
 @Component({
   selector: 'app-donnees-canevas',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DownloadMenuComponent],
   template: `
-    <p class="hint">
-      Glissez une entité pour la repositionner. Survolez une entité : glissez depuis l'un des 4 points sur ses
-      bords vers une autre entité pour créer une relation, ou cliquez sur le « × » rouge pour la supprimer.
-    </p>
+    <div class="page-header">
+      <p class="hint">
+        Glissez « Entité » depuis la palette sur le plan pour en créer une nouvelle. Glissez une entité existante
+        pour la repositionner. Survolez une entité : glissez depuis l'un des 4 points sur ses bords vers une autre
+        entité pour créer une relation, ou cliquez sur le « × » rouge pour la supprimer.
+      </p>
+      <app-download-menu [formats]="pngFormat" [disabled]="entities.length === 0" (download)="exportPng()" />
+    </div>
 
-    <div class="stage-wrap">
-      <div class="empty-state" *ngIf="!loading && entities.length === 0">
-        Aucune entité pour l'instant — ajoutez-en depuis l'onglet Entités.
+    <div class="donnees-layout">
+      <aside class="palette">
+        <h4>Éléments</h4>
+        <div class="item" draggable="true" (dragstart)="onDragStart($event)">
+          <span class="palette-icon" [innerHTML]="entityIcon()"></span>
+          Entité de données
+        </div>
+      </aside>
+
+      <div class="stage-wrap">
+        <div class="empty-state" *ngIf="!loading && entities.length === 0">
+          Aucune entité pour l'instant — glissez « Entité de données » depuis la palette.
+        </div>
+        <div #stageHost class="stage-host" (dragover)="onDragOver($event)" (drop)="onDrop($event)"></div>
       </div>
-      <div #stageHost class="stage-host"></div>
     </div>
 
     <div class="pending-form" *ngIf="pendingRelation as pr">
@@ -77,12 +103,61 @@ interface PendingRelation {
         </div>
       </form>
     </div>
+
+    <div class="pending-form" *ngIf="pendingCreate as p">
+      <form class="card form-card" (submit)="confirmCreate($event)">
+        <h3>Nouvelle entité de données</h3>
+        <label class="field">
+          Nom
+          <input type="text" [value]="p.nom" (input)="p.nom = $any($event.target).value" required autofocus />
+        </label>
+        <label class="field">
+          Description (facultatif)
+          <textarea [value]="p.description" (input)="p.description = $any($event.target).value"></textarea>
+        </label>
+        <label class="field">
+          Propriétaire (facultatif)
+          <input type="text" placeholder="Qui en est responsable ?" [value]="p.proprietaire" (input)="p.proprietaire = $any($event.target).value" />
+        </label>
+        <div class="pending-actions">
+          <button type="button" class="btn btn-ghost" (click)="cancelCreate()">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer</button>
+        </div>
+      </form>
+    </div>
   `,
   styles: [
     `
-      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 1rem; }
+      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; max-width: 640px; }
+      .donnees-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+      .palette {
+        width: 210px;
+        flex-shrink: 0;
+        background: var(--color-white);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--color-border);
+        padding: 1.1rem;
+      }
+      .palette h4 { margin: 0 0 0.75rem; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+      .palette .item {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.5rem 0.55rem;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        cursor: grab;
+        font-size: 0.86rem;
+        background: var(--color-surface);
+        user-select: none;
+      }
+      .palette .item:active { cursor: grabbing; }
+      .palette-icon { width: 22px; height: 22px; flex-shrink: 0; display: inline-flex; }
+      .palette-icon svg { width: 22px; height: 22px; }
       .stage-wrap {
         position: relative;
+        flex: 1;
+        min-width: 0;
         background: var(--color-white);
         border-radius: var(--radius-lg);
         border: 1px solid var(--color-border);
@@ -102,10 +177,12 @@ export class DonneesCanevasComponent implements AfterViewInit, OnDestroy {
   @ViewChild('stageHost') stageHost!: ElementRef<HTMLDivElement>;
 
   cardinalites = CARDINALITES;
+  pngFormat = PNG_FORMAT;
   loading = true;
   entities: DataEntity[] = [];
   relations: DataRelation[] = [];
   pendingRelation: PendingRelation | null = null;
+  pendingCreate: PendingCreate | null = null;
 
   private stage!: Konva.Stage;
   private layer!: Konva.Layer;
@@ -157,6 +234,69 @@ export class DonneesCanevasComponent implements AfterViewInit, OnDestroy {
 
   entityLabel(id: string): string {
     return this.entities.find((e) => e.id === id)?.nom ?? '?';
+  }
+
+  entityIcon(): string {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>';
+  }
+
+  /** Ce canevas est le diagramme lui-même (pas de génération SVG backend pour ce module) : export direct du rendu Konva. */
+  exportPng(): void {
+    downloadDataUrl(this.stage.toDataURL({ pixelRatio: 2 }), 'diagramme-de-classe.png');
+  }
+
+  // ── Drop depuis la palette ───────────────────────────────────────────────
+
+  onDragStart(event: DragEvent): void {
+    event.dataTransfer?.setData('application/x-archivision-type-entite', '1');
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    if (!event.dataTransfer?.getData('application/x-archivision-type-entite')) return;
+
+    const rect = this.stageHost.nativeElement.getBoundingClientRect();
+    const scale = this.stage.scaleX();
+    const x = (event.clientX - rect.left - this.stage.x()) / scale;
+    const y = (event.clientY - rect.top - this.stage.y()) / scale;
+
+    this.pendingCreate = { x, y, nom: '', description: '', proprietaire: '' };
+  }
+
+  cancelCreate(): void {
+    this.pendingCreate = null;
+  }
+
+  confirmCreate(event: Event): void {
+    event.preventDefault();
+    const p = this.pendingCreate;
+    if (!p || !p.nom.trim()) return;
+
+    this.donneesService
+      .create({
+        nom: p.nom.trim(),
+        description: p.description || undefined,
+        proprietaire: p.proprietaire || undefined,
+        positionX: p.x,
+        positionY: p.y,
+      })
+      .subscribe({
+        next: (created) => {
+          // Le backend ne renvoie pas `attributs` à la création (aucun `include`
+          // sur cette route) : le normaliser à vide plutôt que de casser le rendu.
+          this.entities = [...this.entities, { ...created, attributs: created.attributs ?? [] }];
+          this.pendingCreate = null;
+          this.render();
+          this.toast.success('Entité créée.');
+          this.changed.emit();
+        },
+        error: () => this.toast.error("Impossible de créer cette entité."),
+      });
   }
 
   // ── Chargement ───────────────────────────────────────────────────────────

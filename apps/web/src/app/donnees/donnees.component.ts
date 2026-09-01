@@ -36,7 +36,7 @@ const ICONS: Record<string, string> = {
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'entites'" (click)="tab = 'entites'">Entités</button>
       <button class="tab" [class.active]="tab === 'relations'" (click)="tab = 'relations'">Relations</button>
-      <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme UML</button>
+      <button class="tab" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme de classe</button>
     </div>
 
     <section *ngIf="tab === 'entites'">

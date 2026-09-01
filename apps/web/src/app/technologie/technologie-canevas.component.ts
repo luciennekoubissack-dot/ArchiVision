@@ -1,22 +1,42 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, OnDestroy, Output, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import Konva from 'konva';
 import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { TechComponent, TechnologieService, TypeTechComponent } from './technologie.service';
 import { ToastService } from '../shared/toast.service';
+import { downloadDataUrl } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 
-// Notation UML « déploiement » : le TechComponent est un Nœud (boîte 3D),
-// chaque application déployée est son propre Composant relié par un trait
-// pointillé — voir apps/web/src/assets/diagramme-deploiement-template.png.
+const TYPES: TypeTechComponent[] = ['SERVEUR', 'RESEAU', 'CLOUD', 'BASE_DE_DONNEES', 'MIDDLEWARE'];
+const PNG_FORMAT: DownloadFormatOption[] = [{ value: 'png', label: 'PNG' }];
+
+interface PendingCreate {
+  type: TypeTechComponent;
+  x: number;
+  y: number;
+  nom: string;
+  description: string;
+}
+
+// Notation UML « déploiement » (norme UML2, voir OMG UML Superstructure §7.3.4/§18) :
+// - Le TechComponent est un Nœud (boîte 3D), stéréotypé «device» pour le matériel
+//   physique (serveur, réseau) ou «execution environment» pour un environnement
+//   d'exécution logique (cloud, SGBD, middleware) — « nœud » seul n'est pas un
+//   stéréotype valide, Node est déjà la métaclasse UML.
+// - Chaque application déployée est un Artefact (icône document à coin plié,
+//   PAS l'icône Composant à encoches) relié au nœud par une dépendance de
+//   déploiement : flèche pointillée à pointe ouverte, stéréotype «deploy».
+// Voir apps/web/src/assets/diagramme-deploiement-template.png pour l'inspiration
+// générale de mise en page (nœuds + artefacts reliés par des dépendances).
 const NODE_W = 150;
 const NODE_H = 64;
 const DEPTH = 14;
 const HEADER_H = 26;
 const COMP_W = 140;
 const COMP_H = 30;
-const COMP_GAP_Y = 12;
-const NODE_TO_COMP_GAP = 50;
+const COMP_GAP_Y = 20;
+const NODE_TO_COMP_GAP = 55;
 const GAP_X = 40;
 const ROW_Y = 60;
 const UNIT_W = NODE_W + DEPTH + NODE_TO_COMP_GAP + COMP_W + GAP_X;
@@ -27,6 +47,15 @@ const TYPE_LABEL: Record<TypeTechComponent, string> = {
   CLOUD: 'Cloud',
   BASE_DE_DONNEES: 'Base de données',
   MIDDLEWARE: 'Middleware',
+};
+
+/** «device» pour le matériel physique, «execution environment» pour un environnement logique. */
+const TYPE_STEREOTYPE: Record<TypeTechComponent, string> = {
+  SERVEUR: '«device»',
+  RESEAU: '«device»',
+  CLOUD: '«execution environment»',
+  BASE_DE_DONNEES: '«execution environment»',
+  MIDDLEWARE: '«execution environment»',
 };
 
 const TYPE_COLOR: Record<TypeTechComponent, string> = {
@@ -53,21 +82,79 @@ interface Pos {
 @Component({
   selector: 'app-technologie-canevas',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DownloadMenuComponent],
   template: `
-    <p class="hint">Glissez un nœud pour le repositionner. Les applications qu'il héberge s'affichent comme des composants reliés.</p>
-    <div class="stage-wrap">
-      <div class="empty-state" *ngIf="!loading && components.length === 0">
-        Aucun composant technique pour l'instant — ajoutez-en depuis l'onglet Composants.
+    <div class="page-header">
+      <p class="hint">Glissez un composant de la palette sur le plan pour l'ajouter. Glissez un nœud déjà placé pour le repositionner.</p>
+      <app-download-menu [formats]="pngFormat" [disabled]="components.length === 0" (download)="exportPng()" />
+    </div>
+    <div class="tech-layout">
+      <aside class="palette">
+        <h4>Composants</h4>
+        <div class="item" *ngFor="let t of types" draggable="true" (dragstart)="onDragStart($event, t)">
+          <span class="palette-swatch" [style.background]="typeColor(t)"></span>
+          {{ typeLabel(t) }}
+        </div>
+      </aside>
+
+      <div class="stage-wrap">
+        <div class="empty-state" *ngIf="!loading && components.length === 0">
+          Aucun composant technique pour l'instant — glissez une icône depuis la palette.
+        </div>
+        <div #stageHost class="stage-host" (dragover)="onDragOver($event)" (drop)="onDrop($event)"></div>
       </div>
-      <div #stageHost class="stage-host"></div>
+    </div>
+
+    <div class="pending-form" *ngIf="pendingCreate as p">
+      <form class="card form-card" (submit)="confirmCreate($event)">
+        <h3>Nouveau composant — {{ typeLabel(p.type) }}</h3>
+        <label class="field">
+          Nom
+          <input type="text" [value]="p.nom" (input)="p.nom = $any($event.target).value" required autofocus />
+        </label>
+        <label class="field">
+          Justification
+          <textarea placeholder="Pourquoi ce choix technologique ?" [value]="p.description" (input)="p.description = $any($event.target).value"></textarea>
+        </label>
+        <div class="pending-actions">
+          <button type="button" class="btn btn-ghost" (click)="cancelCreate()">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer</button>
+        </div>
+      </form>
     </div>
   `,
   styles: [
     `
-      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 1rem; }
+      .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0; max-width: 640px; }
+      .tech-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+      .palette {
+        width: 210px;
+        flex-shrink: 0;
+        background: var(--color-white);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--color-border);
+        padding: 1.1rem;
+      }
+      .palette h4 { margin: 0 0 0.75rem; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+      .palette .item {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.5rem 0.55rem;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        margin-bottom: 0.4rem;
+        cursor: grab;
+        font-size: 0.86rem;
+        background: var(--color-surface);
+        user-select: none;
+      }
+      .palette .item:active { cursor: grabbing; }
+      .palette-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
       .stage-wrap {
         position: relative;
+        flex: 1;
+        min-width: 0;
         background: var(--color-white);
         border-radius: var(--radius-lg);
         border: 1px solid var(--color-border);
@@ -75,14 +162,21 @@ interface Pos {
       }
       .stage-host { width: 100%; height: 60vh; min-height: 380px; cursor: grab; }
       .stage-wrap .empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; color: var(--color-text-muted); text-align: center; padding: 2rem; }
+      .pending-form { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.25); display: flex; align-items: center; justify-content: center; z-index: 50; }
+      .pending-form .card { width: 320px; }
+      .pending-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem; }
     `,
   ],
 })
 export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
+  @Output() changed = new EventEmitter<void>();
   @ViewChild('stageHost') stageHost!: ElementRef<HTMLDivElement>;
 
+  types = TYPES;
+  pngFormat = PNG_FORMAT;
   loading = true;
   components: TechComponent[] = [];
+  pendingCreate: PendingCreate | null = null;
 
   private stage!: Konva.Stage;
   private layer!: Konva.Layer;
@@ -191,7 +285,7 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
         x: 6,
         y: frontY + 2,
         width: NODE_W - 12,
-        text: `«nœud» ${TYPE_LABEL[comp.type]}`,
+        text: `${TYPE_STEREOTYPE[comp.type]} ${TYPE_LABEL[comp.type]}`,
         fontSize: 8,
         fontStyle: 'italic',
         fill: '#c9d2e3',
@@ -221,15 +315,34 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
     comp.deploiements.forEach((d, i) => {
       const compY = frontY + i * (COMP_H + COMP_GAP_Y);
       const compX = nodeRightX + NODE_TO_COMP_GAP;
+      const midY = compY + COMP_H / 2;
+
+      // Dépendance de déploiement UML : flèche pointillée à pointe ouverte,
+      // du Nœud vers l'Artefact qu'il héberge, étiquetée «deploy».
       group.add(
-        new Konva.Line({
-          points: [nodeRightX, compY + COMP_H / 2, compX, compY + COMP_H / 2],
-          stroke: '#8991a8',
+        new Konva.Arrow({
+          points: [nodeRightX, midY, compX, midY],
+          stroke: '#5b6478',
+          fill: '#5b6478',
           strokeWidth: 1.2,
           dash: [5, 4],
+          pointerLength: 7,
+          pointerWidth: 6,
         }),
       );
-      group.add(this.buildAppComponentBox(d.application.nom, compX, compY));
+      group.add(
+        new Konva.Text({
+          x: nodeRightX,
+          y: midY - 15,
+          width: NODE_TO_COMP_GAP,
+          text: '«deploy»',
+          fontSize: 8,
+          fontStyle: 'italic',
+          fill: '#5b6478',
+          align: 'center',
+        }),
+      );
+      group.add(this.buildArtifactBox(d.application.nom, compX, compY));
     });
 
     group.on('mouseenter', () => (document.body.style.cursor = 'grab'));
@@ -243,34 +356,67 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
     return group;
   }
 
-  /** Boîte « Composant » UML — rectangle + icône composant (deux rectangles), pour une application déployée. */
-  private buildAppComponentBox(nom: string, x: number, y: number): Konva.Group {
+  /**
+   * Boîte « Artefact » UML (et non « Composant » : une application déployée
+   * est un livrable exécutable, ce que l'UML modélise comme un Artefact,
+   * avec son icône dédiée en forme de document à coin plié) et son
+   * stéréotype «artifact» au-dessus du nom.
+   */
+  private buildArtifactBox(nom: string, x: number, y: number): Konva.Group {
     const box = new Konva.Group({ x, y });
     box.add(new Konva.Rect({ width: COMP_W, height: COMP_H, fill: '#F5F9FF', stroke: '#1F3BB3', strokeWidth: 1.3, cornerRadius: 3 }));
     box.add(
       new Konva.Text({
         x: 8,
-        y: 0,
+        y: 3,
         width: COMP_W - 26,
-        height: COMP_H,
+        text: '«artifact»',
+        fontSize: 7.5,
+        fontStyle: 'italic',
+        fill: '#5b6478',
+      }),
+    );
+    box.add(
+      new Konva.Text({
+        x: 8,
+        y: 13,
+        width: COMP_W - 26,
+        height: COMP_H - 13,
         text: nom,
         fontSize: 10.5,
+        fontStyle: 'bold',
         fill: '#1a1a1a',
         verticalAlign: 'middle',
         wrap: 'none',
         ellipsis: true,
       }),
     );
-    box.add(this.buildComponentIcon(COMP_W - 18, 7));
+    box.add(this.buildArtifactIcon(COMP_W - 18, 6));
     return box;
   }
 
-  /** Icône UML de composant : rectangle avec deux petites encoches sur le bord gauche. */
-  private buildComponentIcon(x: number, y: number): Konva.Group {
+  /** Icône UML d'artefact : rectangle avec le coin supérieur droit plié (icône « document »). */
+  private buildArtifactIcon(x: number, y: number): Konva.Group {
+    const w = 12;
+    const h = 15;
+    const fold = 4;
     const icon = new Konva.Group({ x, y });
-    icon.add(new Konva.Rect({ width: 12, height: 16, stroke: '#1F3BB3', strokeWidth: 1, fill: '#ffffff' }));
-    icon.add(new Konva.Rect({ x: -3, y: 2, width: 6, height: 3.5, stroke: '#1F3BB3', strokeWidth: 1, fill: '#ffffff' }));
-    icon.add(new Konva.Rect({ x: -3, y: 9, width: 6, height: 3.5, stroke: '#1F3BB3', strokeWidth: 1, fill: '#ffffff' }));
+    icon.add(
+      new Konva.Line({
+        points: [0, 0, w - fold, 0, w, fold, w, h, 0, h],
+        closed: true,
+        stroke: '#1F3BB3',
+        strokeWidth: 1,
+        fill: '#ffffff',
+      }),
+    );
+    icon.add(
+      new Konva.Line({
+        points: [w - fold, 0, w - fold, fold, w, fold],
+        stroke: '#1F3BB3',
+        strokeWidth: 1,
+      }),
+    );
     return icon;
   }
 
@@ -278,6 +424,68 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
     this.technologieService.update(id, { positionX: x, positionY: y }).subscribe({
       error: () => this.toast.error("Impossible d'enregistrer la position."),
     });
+  }
+
+  typeLabel(type: TypeTechComponent): string {
+    return TYPE_LABEL[type];
+  }
+
+  typeColor(type: TypeTechComponent): string {
+    return TYPE_COLOR[type];
+  }
+
+  /** Ce canevas est le diagramme lui-même (pas de génération SVG backend pour ce module) : export direct du rendu Konva. */
+  exportPng(): void {
+    downloadDataUrl(this.stage.toDataURL({ pixelRatio: 2 }), 'diagramme-de-deploiement.png');
+  }
+
+  // ── Drop depuis la palette ───────────────────────────────────────────────
+
+  onDragStart(event: DragEvent, type: TypeTechComponent): void {
+    event.dataTransfer?.setData('application/x-archivision-type-tech', type);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    const type = event.dataTransfer?.getData('application/x-archivision-type-tech') as TypeTechComponent | undefined;
+    if (!type) return;
+
+    const rect = this.stageHost.nativeElement.getBoundingClientRect();
+    const scale = this.stage.scaleX();
+    const x = (event.clientX - rect.left - this.stage.x()) / scale;
+    const y = (event.clientY - rect.top - this.stage.y()) / scale;
+
+    this.pendingCreate = { type, x, y, nom: '', description: '' };
+  }
+
+  cancelCreate(): void {
+    this.pendingCreate = null;
+  }
+
+  confirmCreate(event: Event): void {
+    event.preventDefault();
+    const p = this.pendingCreate;
+    if (!p || !p.nom.trim()) return;
+
+    this.technologieService
+      .create({ nom: p.nom.trim(), type: p.type, description: p.description || undefined, positionX: p.x, positionY: p.y })
+      .subscribe({
+        next: (created) => {
+          // Le backend ne renvoie pas `deploiements` à la création (aucun `include`
+          // sur cette route) : le normaliser à vide plutôt que de casser le rendu.
+          this.components = [...this.components, { ...created, deploiements: created.deploiements ?? [] }];
+          this.pendingCreate = null;
+          this.render();
+          this.toast.success('Composant ajouté.');
+          this.changed.emit();
+        },
+        error: () => this.toast.error("Impossible d'ajouter ce composant."),
+      });
   }
 
   private onWheel(e: Konva.KonvaEventObject<WheelEvent>): void {

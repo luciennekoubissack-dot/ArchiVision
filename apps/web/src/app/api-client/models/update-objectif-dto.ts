@@ -14,7 +14,17 @@ export interface UpdateObjectifDto {
   nom?: string;
 
   /**
+   * Identifiant de l'objectif AS-IS dont cet objectif TO-BE est l'évolution (uniquement si statut = TO_BE).
+   */
+  objectifAsIsId?: string;
+
+  /**
    * Sous-objectif rattaché.
    */
   sousObjectif?: string;
+
+  /**
+   * Statut de l'objectif pour l'analyse des écarts (AS_IS, TO_BE ou LES_DEUX).
+   */
+  statut?: 'AS_IS' | 'TO_BE' | 'LES_DEUX';
 }

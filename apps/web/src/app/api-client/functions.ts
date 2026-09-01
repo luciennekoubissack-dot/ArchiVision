@@ -217,6 +217,8 @@ export type { SolutionControllerFindAll$Params as SolutionControllerFindAll$Para
 export { solutionControllerFindAll as solutionControllerFindAll } from './fn/solutions/solution-controller-find-all';
 export type { SolutionControllerCreate$Params as SolutionControllerCreate$Params } from './fn/solutions/solution-controller-create';
 export { solutionControllerCreate as solutionControllerCreate } from './fn/solutions/solution-controller-create';
+export type { SolutionControllerListGaps$Params as SolutionControllerListGaps$Params } from './fn/solutions/solution-controller-list-gaps';
+export { solutionControllerListGaps as solutionControllerListGaps } from './fn/solutions/solution-controller-list-gaps';
 export type { SolutionControllerFindOne$Params as SolutionControllerFindOne$Params } from './fn/solutions/solution-controller-find-one';
 export { solutionControllerFindOne as solutionControllerFindOne } from './fn/solutions/solution-controller-find-one';
 export type { SolutionControllerRemove$Params as SolutionControllerRemove$Params } from './fn/solutions/solution-controller-remove';
@@ -225,6 +227,8 @@ export type { SolutionControllerUpdate$Params as SolutionControllerUpdate$Params
 export { solutionControllerUpdate as solutionControllerUpdate } from './fn/solutions/solution-controller-update';
 export type { SolutionControllerUpdateScores$Params as SolutionControllerUpdateScores$Params } from './fn/solutions/solution-controller-update-scores';
 export { solutionControllerUpdateScores as solutionControllerUpdateScores } from './fn/solutions/solution-controller-update-scores';
+export type { SolutionControllerUpdateGaps$Params as SolutionControllerUpdateGaps$Params } from './fn/solutions/solution-controller-update-gaps';
+export { solutionControllerUpdateGaps as solutionControllerUpdateGaps } from './fn/solutions/solution-controller-update-gaps';
 export type { CritereEvaluationControllerFindAll$Params as CritereEvaluationControllerFindAll$Params } from './fn/criteres-evaluation/critere-evaluation-controller-find-all';
 export { critereEvaluationControllerFindAll as critereEvaluationControllerFindAll } from './fn/criteres-evaluation/critere-evaluation-controller-find-all';
 export type { CritereEvaluationControllerCreate$Params as CritereEvaluationControllerCreate$Params } from './fn/criteres-evaluation/critere-evaluation-controller-create';

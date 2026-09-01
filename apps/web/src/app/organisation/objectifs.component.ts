@@ -9,11 +9,27 @@ import { exportToExcel } from '../shared/excel.util';
 import { PaginationComponent } from '../shared/pagination.component';
 import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
+type StatutObjectif = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
+
 interface ObjectifDraft {
   nom: string;
   description?: string;
   sousObjectif?: string;
+  statut: StatutObjectif;
+  objectifAsIsId?: string;
 }
+
+const STATUT_LABEL: Record<StatutObjectif, string> = {
+  AS_IS: 'AS-IS',
+  TO_BE: 'TO-BE',
+  LES_DEUX: 'Les deux',
+};
+const STATUT_BADGE: Record<StatutObjectif, string> = {
+  AS_IS: 'badge-neutral',
+  TO_BE: 'badge-success',
+  LES_DEUX: 'badge-warning',
+};
+const STATUTS: StatutObjectif[] = ['LES_DEUX', 'AS_IS', 'TO_BE'];
 
 const ICONS: Record<string, string> = {
   eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
@@ -48,12 +64,16 @@ const ICONS: Record<string, string> = {
       <div class="empty-state" *ngIf="objectifs.length === 0">Aucun objectif défini pour cette organisation.</div>
       <div class="table-scroll" *ngIf="objectifs.length > 0">
         <table class="table">
-          <thead><tr><th>Intitulé</th><th>Description</th><th>Sous-objectif</th><th></th></tr></thead>
+          <thead><tr><th>Intitulé</th><th>Description</th><th>Sous-objectif</th><th>Statut</th><th></th></tr></thead>
           <tbody>
             <tr *ngFor="let objectif of objectifs">
               <td>{{ objectif.nom }}</td>
               <td>{{ objectif.description || '—' }}</td>
               <td>{{ objectif.sousObjectif || '—' }}</td>
+              <td>
+                <span class="badge" [class]="statutBadge(objectif.statut)">{{ statutLabel(objectif.statut) }}</span>
+                <span class="muted evolution-note" *ngIf="objectif.objectifAsIs">← {{ objectif.objectifAsIs.nom }}</span>
+              </td>
               <td class="row-actions">
                 <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openView(objectif)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('eye')"></svg>
@@ -95,6 +115,19 @@ const ICONS: Record<string, string> = {
           Sous-objectif
           <input type="text" [value]="newObjectif.sousObjectif || ''" (input)="newObjectif.sousObjectif = $any($event.target).value" />
         </label>
+        <label class="field">
+          Statut
+          <select [value]="newObjectif.statut" (change)="onCreateStatutChange($any($event.target).value)">
+            <option *ngFor="let s of statuts" [value]="s">{{ statutLabel(s) }}</option>
+          </select>
+        </label>
+        <label class="field" *ngIf="newObjectif.statut === 'TO_BE'">
+          Objectif AS-IS d'origine (optionnel)
+          <select [value]="newObjectif.objectifAsIsId || ''" (change)="newObjectif.objectifAsIsId = $any($event.target).value || undefined">
+            <option value="">— Aucun (objectif entièrement nouveau) —</option>
+            <option *ngFor="let o of asIsObjectifs" [value]="o.id">{{ o.nom }}</option>
+          </select>
+        </label>
         <div class="popover-actions">
           <button type="button" class="btn btn-ghost" (click)="closeCreate()">Annuler</button>
           <button type="submit" class="btn btn-primary" [disabled]="creating">{{ creating ? 'Création…' : "Créer l'objectif" }}</button>
@@ -115,6 +148,15 @@ const ICONS: Record<string, string> = {
           <dt>Intitulé</dt><dd>{{ o.nom }}</dd>
           <dt>Description</dt><dd>{{ o.description || '—' }}</dd>
           <dt>Sous-objectif</dt><dd>{{ o.sousObjectif || '—' }}</dd>
+          <dt>Statut</dt>
+          <dd><span class="badge" [class]="statutBadge(o.statut)">{{ statutLabel(o.statut) }}</span></dd>
+          <ng-container *ngIf="o.objectifAsIs">
+            <dt>Évolution de</dt><dd>{{ o.objectifAsIs.nom }} (AS-IS)</dd>
+          </ng-container>
+          <ng-container *ngIf="o.objectifsToBe && o.objectifsToBe.length > 0">
+            <dt>Évolue vers</dt>
+            <dd>{{ toBeNames(o) }}</dd>
+          </ng-container>
         </dl>
       </div>
     </div>
@@ -140,6 +182,19 @@ const ICONS: Record<string, string> = {
           Sous-objectif
           <input type="text" [value]="draft.sousObjectif || ''" (input)="draft.sousObjectif = $any($event.target).value" />
         </label>
+        <label class="field">
+          Statut
+          <select [value]="draft.statut" (change)="onEditStatutChange($any($event.target).value)">
+            <option *ngFor="let s of statuts" [value]="s">{{ statutLabel(s) }}</option>
+          </select>
+        </label>
+        <label class="field" *ngIf="draft.statut === 'TO_BE'">
+          Objectif AS-IS d'origine (optionnel)
+          <select [value]="draft.objectifAsIsId || ''" (change)="draft.objectifAsIsId = $any($event.target).value || undefined">
+            <option value="">— Aucun (objectif entièrement nouveau) —</option>
+            <option *ngFor="let o of asIsObjectifs" [value]="o.id" [disabled]="o.id === editTarget?.id">{{ o.nom }}</option>
+          </select>
+        </label>
         <div class="popover-actions">
           <button type="button" class="btn btn-ghost" (click)="closeEdit()">Annuler</button>
           <button type="submit" class="btn btn-success" [disabled]="saving">{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
@@ -155,18 +210,21 @@ const ICONS: Record<string, string> = {
       .table { width: 100%; min-width: 560px; border-collapse: collapse; }
       .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
       .row-actions { display: flex; gap: 0.4rem; white-space: nowrap; }
+      .evolution-note { display: block; font-size: 0.78rem; margin-top: 0.2rem; }
     `,
   ],
 })
 export class ObjectifsComponent implements OnInit {
   objectifs: Objectif[] = [];
+  asIsObjectifs: Objectif[] = [];
+  statuts = STATUTS;
   page = 1;
   total = 0;
   pageSize = DEFAULT_PAGE_SIZE;
 
   creating = false;
   createPopover = false;
-  newObjectif: ObjectifDraft = { nom: '' };
+  newObjectif: ObjectifDraft = { nom: '', statut: 'LES_DEUX' };
 
   viewTarget: Objectif | null = null;
 
@@ -188,6 +246,7 @@ export class ObjectifsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadObjectifs();
+    this.loadAsIsObjectifs();
   }
 
   onPageChange(page: number): void {
@@ -205,12 +264,43 @@ export class ObjectifsComponent implements OnInit {
     });
   }
 
+  /** Alimente le sélecteur "Objectif AS-IS d'origine" : a besoin de tous les objectifs AS-IS, pas seulement la page courante. */
+  private loadAsIsObjectifs(): void {
+    this.objectifService.list().subscribe({
+      next: (all) => (this.asIsObjectifs = all.filter((o) => o.statut === 'AS_IS')),
+      error: () => this.toast.error('Impossible de charger les objectifs AS-IS.'),
+    });
+  }
+
   icon(name: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
   }
 
+  statutLabel(s: StatutObjectif): string {
+    return STATUT_LABEL[s];
+  }
+
+  toBeNames(o: Objectif): string {
+    return (o.objectifsToBe ?? []).map((t) => t.nom).join(', ');
+  }
+
+  statutBadge(s: StatutObjectif): string {
+    return STATUT_BADGE[s];
+  }
+
+  onCreateStatutChange(value: string): void {
+    this.newObjectif.statut = value as StatutObjectif;
+    if (value !== 'TO_BE') this.newObjectif.objectifAsIsId = undefined;
+  }
+
+  onEditStatutChange(value: string): void {
+    if (!this.editDraft) return;
+    this.editDraft.statut = value as StatutObjectif;
+    if (value !== 'TO_BE') this.editDraft.objectifAsIsId = undefined;
+  }
+
   openCreate(): void {
-    this.newObjectif = { nom: '' };
+    this.newObjectif = { nom: '', statut: 'LES_DEUX' };
     this.createPopover = true;
   }
 
@@ -228,6 +318,7 @@ export class ObjectifsComponent implements OnInit {
         this.closeCreate();
         this.toast.success('Objectif créé.');
         this.loadObjectifs();
+        this.loadAsIsObjectifs();
       },
       error: () => {
         this.creating = false;
@@ -242,7 +333,13 @@ export class ObjectifsComponent implements OnInit {
         exportToExcel(
           'objectifs',
           'Objectifs',
-          objectifs.map((o) => ({ Intitulé: o.nom, Description: o.description ?? '', 'Sous-objectif': o.sousObjectif ?? '' })),
+          objectifs.map((o) => ({
+            Intitulé: o.nom,
+            Description: o.description ?? '',
+            'Sous-objectif': o.sousObjectif ?? '',
+            Statut: this.statutLabel(o.statut),
+            'Évolution de': o.objectifAsIs?.nom ?? '',
+          })),
         ),
       error: () => this.toast.error("Impossible d'exporter les objectifs."),
     });
@@ -262,6 +359,8 @@ export class ObjectifsComponent implements OnInit {
       nom: objectif.nom,
       description: objectif.description ?? '',
       sousObjectif: objectif.sousObjectif ?? '',
+      statut: objectif.statut,
+      objectifAsIsId: objectif.objectifAsIsId ?? undefined,
     };
   }
 
@@ -280,6 +379,7 @@ export class ObjectifsComponent implements OnInit {
         this.saving = false;
         this.closeEdit();
         this.toast.success('Objectif modifié.');
+        this.loadAsIsObjectifs();
       },
       error: () => {
         this.saving = false;
@@ -295,6 +395,7 @@ export class ObjectifsComponent implements OnInit {
       next: () => {
         this.toast.success('Objectif supprimé.');
         this.loadObjectifs();
+        this.loadAsIsObjectifs();
       },
       error: () => this.toast.error("Impossible de supprimer l'objectif."),
     });

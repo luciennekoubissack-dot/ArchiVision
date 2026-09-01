@@ -28,22 +28,39 @@ interface PendingEchange {
   protocole: string;
 }
 
+interface PendingCreate {
+  x: number;
+  y: number;
+  nom: string;
+  description: string;
+}
+
 @Component({
   selector: 'app-applications-canevas',
   standalone: true,
   imports: [CommonModule],
   template: `
     <p class="hint">
-      Glissez une application pour la repositionner. Survolez une application : glissez depuis l'un des 4 points
-      sur ses bords vers une autre application pour créer un échange, ou cliquez sur le « × » rouge pour la
-      supprimer.
+      Glissez « Application » depuis la palette sur le plan pour en créer une nouvelle. Glissez une application
+      existante pour la repositionner. Survolez une application : glissez depuis l'un des 4 points sur ses bords
+      vers une autre application pour créer un échange, ou cliquez sur le « × » rouge pour la supprimer.
     </p>
 
-    <div class="stage-wrap">
-      <div class="empty-state" *ngIf="!loading && applications.length === 0">
-        Aucune application pour l'instant .
+    <div class="app-layout">
+      <aside class="palette">
+        <h4>Éléments</h4>
+        <div class="item" draggable="true" (dragstart)="onDragStart($event)">
+          <span class="palette-icon" [innerHTML]="appIcon()"></span>
+          Application
+        </div>
+      </aside>
+
+      <div class="stage-wrap">
+        <div class="empty-state" *ngIf="!loading && applications.length === 0">
+          Aucune application pour l'instant — glissez « Application » depuis la palette.
+        </div>
+        <div #stageHost class="stage-host" (dragover)="onDragOver($event)" (drop)="onDrop($event)"></div>
       </div>
-      <div #stageHost class="stage-host"></div>
     </div>
 
     <div class="pending-form" *ngIf="pendingEchange as pe">
@@ -64,12 +81,57 @@ interface PendingEchange {
         </div>
       </form>
     </div>
+
+    <div class="pending-form" *ngIf="pendingCreate as p">
+      <form class="card form-card" (submit)="confirmCreate($event)">
+        <h3>Nouvelle application</h3>
+        <label class="field">
+          Nom
+          <input type="text" [value]="p.nom" (input)="p.nom = $any($event.target).value" required autofocus />
+        </label>
+        <label class="field">
+          Description (facultatif)
+          <textarea [value]="p.description" (input)="p.description = $any($event.target).value"></textarea>
+        </label>
+        <div class="pending-actions">
+          <button type="button" class="btn btn-ghost" (click)="cancelCreate()">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer</button>
+        </div>
+      </form>
+    </div>
   `,
   styles: [
     `
       .hint { color: var(--color-text-muted); font-size: 0.85rem; margin: 0 0 1rem; }
+      .app-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+      .palette {
+        width: 210px;
+        flex-shrink: 0;
+        background: var(--color-white);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--color-border);
+        padding: 1.1rem;
+      }
+      .palette h4 { margin: 0 0 0.75rem; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+      .palette .item {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.5rem 0.55rem;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        cursor: grab;
+        font-size: 0.86rem;
+        background: var(--color-surface);
+        user-select: none;
+      }
+      .palette .item:active { cursor: grabbing; }
+      .palette-icon { width: 22px; height: 22px; flex-shrink: 0; display: inline-flex; }
+      .palette-icon svg { width: 22px; height: 22px; }
       .stage-wrap {
         position: relative;
+        flex: 1;
+        min-width: 0;
         background: var(--color-white);
         border-radius: var(--radius-lg);
         border: 1px solid var(--color-border);
@@ -92,6 +154,7 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
   applications: Application[] = [];
   echanges: ApplicationEchange[] = [];
   pendingEchange: PendingEchange | null = null;
+  pendingCreate: PendingCreate | null = null;
 
   private stage!: Konva.Stage;
   private layer!: Konva.Layer;
@@ -139,6 +202,56 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
 
   appLabel(id: string): string {
     return this.applications.find((a) => a.id === id)?.nom ?? '?';
+  }
+
+  appIcon(): string {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>';
+  }
+
+  // ── Drop depuis la palette ───────────────────────────────────────────────
+
+  onDragStart(event: DragEvent): void {
+    event.dataTransfer?.setData('application/x-archivision-type-application', '1');
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    if (!event.dataTransfer?.getData('application/x-archivision-type-application')) return;
+
+    const rect = this.stageHost.nativeElement.getBoundingClientRect();
+    const scale = this.stage.scaleX();
+    const x = (event.clientX - rect.left - this.stage.x()) / scale;
+    const y = (event.clientY - rect.top - this.stage.y()) / scale;
+
+    this.pendingCreate = { x, y, nom: '', description: '' };
+  }
+
+  cancelCreate(): void {
+    this.pendingCreate = null;
+  }
+
+  confirmCreate(event: Event): void {
+    event.preventDefault();
+    const p = this.pendingCreate;
+    if (!p || !p.nom.trim()) return;
+
+    this.urbanisationService
+      .createApplication({ nom: p.nom.trim(), description: p.description || undefined, positionX: p.x, positionY: p.y })
+      .subscribe({
+        next: (created) => {
+          this.applications = [...this.applications, created];
+          this.pendingCreate = null;
+          this.render();
+          this.toast.success('Application créée.');
+          this.changed.emit();
+        },
+        error: () => this.toast.error("Impossible de créer cette application."),
+      });
   }
 
   // ── Chargement ───────────────────────────────────────────────────────────

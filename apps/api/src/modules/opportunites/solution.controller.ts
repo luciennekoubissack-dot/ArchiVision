@@ -6,7 +6,9 @@ import { SolutionService } from './solution.service';
 import { CreateSolutionDto } from './dto/create-solution.dto';
 import { UpdateSolutionDto } from './dto/update-solution.dto';
 import { UpdateScoresDto } from './dto/update-scores.dto';
+import { LinkGapsDto } from './dto/link-gaps.dto';
 import { SolutionEntity } from './entities/solution.entity';
+import { SolutionGapWithSolutionEntity } from './entities/solution-gap.entity';
 
 @ApiTags('solutions')
 @ApiBearerAuth('access-token')
@@ -23,6 +25,16 @@ export class SolutionController {
   @ApiPaginatedResponse(SolutionEntity)
   findAll(@CurrentUser() user: AuthUser, @Query() pagination: PaginationQueryDto) {
     return this.service.findAll(requireOrganisationId(user), pagination);
+  }
+
+  // Route littérale à déclarer avant ':id' : Express fait correspondre les
+  // routes dans l'ordre de déclaration, sinon "/solutions/gaps" serait pris
+  // pour une demande de solution d'identifiant "gaps".
+  @ApiOperation({ summary: "Lister tous les écarts déjà adressés par une solution, toutes solutions confondues" })
+  @Get('gaps')
+  @ApiOkResponse({ type: [SolutionGapWithSolutionEntity] })
+  listGaps(@CurrentUser() user: AuthUser) {
+    return this.service.listGaps(requireOrganisationId(user));
   }
 
   @ApiOperation({ summary: 'Recuperer une solution par son identifiant' })
@@ -58,6 +70,15 @@ export class SolutionController {
   @ApiOkResponse({ type: SolutionEntity })
   updateScores(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateScoresDto) {
     return this.service.updateScores(id, requireOrganisationId(user), dto.items);
+  }
+
+  @ApiOperation({ summary: 'Mettre a jour les écarts (Analyse des écarts) adressés par une solution' })
+  @Patch(':id/gaps')
+  @UseGuards(RolesGuard)
+  @Roles(RoleUtilisateur.ADMINISTRATEUR, RoleUtilisateur.ARCHITECTE)
+  @ApiOkResponse({ type: SolutionEntity })
+  updateGaps(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: LinkGapsDto) {
+    return this.service.updateGaps(id, requireOrganisationId(user), dto.items);
   }
 
   @ApiOperation({ summary: 'Supprimer une solution' })

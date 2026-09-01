@@ -34,6 +34,11 @@ describe('SolutionService', () => {
     evaluationScore: {
       upsert: jest.fn(),
     },
+    solutionGap: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   };
 
@@ -55,7 +60,7 @@ describe('SolutionService', () => {
     expect(result).toEqual(mockSolution);
     expect(prismaMock.solution.create).toHaveBeenCalledWith({
       data: { nom: mockSolution.nom, organisationId: ORG_ID },
-      include: { scores: true },
+      include: { scores: true, gaps: true },
     });
   });
 
@@ -66,7 +71,7 @@ describe('SolutionService', () => {
 
     expect(result).toEqual([mockSolution]);
     expect(prismaMock.solution.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { organisationId: ORG_ID }, include: { scores: true } }),
+      expect.objectContaining({ where: { organisationId: ORG_ID }, include: { scores: true, gaps: true } }),
     );
   });
 
@@ -131,5 +136,41 @@ describe('SolutionService', () => {
 
       await expect(service.updateScores(mockSolution.id, ORG_ID, items)).rejects.toThrow(NotFoundException);
     });
+  });
+
+  describe('updateGaps', () => {
+    const items = [{ domaine: 'OBJECTIF' as never, elementId: 'objectif-001', elementNom: 'Digitaliser la gestion' }];
+
+    it('remplace les écarts adressés (delete puis createMany) et retourne la solution à jour', async () => {
+      prismaMock.solution.count.mockResolvedValue(1);
+      prismaMock.solution.findUnique.mockResolvedValue({ ...mockSolution, gaps: items });
+
+      const result = await service.updateGaps(mockSolution.id, ORG_ID, items);
+
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+      expect(prismaMock.solutionGap.deleteMany).toHaveBeenCalledWith({ where: { solutionId: mockSolution.id } });
+      expect(prismaMock.solutionGap.createMany).toHaveBeenCalledWith({
+        data: [{ solutionId: mockSolution.id, domaine: 'OBJECTIF', elementId: 'objectif-001', elementNom: 'Digitaliser la gestion' }],
+      });
+      expect(result).toEqual({ ...mockSolution, gaps: items });
+    });
+
+    it('lève NotFoundException si la solution est introuvable', async () => {
+      prismaMock.solution.count.mockResolvedValue(0);
+
+      await expect(service.updateGaps('inconnu', ORG_ID, items)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  it('liste tous les écarts adressés de l\'organisation, toutes solutions confondues', async () => {
+    const gaps = [{ id: 'gap-001', solutionId: mockSolution.id, domaine: 'OBJECTIF', elementId: 'objectif-001', elementNom: 'x', solution: { id: mockSolution.id, nom: mockSolution.nom } }];
+    prismaMock.solutionGap.findMany.mockResolvedValue(gaps);
+
+    const result = await service.listGaps(ORG_ID);
+
+    expect(result).toEqual(gaps);
+    expect(prismaMock.solutionGap.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { solution: { organisationId: ORG_ID } } }),
+    );
   });
 });

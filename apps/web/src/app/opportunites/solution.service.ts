@@ -9,20 +9,27 @@ import { EvaluationScoreEntity } from '../api-client/models/evaluation-score-ent
 import { CreateSolutionDto } from '../api-client/models/create-solution-dto';
 import { UpdateSolutionDto } from '../api-client/models/update-solution-dto';
 import { ScoreItemDto } from '../api-client/models/score-item-dto';
+import { GapLinkItemDto } from '../api-client/models/gap-link-item-dto';
+import { SolutionGapWithSolutionEntity } from '../api-client/models/solution-gap-with-solution-entity';
 import { solutionControllerFindAll } from '../api-client/fn/solutions/solution-controller-find-all';
 import { solutionControllerCreate } from '../api-client/fn/solutions/solution-controller-create';
 import { solutionControllerUpdate } from '../api-client/fn/solutions/solution-controller-update';
 import { solutionControllerUpdateScores } from '../api-client/fn/solutions/solution-controller-update-scores';
+import { solutionControllerUpdateGaps } from '../api-client/fn/solutions/solution-controller-update-gaps';
+import { solutionControllerListGaps } from '../api-client/fn/solutions/solution-controller-list-gaps';
 import { solutionControllerRemove } from '../api-client/fn/solutions/solution-controller-remove';
 
 export type StatutSolution = 'PROPOSEE' | 'RETENUE' | 'REJETEE';
 export type AvancementSolution = 'NON_DEMARRE' | 'EN_COURS' | 'TERMINE' | 'BLOQUE';
+export type DomaineEcart = 'OBJECTIF' | 'METIER' | 'DONNEES' | 'APPLICATIF' | 'TECHNOLOGIQUE';
 
 export type EvaluationScore = EvaluationScoreEntity;
 export type Solution = SolutionEntity;
 export type CreateSolutionPayload = CreateSolutionDto;
 export type UpdateSolutionPayload = UpdateSolutionDto;
 export type ScoreItem = ScoreItemDto;
+export type GapLinkItem = GapLinkItemDto;
+export type SolutionGap = SolutionGapWithSolutionEntity;
 
 /**
  * Enveloppe fine autour du client généré depuis le contrat OpenAPI
@@ -56,6 +63,17 @@ export class SolutionService {
     return solutionControllerUpdateScores(this.http, this.config.rootUrl, { id, body: { items } }).pipe(
       map((r) => r.body),
     );
+  }
+
+  updateGaps(id: string, items: GapLinkItem[]): Observable<Solution> {
+    return solutionControllerUpdateGaps(this.http, this.config.rootUrl, { id, body: { items } }).pipe(
+      map((r) => r.body),
+    );
+  }
+
+  /** Tous les écarts déjà adressés par au moins une solution, toutes solutions confondues (contrôle de couverture, Analyse des écarts). */
+  listGaps(): Observable<SolutionGap[]> {
+    return solutionControllerListGaps(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 
   delete(id: string): Observable<void> {

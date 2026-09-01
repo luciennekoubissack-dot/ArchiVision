@@ -8,6 +8,14 @@ import { UpdateVisionCanvasPayload, VisionCanvas, VisionCanvasField, VisionCanva
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { exportToExcel, importFromExcel } from '../shared/excel.util';
+import { downloadCsv, downloadPdf } from '../shared/download.util';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
+
+const VISION_EXPORT_FORMATS: DownloadFormatOption[] = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'csv', label: 'CSV' },
+  { value: 'excel', label: 'Excel' },
+];
 
 type Tab = 'processus' | 'exigences' | 'diagramme';
 
@@ -103,7 +111,7 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-vision',
   standalone: true,
-  imports: [CommonModule, BpmnComponent],
+  imports: [CommonModule, BpmnComponent, DownloadMenuComponent],
   template: `
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'processus'" (click)="tab = 'processus'">Processus</button>
@@ -185,6 +193,10 @@ const ICONS: Record<string, string> = {
     </div>
 
     <!-- ── Diagramme de vision (canevas à 8 blocs) ───────────────────────── -->
+    <div class="page-header" *ngIf="tab === 'diagramme'">
+      <h3>Diagramme de vision</h3>
+      <app-download-menu [formats]="visionFormats" (download)="exportVision($event)" />
+    </div>
     <section class="vc" *ngIf="tab === 'diagramme'">
       <div class="vc-header">
         <strong>Vision</strong>
@@ -284,6 +296,7 @@ export class VisionComponent implements OnInit {
   saving = false;
 
   blocks = VISION_BLOCKS;
+  visionFormats = VISION_EXPORT_FORMATS;
   canvas: VisionCanvas = { id: '' };
   canvasLoading = false;
   private canvasLoaded = false;
@@ -449,5 +462,12 @@ export class VisionComponent implements OnInit {
     this.visionCanvasService.update(payload).subscribe({
       error: () => this.toast.error('Impossible d’enregistrer.'),
     });
+  }
+
+  exportVision(format: string): void {
+    const sections = this.blocks.map((block) => ({ label: block.label, value: this.fieldValue(block.field) }));
+    if (format === 'pdf') downloadPdf('Diagramme de vision', sections, 'diagramme-de-vision.pdf');
+    else if (format === 'csv') downloadCsv(sections, 'diagramme-de-vision.csv');
+    else exportToExcel('diagramme-de-vision', 'Vision', sections.map((s) => ({ Libellé: s.label, Valeur: s.value })));
   }
 }

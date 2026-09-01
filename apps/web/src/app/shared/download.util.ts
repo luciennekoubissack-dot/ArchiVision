@@ -1,6 +1,48 @@
+import jsPDF from 'jspdf';
+
 export function downloadJson(data: unknown, filename: string): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   triggerDownload(blob, filename);
+}
+
+/** Exporte une liste de paires libellé/valeur en CSV (une ligne par entrée). */
+export function downloadCsv(rows: { label: string; value: string }[], filename: string): void {
+  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const lines = ['Libellé,Valeur', ...rows.map((r) => `${escape(r.label)},${escape(r.value)}`)];
+  // BOM UTF-8 : sans lui, Excel interprète le CSV en ANSI et corrompt les accents.
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  triggerDownload(blob, filename.endsWith('.csv') ? filename : `${filename}.csv`);
+}
+
+/** Exporte un titre + une liste de sections libellé/valeur en PDF (texte simple, mise en page verticale). */
+export function downloadPdf(title: string, sections: { label: string; value: string }[], filename: string): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const marginX = 15;
+  const maxWidth = 180;
+  let y = 20;
+
+  doc.setFontSize(16);
+  doc.text(title, marginX, y);
+  y += 12;
+
+  sections.forEach((section) => {
+    if (y > 270) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text(section.label, marginX, y);
+    y += 6;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    const lines: string[] = doc.splitTextToSize(section.value || '(non renseigné)', maxWidth);
+    doc.text(lines, marginX, y);
+    y += lines.length * 5.5 + 6;
+  });
+
+  doc.save(filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
 }
 
 export function downloadSvg(svg: string, filename: string): void {
@@ -37,6 +79,14 @@ export function downloadPng(svg: string, filename: string): void {
 
   image.onerror = () => URL.revokeObjectURL(url);
   image.src = url;
+}
+
+/** Déclenche le téléchargement d'une data URL (ex : `stage.toDataURL()` d'un canevas Konva). */
+export function downloadDataUrl(dataUrl: string, filename: string): void {
+  const anchor = document.createElement('a');
+  anchor.href = dataUrl;
+  anchor.download = filename;
+  anchor.click();
 }
 
 function triggerDownload(blob: Blob, filename: string): void {

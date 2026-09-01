@@ -12,6 +12,8 @@ describe('ObjectifService', () => {
     nom: 'Réduire les coûts IT',
     description: null,
     sousObjectif: null,
+    statut: 'LES_DEUX',
+    objectifAsIsId: null,
     organisationId: 'org-001',
     createdAt: '2026-07-01T10:00:00.000Z',
     updatedAt: '2026-07-01T10:00:00.000Z',
