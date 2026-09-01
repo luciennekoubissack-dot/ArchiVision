@@ -41,6 +41,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Dépendances de production uniquement, à l'identique de l'image Docker
+      # (Dockerfile.api : `npm ci --omit=dev --omit=optional`). --omit=dev
+      # seul ne suffit pas : la CLI Prisma (devDependency, jamais utilisée à
+      # l'exécution) entraîne plusieurs de ses propres dépendances comme
+      # « optional dependency d'une devDependency » (devOptional dans
+      # package-lock.json), qu'--omit=dev seul n'exclut pas de l'audit. Voir
+      # docs/audit.md pour le détail de cette découverte.
+      - name: Audit des dépendances de production
+        run: npm audit --omit=dev --omit=optional --audit-level=high
+
   web:
     name: Web (typecheck, tests, build)
     runs-on: ubuntu-latest
@@ -66,3 +76,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Audit des dépendances de production
+        run: npm audit --omit=dev --audit-level=high

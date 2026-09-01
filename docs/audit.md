@@ -3038,3 +3038,301 @@ autres diagrammes contre leur norme.
   `architecture-systeme` 9/9, `technologie` 7/7.
 - Revue de code du rendu Konva / SVG de chaque diagramme. Pas de contrôle
   navigateur en direct (port 4201 occupé par une autre session).
+
+---
+
+## 2026-09-01 (suite 3) : page d'accueil enrichie
+
+### ⚪ UX / contenu public
+
+La page d'accueil ([home.component.ts](../apps/web/src/app/public/home.component.ts))
+se limitait à un hero, trois étapes et deux grilles de features génériques.
+Elle contredisait aussi le nouveau parcours (« connecté·e immédiatement, aucune
+validation à attendre »).
+
+Ajouts :
+
+- **Introduction plus explicite** : positionnement TOGAF ADM, référentiel unique,
+  vues et diagrammes générés.
+- Étape 1 corrigée : l'inscription est désormais vérifiée par l'équipe avant
+  validation, puis lien de connexion par e-mail.
+- Section **« Un aperçu de l'application »** : galerie de 6 visuels réels
+  (diagramme de vision, vue ArchiMate, BPMN, diagramme de composants, diagramme
+  de déploiement, organigramme) tirés de `apps/web/src/assets`, présentés dans
+  un cadre façon fenêtre navigateur, `loading="lazy"`.
+- Section **« Les modules »** : 8 cartes couvrant vision/exigences, procédures
+  BPMN, architecture métier / données / applicative / technologique, canevas,
+  roadmap & gouvernance.
+- Section **« Dernières améliorations »** : timeline reprenant les évolutions
+  récentes (génération automatique des diagrammes, validation des organisations,
+  diagramme de vision pré-rempli, inscription responsive).
+
+### Vérifié
+
+- `npm run typecheck` propre ; `npm run test:ci` 172/172.
+- Navigateur (serveur de préview dédié) : les 6 sections s'affichent, les 6
+  images se chargent (200), aucune erreur console ; pas de défilement horizontal
+  à 1280 px ni à 390 px (galerie, modules et étapes passent en une colonne).
+
+---
+
+## 2026-09-01 (suite 8) : avis d'ensemble, à la demande de l'utilisateur
+
+L'utilisateur a demandé un avis global sur l'état de l'application plutôt
+qu'un audit technique ciblé. Synthèse basée sur la relecture de ce journal
+(2026-08-18 à ce jour) et quelques vérifications ponctuelles (structure de
+dossiers, présence du JWT en `localStorage`), pas un nouveau passage complet
+de sécurité ou de performance (déjà couvert par les entrées précédentes du
+jour).
+
+### Ce qui distingue ce projet pour un stage
+
+- **Discipline d'audit continue et réellement suivie d'effet.** Depuis le
+  premier audit du 2026-08-18, chaque point 🔴 relevé a fini par être traité
+  ou explicitement requalifié avec une justification (ex. upload de logo :
+  le correctif littéral suggéré aurait cassé l'inscription, le vrai risque
+  XSS a été traité autrement). Le dossier plat `apps/web/src/app` (~55
+  fichiers) signalé en 🟡 le 2026-08-18 est aujourd'hui réorganisé en 24
+  dossiers par fonctionnalité : les points de dette notés ne sont pas restés
+  lettre morte.
+- **Vérification en conditions réelles, pas seulement en tests unitaires.**
+  Plusieurs bugs réels (gel du navigateur sur Chart.js, corruption d'accents
+  à l'import CSV, `Solution.create()` sans `include`) n'ont été trouvés qu'en
+  rejouant le scénario dans un navigateur avec de vraies données
+  accentuées : le journal le documente explicitement comme un enseignement
+  méthodologique, pas un hasard.
+- **Conformité aux notations réelles, vérifiée contre les normes**, pas
+  juste "ça ressemble à". BPMN 2.0, ArchiMate 3.x et UML 2.5 (stéréotypes de
+  déploiement, sens de la dépendance, multiplicités) ont chacun fait l'objet
+  d'une relecture contre leur spécification, avec des écarts corrigés (ex.
+  `«execution environment»` → `«executionEnvironment»`). C'est un niveau de
+  rigueur rarement vu sur un projet de cette taille.
+- **Isolation multi-tenant et RBAC posés dès le départ et maintenus** à
+  chaque nouveau module (Architecture applicative, Opportunités,
+  Gouvernance...), jamais traités comme un détail ajouté après coup.
+
+### Ce qui reste fragile ou à surveiller
+
+- **Token JWT toujours en `localStorage`** (confirmé encore présent dans
+  [auth.service.ts](../apps/web/src/app/auth/auth.service.ts) à cette date).
+  Documenté depuis le premier audit, jamais traité : la surface `[innerHTML]`
+  qui pourrait un jour l'exposer via une faille XSS a nettement grandi
+  depuis (6 générateurs SVG). Toujours pas de faille trouvée à ce jour, mais
+  c'est le point de sécurité qui a le plus vieilli sans être traité.
+- **Vélocité fonctionnelle très élevée** (10+ modules ADM complets en deux
+  semaines) au prix d'une dette assumée mais réelle : glyphes BPMN dessinés
+  deux fois (SVG serveur + Konva client, désynchronisation possible),
+  clients API parfois édités à la main plutôt que régénérés faute de serveur
+  disponible au moment du commit, doublon de requêtes `list()`/
+  `listPaginated()` dans deux composants. Rien de bloquant individuellement,
+  mais le rythme laisse peu de place à un nettoyage de fond.
+- **Aucune vérification d'identité réelle des entreprises à l'inscription** :
+  la validation superadmin repose sur les informations déclarées, pas sur
+  une preuve d'existence légale. Acceptable pour une démonstration ou un
+  usage interne encadré, pas pour un vrai SaaS public sans durcissement
+  supplémentaire de ce processus.
+- **Déploiement Docker fonctionnel mais encore artisanal** : pas d'étape
+  `prisma migrate deploy` intégrée, mot de passe Postgres et secrets à
+  fournir manuellement, aucune CI qui rejoue `npm audit`/les suites de tests
+  avant merge (pas vérifié si `ci/cd` du dernier commit couvre déjà ce point,
+  à confirmer séparément).
+
+### Avis
+
+Pour un projet de stage, le niveau d'exigence dépasse largement ce qui est
+généralement attendu : la couverture fonctionnelle suit fidèlement le cycle
+TOGAF ADM complet (A à H), les diagrammes respectent les normes qu'ils
+prétendent suivre plutôt que de s'en inspirer vaguement, et surtout, la
+sécurité et la qualité ont été traitées comme un sujet continu (journal
+vivant, ré-audits réguliers) plutôt que comme une case cochée une fois. Le
+point faible principal reste le même depuis le premier jour et n'a pas
+progressé (JWT en `localStorage`), ce qui est le signe d'une dette
+consciente et documentée plutôt que d'un angle mort, mais qui mériterait
+d'être traité avant tout déploiement destiné à de vrais utilisateurs
+externes plutôt qu'à une démonstration.
+
+---
+
+## 2026-09-01 (suite 9) : correctif à l'avis d'ensemble, durcissement Docker/CI, découverte d'une faille frontend
+
+L'utilisateur a demandé de traiter tous les points fragiles listés dans
+l'entrée précédente. Avant de s'y lancer, question posée pour prioriser :
+réponse "tous sans plus tarder". Traitement dans l'ordre : Docker/CI
+(rapide), puis vérification du JWT (le plus important).
+
+### 🔴 Correctif à l'entrée précédente : le JWT n'est plus en `localStorage`
+
+L'avis d'ensemble du 2026-09-01 (suite 8) affirmait "Token JWT toujours en
+`localStorage`, confirmé encore présent". **C'était une erreur** : le grep
+qui a servi de base ne distinguait pas *quoi* était stocké. En relisant le
+code en entier ([auth.service.ts](../apps/web/src/app/auth/auth.service.ts)),
+`localStorage` ne contient plus que le profil d'affichage non sensible
+(id/email/nom/rôle) ; le jeton lui-même est déjà posé en cookie `httpOnly`
+par l'API ([auth.controller.ts](../apps/api/src/modules/auth/auth.controller.ts),
+`setAuthCookies()`/`clearAuthCookies()` dans
+[auth-cookies.ts](../libs/shared/src/utils/auth-cookies.ts)), avec un cookie
+`XSRF-TOKEN` non-`httpOnly` associé et un `CsrfGuard` en double soumission
+cookie/en-tête ([csrf.guard.ts](../libs/shared/src/guards/csrf.guard.ts)),
+`cookie-parser` et CORS `credentials: true` posés dans
+[main.ts](../apps/api/src/main.ts), et le `HttpClient` Angular configuré en
+conséquence (`withXsrfConfiguration`, `withCredentials` sur chaque requête
+via l'intercepteur). Cette migration a été faite intégralement et
+correctement par une session parallèle, sans mise à jour de ce journal, ce
+qui explique l'écart entre le code réel et ce qui y était écrit.
+
+**Vérifié en conditions réelles** (base et instance API de vérification
+dédiées, isolées de l'environnement de dev habituel) : `POST /auth/login`
+pose bien `access_token` (`HttpOnly`) et `XSRF-TOKEN` (lisible) ;
+`GET /auth/me` réussit avec le seul cookie, sans en-tête `Authorization` ;
+`PATCH /auth/me` sans en-tête `x-xsrf-token` → `403` ; avec l'en-tête
+correspondant au cookie → mutation appliquée. Les 540 tests backend et
+l'intégralité de la suite frontend passent. Ce point de l'audit initial
+(2026-08-18), le plus ancien resté ouvert, est donc bien résolu.
+
+**Leçon retenue** : ne plus conclure "toujours en localStorage" sur la
+seule présence du mot dans un grep sans lire ce qui y est réellement
+stocké. Corrigé ici plutôt que laissé tel quel, conformément à la règle de
+ce journal (jamais réécrire une entrée passée, seulement corriger via une
+nouvelle entrée datée).
+
+### 🟠 Docker : deux vrais bugs trouvés et corrigés
+
+1. **L'image de production embarquait 8 vulnérabilités hautes/modérées
+   jamais détectées jusqu'ici**, alors que les audits précédents
+   affirmaient "0 vulnérabilité d'exécution". `Dockerfile.api` utilisait
+   `npm ci --omit=dev`, qui n'exclut pas les paquets marqués `devOptional`
+   dans `package-lock.json` (dépendance optionnelle *d'une* devDependency :
+   la CLI Prisma, jamais utilisée à l'exécution, en tire plusieurs :
+   `mysql2`, `find-my-way`, `fast-uri`, `valibot`, `deepmerge-ts`,
+   `@prisma/dev`, `@prisma/config`). Reproduit avec une installation
+   `--omit=dev` réelle dans un dossier isolé (315 paquets installés, 8
+   vulnérabilités) avant correctif. Corrigé : `--omit=dev --omit=optional`
+   dans `Dockerfile.api` (182 paquets, 0 vulnérabilité). Seul paquet
+   purement optionnel non-dev du lockfile : `pg-cloudflare` (adaptateur
+   Cloudflare Workers, sans objet ici, connexion Postgres standard via `pg`
+   + `@prisma/adapter-pg`).
+2. **Le service `migrate` de `docker-compose.yml` (censé appliquer les
+   migrations au démarrage, ajouté depuis l'audit du 2026-09-01 suite 1)
+   ne fonctionnait pas du tout** : `prisma.config.ts` (requis par Prisma 7
+   pour `migrate deploy`, porte `datasource.url` depuis `DATABASE_URL`)
+   n'était jamais copié dans l'étage `builder` du `Dockerfile.api`, seule
+   `apps/api/` et quelques fichiers de config l'étaient. Le conteneur
+   `migrate` échouait donc systématiquement (`Error: the datasource.url
+   property is required...`), avant même de tenter une connexion. Bug de
+   déploiement bloquant, non détecté par les audits précédents faute
+   d'avoir été rejoué en conditions réelles. Corrigé : `prisma.config.ts`
+   ajouté à la ligne `COPY` des fichiers de config du `builder`.
+3. **Vérifié de bout en bout** après les deux correctifs : image
+   reconstruite, `docker compose up` complet (postgres → migrate → api),
+   `migrate` applique les 26 migrations avec succès, `GET /api/v1/health`
+   répond `200 {"status":"ok","db":"ok"}`, conteneur `api` toujours non-root
+   (`node`, uid 1000). Conteneurs, volumes et images de vérification
+   supprimés après coup.
+4. **CI** ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) : ajout
+   d'une étape `npm audit --omit=dev --omit=optional --audit-level=high`
+   sur les deux jobs (api, web), qui ne faisait pas partie du pipeline
+   jusqu'ici malgré des audits `npm audit` manuels répétés dans ce journal.
+
+### 🔴 Nouvelle découverte : dépendances frontend jamais auditées
+
+Tous les audits précédents de ce journal n'ont fait tourner `npm audit`
+que sur `apps/api`. Un premier passage sur `apps/web` (fait dans le cadre
+du point CI ci-dessus) révèle **9 vulnérabilités hautes, jamais
+mentionnées jusqu'ici** :
+
+1. **`@angular/core` et le reste du framework (≤19.2.25 concerné, installé :
+   17.3.12)** : plusieurs CVE réelles, dont des XSS (attributs SVG,
+   liaisons i18n, contournement de sanitisation de binding bidirectionnel,
+   franchissement d'espace de noms template/attribut) et des DoS (`OOM` sur
+   `formatDate`/`digitsInfo`, empoisonnement de cache via
+   `HttpTransferCache`). Particulièrement pertinent ici puisque l'audit du
+   2026-08-26 notait déjà 6 générateurs SVG serveur rendus via `[innerHTML]`
+   + `bypassSecurityTrustHtml` comme surface XSS élargie : une faille XSS
+   dans le moteur de sanitisation d'Angular lui-même aggraverait directement
+   ce risque déjà identifié. Correctif disponible uniquement via
+   `@angular/core@21.2.22` : **saut de 4 versions majeures (17→21)**, non
+   tenté dans cette session (voir "Non traité" ci-dessous).
+2. **`xlsx` (SheetJS) `^0.18.5` : prototype pollution + ReDoS, aucun
+   correctif publié sur le registre npm.** Le mainteneur ne publie plus ses
+   correctifs sur npm depuis plusieurs années ; la version corrigée
+   (0.20.3, vérifié disponible et identique à l'alias `xlsx-latest` du CDN
+   au moment de l'audit) n'est distribuée que via `cdn.sheetjs.com`,
+   pratique documentée par les mainteneurs eux-mêmes et confirmée par
+   l'avis GitHub lui-même ("a non-vulnerable version cannot be found via
+   npm"). Pertinent car `xlsx` est utilisé en production
+   ([excel.util.ts](../apps/web/src/app/shared/excel.util.ts)) pour
+   importer de vrais fichiers utilisateur (réponses d'enquête
+   d'évaluation...). **Corrigé, avec l'accord explicite de l'utilisateur** :
+   `apps/web/package.json` pointe désormais `xlsx` vers
+   `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`. Vérifié : l'API
+   utilisée par `excel.util.ts` (`XLSX.read`/`XLSX.writeFile`) est stable
+   entre 0.18 et 0.20, aucun changement de code nécessaire ; build
+   production sans erreur ni avertissement nouveau ; suite frontend
+   complète 172/172 ; `npm audit --omit=dev --omit=optional` passe de 9 à 8
+   vulnérabilités hautes (xlsx n'y figure plus, restent uniquement celles
+   du framework Angular, voir ci-dessous).
+
+### Décisions de l'utilisateur sur les points restants
+
+- **Migration majeure Angular 17→21** : seule vraie remédiation aux CVE
+  ci-dessus (XSS SVG/i18n, DoS `HttpTransferCache`). Chantier de bien plus
+  grande ampleur que tout le reste de cette session (migration séquentielle
+  probable 17→18→19→20→21, changements cassants possibles sur 24 modules,
+  Konva, Chart.js), risque de régression réel sur toute l'application.
+  **Décision de l'utilisateur : ne pas y toucher pour l'instant** ("on
+  laisse Angular 17 tranquille"), à planifier séparément. Les 8
+  vulnérabilités hautes restent donc ouvertes, dette assumée et documentée.
+- **Unification des glyphes BPMN (SVG serveur / Konva client) et
+  vérification d'identité des entreprises à l'inscription** : les deux
+  points restants de la demande initiale de l'utilisateur. **Décision de
+  l'utilisateur : laissés de côté pour l'instant**, la découverte des
+  failles frontend et du bug de déploiement Docker ayant pris la priorité
+  sur ces deux chantiers (l'un est un refactor de maintenabilité sans
+  faille associée, l'autre nécessite une décision produit qui reste à
+  prendre).
+- **Environnement de dev local cassé, sans rapport avec cette session** :
+  le conteneur `docker-postgres-1` utilisé par le serveur API de
+  développement local (port 3000) a des identifiants qui ne correspondent
+  plus à `DATABASE_URL` dans `.env` (conteneur inactif depuis le
+  2026-07-06, mot de passe visiblement changé depuis). Le serveur de dev
+  tourne donc actuellement sans base de données fonctionnelle
+  (`/api/v1/health` → `db: unreachable`). Découvert en tentant de vérifier
+  le flux de connexion en direct ; signalé à l'utilisateur avec deux options
+  (récupérer l'ancien mot de passe, ou recréer proprement). **Résolu sur
+  demande explicite de l'utilisateur** : `docker inspect` a confirmé la
+  cause exacte (`POSTGRES_PASSWORD=postgres`, l'ancien mot de passe par
+  défaut documenté comme faible depuis l'audit du 2026-08-26, jamais mis à
+  jour sur ce conteneur précis) et une donnée bind-mount orpheline
+  (`docker/data/postgres`, 63 Mo, sans fichier `docker-compose.yml`
+  l'accompagnant, reliquat d'un ancien montage). Conteneur et données
+  supprimés, base recréée proprement via le `docker-compose.yml` actuel du
+  projet (volume nommé, pas de bind mount) avec le mot de passe courant de
+  `.env`, migrations réappliquées, jeu de données de démonstration reseedé.
+  Vérifié : `pg.Pool` du serveur de dev déjà démarré s'est reconnecté tout
+  seul dès que la base a été saine (aucun redémarrage nécessaire),
+  `/api/v1/health` → `200 {"status":"ok","db":"ok"}`, connexion réussie via
+  le vrai formulaire de login dans le navigateur, tableau de bord affichant
+  les données K&B Groupe SARL.
+
+### Vérifié
+
+- Backend : suite complète 540/540 (65 suites).
+- Frontend : suite complète 172/172, avant et après le remplacement de
+  `xlsx` ; build production sans erreur ni nouvel avertissement.
+- Docker : image reconstruite de bout en bout après les deux correctifs
+  (`--omit=optional`, `prisma.config.ts` copié) ; `docker compose up`
+  complet (postgres → migrate → api) sur une base neuve, 26 migrations
+  appliquées avec succès, `GET /api/v1/health` → `200 {"status":"ok",
+  "db":"ok"}`, conteneur non-root confirmé (`whoami` → `node`, uid 1000).
+- JWT/CSRF : vérifié en direct sur une base et une instance API dédiées,
+  isolées de l'environnement de dev local cassé (voir ci-dessus) : login
+  pose `access_token` (`HttpOnly`) + `XSRF-TOKEN` (lisible) ; `GET /auth/me`
+  réussit au seul cookie ; `PATCH /auth/me` sans en-tête CSRF → `403`, avec
+  l'en-tête correspondant → `200`.
+- `npm audit --omit=dev --omit=optional --audit-level=high` : 0 vulnérabilité
+  côté API, 8 hautes côté web (framework Angular uniquement, dette assumée
+  ci-dessus).
+- Toutes les ressources de vérification (conteneurs, volumes, images,
+  instances API de test, bases de données isolées) supprimées après usage ;
+  aucune trace laissée dans l'environnement partagé au-delà des correctifs
+  de code eux-mêmes.

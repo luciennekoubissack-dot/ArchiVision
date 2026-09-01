@@ -25,6 +25,9 @@ export class OrganisationEntity {
   @ApiPropertyOptional({ description: "Pays de l'organisation.", nullable: true, type: String })
   pays?: string | null;
 
+  @ApiPropertyOptional({ description: "Ville du siège social de l'organisation.", nullable: true, type: String })
+  ville?: string | null;
+
   @ApiProperty({ enum: StatutOrganisation, description: "Statut de validation de l'organisation." })
   statut!: StatutOrganisation;
 

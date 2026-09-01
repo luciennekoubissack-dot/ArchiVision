@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OrganisationService, Organisation } from '../organisation/organisation.service';
 import { PartiesPrenantesService, PartiePrenante } from '../organisation/parties-prenantes.service';
+import { ObjectifsComponent } from '../organisation/objectifs.component';
 import { ToastService } from '../shared/toast.service';
 import { AuthService } from '../auth/auth.service';
 import { BpmnComponent } from '../vision/bpmn.component';
@@ -22,26 +23,30 @@ interface WizardStep {
 }
 
 const STEPS: WizardStep[] = [
-  { key: 'vision', numero: 1, titre: 'Vision stratégique', sousTitre: 'Vision, problématiques à résoudre et parties prenantes', icon: 'target' },
-  { key: 'bpmn', numero: 2, titre: 'Procédures', sousTitre: 'Processus métier, support et de pilotage', icon: 'flow' },
-  { key: 'metier', numero: 3, titre: 'Architecture métier', sousTitre: 'Capacités, acteurs et éléments ArchiMate', icon: 'layers' },
-  { key: 'donnees', numero: 4, titre: 'Architecture des données', sousTitre: 'Entités, attributs et relations', icon: 'database' },
-  { key: 'applicatif', numero: 5, titre: 'Architecture applicative', sousTitre: 'Portefeuille d’applications', icon: 'grid' },
-  { key: 'techno', numero: 6, titre: 'Architecture technologique', sousTitre: 'Composants et déploiements', icon: 'server' },
-  { key: 'roadmap', numero: 7, titre: 'Roadmap de transformation', sousTitre: 'Projets, priorités et échéances', icon: 'flag' },
-  { key: 'synthese', numero: 8, titre: 'Synthèse', sousTitre: 'Architecture générée automatiquement', icon: 'eye' },
+  { key: 'entreprise', numero: 1, titre: 'Entreprise', sousTitre: 'Identité, secteur, taille et localisation', icon: 'building' },
+  { key: 'strategie', numero: 2, titre: 'Stratégie', sousTitre: 'Vision, objectifs, problématiques et parties prenantes', icon: 'target' },
+  { key: 'bpmn', numero: 3, titre: 'Procédures', sousTitre: 'Processus métier, support et de pilotage', icon: 'flow' },
+  { key: 'metier', numero: 4, titre: 'Architecture métier', sousTitre: 'Capacités, acteurs et éléments ArchiMate', icon: 'layers' },
+  { key: 'donnees', numero: 5, titre: 'Architecture des données', sousTitre: 'Entités, attributs et relations', icon: 'database' },
+  { key: 'applicatif', numero: 6, titre: 'Architecture applicative', sousTitre: 'Portefeuille d’applications', icon: 'grid' },
+  { key: 'techno', numero: 7, titre: 'Architecture technologique', sousTitre: 'Composants et déploiements', icon: 'server' },
+  { key: 'roadmap', numero: 8, titre: 'Roadmap de transformation', sousTitre: 'Projets, priorités et échéances', icon: 'flag' },
+  { key: 'synthese', numero: 9, titre: 'Synthèse', sousTitre: 'Architecture générée automatiquement', icon: 'eye' },
 ];
 
 /// Question(s) guide pour chaque étape de la démarche TOGAF ADM, pour aider
 /// l'utilisateur à savoir quoi renseigner sans connaître la méthode par cœur.
-/// Uniquement pour les étapes sans page dédiée (les étapes 2 à 7 embarquent
+/// Uniquement pour les étapes sans page dédiée (les étapes 3 à 8 embarquent
 /// un composant qui affiche déjà sa propre question — voir bpmn/architecture-
 /// metier/donnees/applications/technologie/roadmap.component.ts).
 const STEP_QUESTIONS: Record<string, string> = {
-  vision: 'Quels sont les objectifs de l’entreprise ? Quels problèmes veut-on résoudre ? Quelle est sa vision ?',
+  entreprise: 'Comment se présente l’entreprise : son nom, son secteur, sa taille, où est son siège ?',
+  strategie: 'Quels sont les objectifs de l’entreprise ? Quels problèmes veut-on résoudre ? Quelle est sa vision ?',
 };
 
 const ICONS: Record<string, string> = {
+  building: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1"/>',
+  camera: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/>',
   target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
   flow: '<circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.2 7.4 10 15.5M16.8 7.4 14 15.5M7.5 6h9"/>',
   layers: '<polygon points="12 3 3 8 12 13 21 8 12 3"/><polyline points="3 16 12 21 21 16"/><polyline points="3 12 12 17 21 12"/>',
@@ -59,6 +64,7 @@ const ICONS: Record<string, string> = {
   imports: [
     CommonModule,
     RouterLink,
+    ObjectifsComponent,
     BpmnComponent,
     ArchitectureMetierComponent,
     DonneesComponent,
@@ -102,8 +108,59 @@ const ICONS: Record<string, string> = {
         <strong>À se demander :</strong> {{ q }}
       </div>
 
-      <!-- ── Étape 1 : Vision ─────────────────────────────────────────────── -->
-      <div *ngIf="current.key === 'vision' && organisation">
+      <!-- ── Étape 1 : Entreprise ─────────────────────────────────────────── -->
+      <div *ngIf="current.key === 'entreprise' && organisation">
+        <div class="entreprise-head">
+          <div class="entreprise-fields">
+            <label class="field">
+              Nom de l'organisation
+              <input type="text" [value]="organisation.nom || ''" (input)="organisation.nom = $any($event.target).value" [disabled]="!canEdit" />
+            </label>
+          </div>
+          <div class="photo-upload">
+            <button type="button" class="photo-circle" (click)="fileInput.click()" [class.has-photo]="logoPreview || organisation.logoUrl" [disabled]="!canEdit">
+              <img *ngIf="logoPreview || organisation.logoUrl" [src]="logoPreview || organisation.logoUrl || ''" alt="Logo" />
+              <svg *ngIf="!logoPreview && !organisation.logoUrl" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('camera')"></svg>
+            </button>
+            <span class="photo-label">{{ uploadingLogo ? 'Envoi…' : 'Logo' }}</span>
+            <input #fileInput type="file" accept="image/png,image/jpeg,image/webp" hidden [disabled]="!canEdit" (change)="onLogoSelected($event)" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <label class="field">
+            Secteur
+            <input type="text" [value]="organisation.secteur || ''" (input)="organisation.secteur = $any($event.target).value" [disabled]="!canEdit" />
+          </label>
+          <label class="field">
+            Taille
+            <input type="text" placeholder="ex. 150 collaborateurs" [value]="organisation.taille || ''" (input)="organisation.taille = $any($event.target).value" [disabled]="!canEdit" />
+          </label>
+        </div>
+
+        <div class="grid-2">
+          <label class="field">
+            Pays
+            <input type="text" [value]="organisation.pays || ''" (input)="organisation.pays = $any($event.target).value" [disabled]="!canEdit" />
+          </label>
+          <label class="field">
+            Ville
+            <input type="text" [value]="organisation.ville || ''" (input)="organisation.ville = $any($event.target).value" [disabled]="!canEdit" />
+          </label>
+        </div>
+
+        <label class="field">
+          Description courte
+          <textarea rows="2" [value]="organisation.description || ''" (input)="organisation.description = $any($event.target).value" [disabled]="!canEdit"></textarea>
+        </label>
+
+        <button class="btn btn-primary" *ngIf="canEdit" (click)="saveEntreprise()" [disabled]="savingEntreprise">
+          {{ savingEntreprise ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </div>
+
+      <!-- ── Étape 2 : Stratégie ──────────────────────────────────────────── -->
+      <div *ngIf="current.key === 'strategie' && organisation">
         <label class="field">
           Vision
           <textarea placeholder="Quelle est la vision de l'entreprise ?" [value]="organisation.vision || ''" (input)="organisation.vision = $any($event.target).value" [disabled]="!canEdit"></textarea>
@@ -115,6 +172,9 @@ const ICONS: Record<string, string> = {
         <button class="btn btn-primary" *ngIf="canEdit" (click)="saveVision()" [disabled]="savingVision">
           {{ savingVision ? 'Enregistrement…' : 'Enregistrer' }}
         </button>
+
+        <hr />
+        <app-objectifs></app-objectifs>
 
         <hr />
         <h3>Parties prenantes</h3>
@@ -132,7 +192,7 @@ const ICONS: Record<string, string> = {
         </ul>
       </div>
 
-      <!-- ── Étapes 2 à 7 : modules embarqués ─────────────────────────────── -->
+      <!-- ── Étapes 3 à 8 : modules embarqués ─────────────────────────────── -->
       <!-- hideDiagram : dans l'assistant on ne montre que les listes/formulaires,
            les diagrammes restent sur les pages dédiées. -->
       <app-bpmn *ngIf="current.key === 'bpmn'" [hideDiagram]="true"></app-bpmn>
@@ -210,11 +270,35 @@ const ICONS: Record<string, string> = {
     `
       .muted { color: var(--color-text-muted); font-size: 0.92rem; }
       hr { border: none; border-top: 1px solid var(--color-border); margin: 1.5rem 0; }
+      .field { display: flex; flex-direction: column; margin-bottom: 0.9rem; }
+      .field input, .field textarea { padding: 0.6rem 0.75rem; margin-top: 0.3rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
       .inline-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
       .inline-form input { padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
       .list { list-style: none; display: grid; gap: 0.5rem; }
       .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border: 1px solid var(--color-border); border-radius: 10px; }
       .list-item .badge { margin-left: 0.5rem; }
+
+      .entreprise-head { display: flex; align-items: flex-start; gap: 1.5rem; }
+      .entreprise-fields { flex: 1; }
+      .photo-upload { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+      .photo-circle {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        color: var(--color-white);
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      .photo-circle.has-photo { background: var(--color-surface); }
+      .photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+      .photo-label { font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600; }
 
       .stepper {
         display: flex;
@@ -314,6 +398,9 @@ export class WizardComponent implements OnInit {
   current: WizardStep = STEPS[0];
 
   organisation: Organisation | null = null;
+  savingEntreprise = false;
+  logoPreview: string | null = null;
+  uploadingLogo = false;
   savingVision = false;
   partiesPrenantes: PartiePrenante[] = [];
   newPartie: { nom: string; role?: string } = { nom: '' };
@@ -366,6 +453,50 @@ export class WizardComponent implements OnInit {
   previous(): void {
     const idx = this.steps.findIndex((s) => s.key === this.current.key);
     if (idx > 0) this.current = this.steps[idx - 1];
+  }
+
+  saveEntreprise(): void {
+    if (!this.organisation) return;
+    this.savingEntreprise = true;
+    this.organisationService
+      .updateMine({
+        nom: this.organisation.nom ?? undefined,
+        description: this.organisation.description ?? undefined,
+        logoUrl: this.organisation.logoUrl ?? undefined,
+        secteur: this.organisation.secteur ?? undefined,
+        taille: this.organisation.taille ?? undefined,
+        pays: this.organisation.pays ?? undefined,
+        ville: this.organisation.ville ?? undefined,
+      })
+      .subscribe({
+        next: (org) => {
+          this.organisation = org;
+          this.savingEntreprise = false;
+          this.toast.success('Informations enregistrées.');
+        },
+        error: () => {
+          this.savingEntreprise = false;
+          this.toast.error("Impossible d'enregistrer les informations.");
+        },
+      });
+  }
+
+  onLogoSelected(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file || !this.organisation) return;
+
+    this.logoPreview = URL.createObjectURL(file);
+    this.uploadingLogo = true;
+    this.auth.uploadLogo(file).subscribe({
+      next: (res) => {
+        if (this.organisation) this.organisation.logoUrl = res.url;
+        this.uploadingLogo = false;
+      },
+      error: () => {
+        this.uploadingLogo = false;
+        this.toast.error("Impossible d'envoyer ce logo. Réessayez avec une image plus légère.");
+      },
+    });
   }
 
   saveVision(): void {

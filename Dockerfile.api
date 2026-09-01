@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copier les manifestes de dépendances en premier pour tirer parti du cache
 COPY package*.json ./
-COPY nest-cli.json tsconfig*.json ./
+COPY nest-cli.json tsconfig*.json prisma.config.ts ./
 COPY libs/ libs/
 COPY apps/api/ apps/api/
 
@@ -28,7 +28,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
-RUN npm ci --omit=dev --ignore-scripts
+# --omit=optional en plus de --omit=dev : la CLI Prisma (devDependency, jamais
+# utilisée à l'exécution, seul `@prisma/client` copié ci-dessous l'est)
+# entraîne plusieurs de ses propres dépendances en tant qu'« optional
+# dependency d'une devDependency » (devOptional dans package-lock.json),
+# qu'--omit=dev seul n'exclut pas. Vérifié : sans --omit=optional, l'image
+# embarquait `prisma`, `mysql2`, `find-my-way`, `fast-uri`... (315 paquets,
+# 8 vulnérabilités hautes/modérées d'npm audit) jamais importés par le code ;
+# avec --omit=optional, 182 paquets, 0 vulnérabilité. Le seul paquet
+# purement optionnel (non-dev) du lockfile est `pg-cloudflare`, un adaptateur
+# pour Cloudflare Workers sans objet sur ce déploiement (connexion Postgres
+# standard via `pg`).
+RUN npm ci --omit=dev --omit=optional --ignore-scripts
 
 # Copier le build et le client Prisma généré
 COPY --from=builder /app/dist ./dist

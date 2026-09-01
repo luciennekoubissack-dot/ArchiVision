@@ -15,6 +15,8 @@ type Tab = 'reponses' | 'rapport';
 
 const ICONS: Record<string, string> = {
   upload: '<path d="M12 20V8"/><path d="M7 13l5-5 5 5"/><path d="M4 3h16"/>',
+  trash:
+    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
 };
 
 @Component({
@@ -50,7 +52,11 @@ const ICONS: Record<string, string> = {
                 <td>{{ r.repondant }}</td>
                 <td>{{ r.score }} / 5</td>
                 <td>{{ r.commentaire || '—' }}</td>
-                <td><button class="btn btn-ghost" (click)="removeReponse(r)">Supprimer</button></td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeReponse(r)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -102,6 +108,7 @@ const ICONS: Record<string, string> = {
       .table-scroll { overflow-x: auto; }
       .table { width: 100%; min-width: 560px; border-collapse: collapse; }
       .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); }
+      .row-actions { display: flex; gap: 0.4rem; white-space: nowrap; }
       .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
       .stat { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 1.5rem 1rem; }
       .stat-value { font-size: 2rem; font-weight: 800; }

@@ -39,6 +39,11 @@ export interface UpdateOrganisationDto {
   taille?: string;
 
   /**
+   * Ville du siège social de l'organisation.
+   */
+  ville?: string;
+
+  /**
    * Vision stratégique de l'organisation.
    */
   vision?: string;

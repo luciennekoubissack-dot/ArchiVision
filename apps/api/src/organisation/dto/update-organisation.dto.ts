@@ -39,6 +39,12 @@ export class UpdateOrganisationDto {
   @MaxLength(100)
   pays?: string;
 
+  @ApiPropertyOptional({ description: "Ville du siège social de l'organisation." })
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  ville?: string;
+
   @ApiPropertyOptional({ description: "Vision stratégique de l'organisation." })
   @IsString()
   @IsOptional()

@@ -59,6 +59,11 @@ export interface OrganisationEntity {
   updatedAt: string;
 
   /**
+   * Ville du siège social de l'organisation.
+   */
+  ville?: string | null;
+
+  /**
    * Vision stratégique de l'organisation.
    */
   vision?: string | null;

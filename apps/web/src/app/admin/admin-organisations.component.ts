@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AdminService, OrganisationAdmin, OrganisationDetailAdmin, StatutOrganisation } from './admin.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
@@ -20,11 +21,18 @@ const STATUT_BADGE: Record<StatutOrganisation, string> = {
   REJETEE: 'badge-danger',
 };
 
+const ICONS: Record<string, string> = {
+  trash:
+    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+};
+
 @Component({
   selector: 'app-admin-organisations',
   standalone: true,
   imports: [CommonModule, PaginationComponent],
   template: `
+    <div class="page-header"><h3>Entreprises ({{ total }})</h3></div>
+
     <div class="tabs">
       <button class="tab" [class.active]="filtre === 'TOUTES'" (click)="selectFiltre('TOUTES')">Toutes</button>
       <button class="tab" [class.active]="filtre === 'EN_ATTENTE'" (click)="selectFiltre('EN_ATTENTE')">En attente</button>
@@ -34,86 +42,91 @@ const STATUT_BADGE: Record<StatutOrganisation, string> = {
 
     <section class="card">
       <div class="empty-state" *ngIf="organisations.length === 0">Aucune organisation dans cette catégorie.</div>
-      <table class="table" *ngIf="organisations.length > 0">
-        <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Secteur</th>
-            <th>Pays</th>
-            <th>Membres</th>
-            <th>Statut</th>
-            <th>Inscrite le</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <ng-container *ngFor="let org of organisations">
+      <div class="table-scroll" *ngIf="organisations.length > 0">
+        <table class="table">
+          <thead>
             <tr>
-              <td><strong>{{ org.nom }}</strong></td>
-              <td>{{ org.secteur || '—' }}</td>
-              <td>{{ org.pays || '—' }}</td>
-              <td>{{ org._count.users }}</td>
-              <td><span class="badge" [class]="statutBadge(org.statut)">{{ statutLabel(org.statut) }}</span></td>
-              <td>{{ org.createdAt | date: 'dd/MM/yyyy' }}</td>
-              <td class="actions">
-                <button class="btn btn-ghost" (click)="toggleDetail(org)">
-                  {{ expandedId === org.id ? 'Masquer' : org.statut === 'EN_ATTENTE' ? 'Vérifier' : 'Détails' }}
-                </button>
-                <button class="btn btn-danger" (click)="remove(org)">Supprimer</button>
-              </td>
+              <th>Nom</th>
+              <th>Secteur</th>
+              <th>Pays</th>
+              <th>Membres</th>
+              <th>Statut</th>
+              <th>Inscrite le</th>
+              <th></th>
             </tr>
-            <tr *ngIf="expandedId === org.id">
-              <td colspan="7" class="detail-row">
-                <div class="empty-state" *ngIf="!detail">Chargement…</div>
-                <div class="review" *ngIf="detail">
-                  <div class="review-grid">
-                    <div><span class="review-label">Nom</span><strong>{{ detail.nom }}</strong></div>
-                    <div><span class="review-label">Localisation</span><strong>{{ localisation(detail) }}</strong></div>
-                    <div><span class="review-label">Secteur</span><strong>{{ detail.secteur || 'Non renseigné' }}</strong></div>
-                    <div><span class="review-label">Responsable</span><strong>{{ responsableLabel(detail) }}</strong></div>
-                    <div class="review-full"><span class="review-label">Objectif</span><strong>{{ detail.vision || 'Non renseigné' }}</strong></div>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let org of organisations">
+              <tr>
+                <td><strong>{{ org.nom }}</strong></td>
+                <td>{{ org.secteur || '—' }}</td>
+                <td>{{ org.pays || '—' }}</td>
+                <td>{{ org._count.users }}</td>
+                <td><span class="badge" [class]="statutBadge(org.statut)">{{ statutLabel(org.statut) }}</span></td>
+                <td>{{ org.createdAt | date: 'dd/MM/yyyy' }}</td>
+                <td class="row-actions">
+                  <button type="button" class="btn btn-ghost" (click)="toggleDetail(org)">
+                    {{ expandedId === org.id ? 'Masquer' : org.statut === 'EN_ATTENTE' ? 'Vérifier' : 'Détails' }}
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="remove(org)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="expandedId === org.id">
+                <td colspan="7" class="detail-row">
+                  <div class="empty-state" *ngIf="!detail">Chargement…</div>
+                  <div class="review" *ngIf="detail">
+                    <div class="review-grid">
+                      <div><span class="review-label">Nom</span><strong>{{ detail.nom }}</strong></div>
+                      <div><span class="review-label">Localisation</span><strong>{{ localisation(detail) }}</strong></div>
+                      <div><span class="review-label">Secteur</span><strong>{{ detail.secteur || 'Non renseigné' }}</strong></div>
+                      <div><span class="review-label">Responsable</span><strong>{{ responsableLabel(detail) }}</strong></div>
+                      <div class="review-full"><span class="review-label">Objectif</span><strong>{{ detail.vision || 'Non renseigné' }}</strong></div>
+                    </div>
+
+                    <p class="review-warning" *ngIf="champsManquants(detail).length > 0">
+                      Informations incomplètes : {{ champsManquants(detail).join(', ') }}. La validation reste bloquée tant que ces champs ne sont pas remplis.
+                    </p>
+
+                    <div class="review-actions" *ngIf="detail.statut === 'EN_ATTENTE'">
+                      <button
+                        class="btn btn-outline"
+                        [disabled]="champsManquants(detail).length > 0"
+                        [title]="champsManquants(detail).length > 0 ? 'Champs obligatoires incomplets' : 'Valider cette organisation'"
+                        (click)="valider(detail)"
+                      >
+                        Valider
+                      </button>
+                      <button class="btn btn-ghost" (click)="rejeter(detail)">Rejeter</button>
+                    </div>
+
+                    <details class="employees">
+                      <summary>Employés ({{ detail.users.length }})</summary>
+                      <ul class="employee-list" *ngIf="detail.users.length > 0">
+                        <li *ngFor="let u of detail.users">
+                          <strong>{{ u.nom }}</strong>, {{ u.email }} <span class="badge badge-neutral">{{ u.role }}</span>
+                        </li>
+                      </ul>
+                      <p class="muted" *ngIf="detail.users.length === 0">Aucun employé pour l'instant.</p>
+                    </details>
                   </div>
-
-                  <p class="review-warning" *ngIf="champsManquants(detail).length > 0">
-                    Informations incomplètes : {{ champsManquants(detail).join(', ') }}. La validation reste bloquée tant que ces champs ne sont pas remplis.
-                  </p>
-
-                  <div class="review-actions" *ngIf="detail.statut === 'EN_ATTENTE'">
-                    <button
-                      class="btn btn-outline"
-                      [disabled]="champsManquants(detail).length > 0"
-                      [title]="champsManquants(detail).length > 0 ? 'Champs obligatoires incomplets' : 'Valider cette organisation'"
-                      (click)="valider(detail)"
-                    >
-                      Valider
-                    </button>
-                    <button class="btn btn-ghost" (click)="rejeter(detail)">Rejeter</button>
-                  </div>
-
-                  <details class="employees">
-                    <summary>Employés ({{ detail.users.length }})</summary>
-                    <ul class="employee-list" *ngIf="detail.users.length > 0">
-                      <li *ngFor="let u of detail.users">
-                        <strong>{{ u.nom }}</strong>, {{ u.email }} <span class="badge badge-neutral">{{ u.role }}</span>
-                      </li>
-                    </ul>
-                    <p class="muted" *ngIf="detail.users.length === 0">Aucun employé pour l'instant.</p>
-                  </details>
-                </div>
-              </td>
-            </tr>
-          </ng-container>
-        </tbody>
-      </table>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+      </div>
       <app-pagination [page]="page" [total]="total" [pageSize]="pageSize" (pageChange)="onPageChange($event)" />
     </section>
   `,
   styles: [
     `
+      .table-scroll { overflow-x: auto; }
       .table { width: 100%; border-collapse: collapse; }
       .table th { text-align: left; padding: 0.6rem 0.75rem; font-size: 0.8rem; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
       .table td { padding: 0.75rem; border-bottom: 1px solid var(--color-border); font-size: 0.92rem; }
-      .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+      .row-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
       .detail-row { background: var(--color-surface); }
       .review { display: grid; gap: 1rem; padding: 0.5rem 0; }
       .review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem 1.5rem; }
@@ -143,10 +156,15 @@ export class AdminOrganisationsComponent implements OnInit {
     private adminService: AdminService,
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
+    private sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
     this.load();
+  }
+
+  icon(name: string): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
   }
 
   statutLabel(statut: StatutOrganisation): string {

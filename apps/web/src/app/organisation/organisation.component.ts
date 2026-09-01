@@ -131,6 +131,7 @@ const ICONS: Record<string, string> = {
           <dt>Description</dt><dd>{{ org.description || '—' }}</dd>
           <dt>Secteur</dt><dd>{{ org.secteur || '—' }}</dd>
           <dt>Taille</dt><dd>{{ org.taille || '—' }}</dd>
+          <dt>Ville</dt><dd>{{ org.ville || '—' }}</dd>
           <dt>Pays</dt><dd>{{ org.pays || '—' }}</dd>
           <dt>Vision</dt><dd>{{ org.vision || '—' }}</dd>
           <dt>Problèmes à résoudre</dt><dd>{{ org.problemesResoudre || '—' }}</dd>
@@ -175,10 +176,16 @@ const ICONS: Record<string, string> = {
             <input type="text" [value]="draft.taille || ''" (input)="draft.taille = $any($event.target).value" />
           </label>
         </div>
-        <label class="field">
-          Pays
-          <input type="text" [value]="draft.pays || ''" (input)="draft.pays = $any($event.target).value" />
-        </label>
+        <div class="grid-2">
+          <label class="field">
+            Pays
+            <input type="text" [value]="draft.pays || ''" (input)="draft.pays = $any($event.target).value" />
+          </label>
+          <label class="field">
+            Ville
+            <input type="text" [value]="draft.ville || ''" (input)="draft.ville = $any($event.target).value" />
+          </label>
+        </div>
 
         <hr />
         <h4>Vision d'architecture</h4>

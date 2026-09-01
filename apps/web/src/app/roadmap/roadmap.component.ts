@@ -76,7 +76,9 @@ const ICONS: Record<string, string> = {
                 </select>
               </td>
               <td class="row-actions">
-                <button class="btn btn-danger" (click)="removeProjet(p)">Supprimer</button>
+                <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeProjet(p)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                </button>
               </td>
             </tr>
           </tbody>
