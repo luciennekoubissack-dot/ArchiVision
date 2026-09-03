@@ -8,10 +8,11 @@ import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { importFromExcel } from '../shared/excel.util';
 import { PaginationComponent } from '../shared/pagination.component';
 import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
+import { QuestionnairesComponent } from './questionnaires.component';
 
 Chart.register(...registerables);
 
-type Tab = 'reponses' | 'rapport';
+type Tab = 'questionnaires' | 'reponses' | 'rapport';
 
 const ICONS: Record<string, string> = {
   upload: '<path d="M12 20V8"/><path d="M7 13l5-5 5 5"/><path d="M4 3h16"/>',
@@ -22,21 +23,25 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-evaluation',
   standalone: true,
-  imports: [CommonModule, PaginationComponent],
+  imports: [CommonModule, PaginationComponent, QuestionnairesComponent],
   template: `
     <p class="muted step-question">Que pensent les parties prenantes de l'architecture mise en œuvre ? Quels enseignements pour la suite ?</p>
 
     <div class="tabs">
+      <button class="tab" [class.active]="tab === 'questionnaires'" (click)="tab = 'questionnaires'">Questionnaires</button>
       <button class="tab" [class.active]="tab === 'reponses'" (click)="tab = 'reponses'">Réponses</button>
       <button class="tab" [class.active]="tab === 'rapport'" (click)="selectRapport()">Rapport d'évaluation</button>
     </div>
+
+    <app-questionnaires *ngIf="tab === 'questionnaires'" />
 
     <!-- ── Réponses ──────────────────────────────────────────────────────── -->
     <section *ngIf="tab === 'reponses'">
       <div class="page-header">
         <h3>Réponses ({{ reponsesTotal }})</h3>
-        <label class="icon-btn file-btn" title="Importer (Excel/CSV)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('upload')"></svg>
+        <label class="btn btn-outline file-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('upload')"></svg>
+          Importer (Excel/CSV)
           <input type="file" accept=".xlsx,.xls,.csv" (change)="importReponses($event)" hidden />
         </label>
       </div>

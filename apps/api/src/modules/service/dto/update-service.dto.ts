@@ -19,4 +19,13 @@ export class UpdateServiceDto {
   @IsUUID()
   @IsOptional()
   parentId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Identifiant du membre titulaire du poste, ou null pour le rendre vacant.',
+    type: String,
+    nullable: true,
+  })
+  @IsUUID()
+  @IsOptional()
+  titulaireId?: string | null;
 }

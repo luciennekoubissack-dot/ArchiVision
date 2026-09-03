@@ -3336,3 +3336,313 @@ mentionnées jusqu'ici** :
   instances API de test, bases de données isolées) supprimées après usage ;
   aucune trace laissée dans l'environnement partagé au-delà des correctifs
   de code eux-mêmes.
+
+---
+
+## 2026-09-02 : photo de profil par téléversement, invitation d'un membre par e-mail
+
+### Contexte
+
+Deux demandes fonctionnelles de l'utilisateur :
+
+1. Dans les paramètres, l'utilisateur devait coller l'URL de sa photo de
+   profil dans un champ texte. Il doit pouvoir téléverser un fichier depuis
+   son poste, comme pour le logo d'organisation.
+2. Un ADMINISTRATEUR ne pouvait ajouter un membre qu'en lui fixant un mot de
+   passe temporaire transmis de la main à la main, sans e-mail. Il doit
+   pouvoir donner l'accès par e-mail : la personne reçoit un lien, crée son
+   compte et choisit son mot de passe.
+
+### Ce qui a été fait
+
+Photo de profil :
+
+- Nouvel endpoint `POST /uploads/avatar`, authentifié (le `JwtAuthGuard`
+  global s'applique, pas de `@Public` contrairement à `/uploads/logo`), même
+  configuration multer que le logo (PNG/JPEG/WEBP, 5 Mo, SVG exclu). La
+  constante `logoMulterOptions` est renommée `imageMulterOptions`, réutilisée
+  par les deux routes.
+- Front : `AuthService.uploadAvatar()` ; l'écran Paramètres remplace le champ
+  URL par un bouton photo rond avec aperçu et une action « Retirer la photo »
+  (envoie `avatarUrl: ''` pour effacer côté serveur).
+
+Invitation d'un membre :
+
+- Nouveau modèle Prisma `Invitation` (`email`, `role`, `organisationId`,
+  `serviceId`/`poste`/`contact` optionnels, `tokenHash` unique, `statut`
+  EN_ATTENTE/ACCEPTEE/REVOKEE, `invitedById`, `expiresAt`, `acceptedAt`) et
+  enum `StatutInvitation`. Migration `20260902100000_add_invitation`.
+- Seule l'empreinte SHA-256 du jeton est stockée ; le jeton brut ne vit que
+  dans le lien e-mail. Jeton de 32 octets, lien valable 7 jours, à usage
+  unique.
+- `InvitationModule` : `InvitationController` (routes admin sous
+  `/invitations`, `@Roles(ADMINISTRATEUR)` : liste des invitations en
+  attente, création, `POST :id/renvoyer`, `DELETE :id` qui passe l'invitation
+  en REVOKEE) et `InvitationPublicController` (`GET /invitations/token/:token`
+  et `POST /invitations/accept`, tous deux `@Public` + throttle 10/min pour
+  freiner le balayage de jetons).
+- L'acceptation crée le `User` avec le rôle prévu dans une transaction avec
+  le passage de l'invitation en ACCEPTEE, puis ouvre la session (mêmes
+  cookies qu'un login). Vérifie que l'organisation est VALIDEE et qu'aucun
+  compte n'a été créé entre-temps pour cet e-mail.
+- `MailService.sendInvitation()` (mode simulé sans SMTP, comme le reste).
+- Front : `InvitationsService`, section « Invitations en attente » dans
+  l'onglet Membres (renvoyer / révoquer), popover « Inviter par e-mail »
+  (e-mail + rôle + poste/contact/structure optionnels), page publique
+  `/rejoindre?token=…` (`RejoindreComponent`) qui affiche l'organisation et
+  le rôle, pré-remplit l'e-mail, demande nom + mot de passe (avec
+  confirmation) puis redirige vers le tableau de bord.
+
+### 🟡 À planifier
+
+- L'endpoint `/uploads/avatar` ne supprime pas l'ancien fichier quand
+  l'utilisateur change de photo : les images orphelines s'accumulent dans
+  `apps/api/uploads`. Même dette que `/uploads/logo`, à traiter globalement
+  (tâche de nettoyage ou stockage objet).
+- La création directe d'un membre avec mot de passe temporaire
+  (`POST /membres`) reste disponible en parallèle de l'invitation. À
+  retirer une fois l'invitation adoptée, pour n'avoir qu'un seul chemin.
+- Pas de limite de volume d'invitations par organisation ni de purge des
+  lignes ACCEPTEE/REVOKEE anciennes.
+- `MembresService` continue d'autoriser un ADMINISTRATEUR à supprimer un
+  membre ; rien n'empêche encore de révoquer l'accès d'un membre déjà actif
+  autrement que par cette suppression.
+
+### Vérifié
+
+- Backend : `npm run typecheck` sans erreur ; suite complète Jest
+  66 suites / 551 tests (dont `invitation.service.spec.ts` :
+  création, doublon compte, doublon invitation, révocation, jeton
+  expiré/déjà utilisé, acceptation nominale).
+- `prisma format` + `prisma generate` OK ; migration SQL écrite à la main
+  au format Prisma (non appliquée ici, pas de base sous la main).
+- Front : `tsc -p tsconfig.app.json --noEmit` sans erreur ;
+  `invitations.service.spec.ts` ajouté (liste paginée, création, renvoi,
+  révocation).
+- Non vérifié faute d'environnement complet (base + SMTP) : le parcours
+  bout-en-bout envoi d'e-mail → ouverture du lien → création de compte →
+  session ; le client `api-client` régénéré (`npm run generate:api-client`
+  contre l'API up) doit reproduire à l'identique les fichiers ajoutés à la
+  main dans `apps/web/src/app/api-client`.
+
+---
+
+## 2026-09-02 : flux « mot de passe oublié »
+
+Sur demande explicite de l'utilisateur, à la suite d'une question posée en
+préparant le déploiement ("comment fait-on si on a oublié le mot de
+passe ?") : jusqu'ici, aucun moyen de récupérer l'accès à un compte, y
+compris pour un ADMINISTRATEUR (`membres.service.ts` ne permet de changer
+ni son propre mot de passe ni celui d'un collègue). Manque bloquant avant
+tout déploiement destiné à de vrais utilisateurs.
+
+### Ce qui a été fait
+
+Même patron que `Invitation` (jeton à usage unique, empreinte SHA-256
+seule stockée), adapté à un compte déjà existant :
+
+- **Schéma** : nouveau modèle `PasswordResetToken` (`userId`, `tokenHash`
+  unique, `expiresAt`, `usedAt`) et relation sur `User`
+  (migration `20260902084742_add_password_reset_token`). Expiration
+  volontairement courte (1h, contre 7 jours pour une invitation) : ce
+  jeton donne accès à un compte existant, pas seulement la création d'un
+  nouveau.
+- **Backend** (`AuthService`/`AuthController`, pas de nouveau module :
+  la fonctionnalité reste un aspect de l'authentification) :
+  - `POST /auth/forgot-password` (`@Public`, throttle 5/min) : répond
+    **toujours** avec le même message générique, que le compte existe ou
+    non (pas d'énumération d'e-mails, même principe que le timing-safe
+    compare du login). N'envoie l'e-mail que si le compte existe.
+  - `POST /auth/reset-password` (`@Public`, throttle 5/min) : vérifie le
+    jeton (existe, non utilisé, non expiré), remplace `passwordHash`,
+    marque le jeton utilisé et invalide tout autre jeton en attente pour
+    ce compte, puis ouvre une session (mêmes cookies `httpOnly`/CSRF
+    qu'un login classique).
+  - `MailService.sendPasswordReset()`, même mode simulé sans `SMTP_HOST`
+    que le reste.
+- **Frontend** : `AuthService.forgotPassword()`/`resetPassword()` ;
+  `MotDePasseOublieComponent` (`/mot-de-passe-oublie`) et
+  `ReinitialiserMotDePasseComponent` (`/reinitialiser-mot-de-passe?token=…`,
+  validation du mot de passe et de sa confirmation côté client avant
+  envoi) ; lien « Mot de passe oublié ? » ajouté sur l'écran de connexion.
+- Client `api-client` régénéré pour de vrai (`npm run generate:api-client`
+  contre l'API de dev réellement démarrée) : au passage, cela a aussi
+  régénéré les fichiers du module Invitation de l'entrée précédente
+  (rédigés à la main faute de serveur disponible à ce moment-là), comblant
+  le point qu'elle laissait ouvert.
+
+### Vérifié
+
+- Backend : suite complète 562/562 (dont 11 nouveaux cas :
+  `forgotPassword`/`resetPassword` dans `auth.service.spec.ts`, HTTP dans
+  `auth.controller.spec.ts`) ; `tsc --noEmit` propre.
+- Frontend : suite complète 178/178 (2 nouveaux cas dans
+  `auth.service.spec.ts`) ; `tsc --noEmit` et build production propres.
+- **Bout en bout, sur une instance API isolée en mode e-mail simulé** (pour
+  ne pas solliciter le vrai SMTP Gmail configuré sur l'environnement de dev
+  partagé) : demande de réinitialisation pour le compte de démonstration →
+  e-mail simulé journalisé avec le bon lien → jeton utilisé pour choisir un
+  nouveau mot de passe → cookies de session posés → ancien mot de passe
+  rejeté (401) → nouveau mot de passe accepté (200) → réutilisation du même
+  jeton rejetée (400, déjà utilisé) → jeton inconnu rejeté (400). Mot de
+  passe de démonstration restauré à l'identique après vérification (via le
+  même flux, pas d'écriture directe en base), jetons de test supprimés.
+- Dans le navigateur, contre le serveur de dev réel : lien « Mot de passe
+  oublié ? » visible et fonctionnel depuis `/login` ; écran de
+  réinitialisation avec jeton d'exemple : validation client du mot de passe
+  trop court/non confirmé, puis message d'erreur serveur correctement
+  affiché pour un jeton invalide ("Ce lien de réinitialisation est
+  invalide ou a déjà été utilisé.").
+- Migration appliquée sur la base de dev partagée ; au passage,
+  `prisma migrate status` confirme que la migration `Invitation` de
+  l'entrée précédente (non appliquée à l'époque faute de base disponible)
+  est elle aussi désormais appliquée.
+
+### 🟡 À planifier
+
+- Toujours pas de moyen pour un ADMINISTRATEUR de forcer la réinitialisation
+  du mot de passe d'un collègue directement (utile si l'e-mail du collègue
+  est aussi inaccessible) : hors périmètre de cette demande, qui couvrait le
+  cas où l'utilisateur lui-même a accès à sa boîte mail.
+
+## 2026-09-02 : module Évaluation, constructeur de questionnaires
+
+### Ce qui a été fait
+
+Ajout d'un onglet « Questionnaires » au module Évaluation, à côté des onglets
+« Réponses » (import Excel) et « Rapport d'évaluation » existants, laissés
+intacts.
+
+- **Schéma** : `Questionnaire` (titre, description, `reponse_fichier_url` /
+  `reponse_fichier_nom`) et `Question` (intitulé, `type` enum `TypeQuestion`,
+  `options TEXT[]`, `note_max`, `ordre`) ; migration
+  `20260902093713_add_questionnaire_evaluation`, appliquée.
+- **Types de question** : OUI_NON, CHOIX_MULTIPLE (>= 2 options), NOTE_MAX
+  (borne 1 à 100, défaut 5), REPONSE_OUVERTE, SUGGESTION.
+- **API** (`evaluation` module) : `GET/POST/PATCH/DELETE /questionnaires`
+  (lecture ouverte, écriture ADMIN/ARCHITECTE), `POST` et `DELETE
+  /questionnaires/:id/reponse-fichier`. Le PATCH remplace intégralement la
+  liste des questions quand `questions` est fourni (transaction : deleteMany
+  puis create). Nouveau `documentMulterOptions` (PDF, xlsx, xls, csv,
+  10 Mo) dans `uploads.config.ts` ; le fichier est servi sous `/uploads`
+  comme les logos/avatars.
+- **Frontend** :
+  [questionnaires.component.ts](../apps/web/src/app/evaluation/questionnaires.component.ts)
+  (liste, éditeur avec ajout/suppression/réordonnancement de questions et
+  éditeur d'options par type, vue détail), branché comme 3e onglet de
+  [evaluation.component.ts](../apps/web/src/app/evaluation/evaluation.component.ts).
+- **Export PDF du questionnaire** : `downloadQuestionnairePdf` dans
+  [download.util.ts](../apps/web/src/app/shared/download.util.ts) (jsPDF, comme
+  le reste de l'app) : formulaire vierge, une zone de réponse adaptée au type
+  (cases Oui/Non, cases à cocher, « _ / max », lignes vides).
+- **Fichier de réponse** : un seul par questionnaire (choix de l'utilisateur),
+  remplacé à chaque téléversement, re-téléchargeable via son lien `/uploads`.
+
+### 🟡 Points de vigilance
+
+- Client `api-client` non régénéré : `questionnaire.service.ts` appelle
+  `HttpClient` en direct (types écrits à la main), en attendant
+  `npm run generate:api-client`. Bridge assumé et commenté.
+- Fichier de réponse servi par la route statique publique `/uploads`
+  (nom = UUID aléatoire), sans contrôle d'accès au téléchargement, comme les
+  logos et avatars existants. Acceptable pour le modèle de menace actuel ;
+  à revoir si les réponses contiennent des données sensibles.
+
+### Vérifié
+
+- API : `npm run typecheck` propre ; `npx jest evaluation` 30/30 (nouveaux
+  `questionnaire.service.spec` 7 cas, `questionnaire.controller.spec` 8 cas :
+  création, remplacement des questions, rejet type inconnu / choix multiple à
+  1 option, 403 superadmin, fichier de réponse).
+- Frontend : `npm run typecheck` propre ; `ng build` OK ; tests web
+  `evaluation` 10/10.
+- Bout en bout contre la vraie base (adaptateur `PrismaPg`) : questionnaire à
+  5 questions typées créé, `options`/`note_max`/`_count` persistés, fichier de
+  réponse rattaché, suppression en cascade des questions vérifiée. Données de
+  test nettoyées.
+
+---
+
+## 2026-09-02 : structures (postes) éditables en liste, avec titulaire
+
+### 🟡 Ergonomie
+
+L'onglet « Structures » de `/organisation` n'affichait les `Service` qu'en
+**arbre**, sans **modification** possible (seulement ajout/suppression) et sans
+moyen de désigner **qui occupe le poste**. D'après l'utilisateur, une structure
+= un poste (ex. « Secrétaire »).
+
+Changements :
+
+- **Schéma** : `Service.titulaireId` (→ `User`, `onDelete: SetNull`) +
+  relation inverse `User.postesOccupes`. Les deux relations `User`↔`Service`
+  sont désormais nommées (`ServiceMembres`, `ServiceTitulaire`). Migration
+  `20260902084359_add_service_titulaire`.
+- **API `service`** : `create`/`update` acceptent `titulaireId` (nullable sur
+  l'update pour rendre le poste vacant) ; `update` vérifie que le titulaire
+  appartient à l'organisation (400 sinon). `findAll` inclut `titulaire`
+  (id + nom) à chaque niveau de l'arbre. Nouvelle route `GET /services/membres`
+  → `{ id, nom }[]` de l'organisation (accessible aux rôles tenant, sans
+  exposer les e-mails via `/membres` qui reste réservé `ADMINISTRATEUR`).
+- **Frontend** ([organisation.component.ts](../apps/web/src/app/organisation/organisation.component.ts)) :
+  l'onglet « Structures » passe en **table standard** (Nom · Structure parente ·
+  Titulaire · Membres · actions). Colonne **Titulaire** = `<select>` inline
+  (« Vacant » + membres) persistant à la volée (`PATCH /services/:id`).
+  Nouveau popover **« Modifier la structure »** (nom, parent en excluant les
+  descendants, titulaire, description). L'arbre reste dans l'onglet
+  « Organigramme ». Les `<select>` pré-remplis utilisent `[selected]` sur les
+  options (le `[value]` sur `<select>` + `*ngFor` ne pré-sélectionne pas de
+  façon fiable sans `ngModel`).
+- Champ texte libre `poste` du membre : laissé tel quel (hors périmètre).
+
+### Incident rencontré (résolu)
+
+Après la migration, le serveur `nest start --watch` (:3000) servait des 500 sur
+`GET /services` : `nest --watch` recompile le TS mais ne recharge pas le client
+Prisma régénéré. Résolu en redémarrant le serveur de dev. À garder en tête
+après toute migration.
+
+### Vérifié
+
+- API : `nest build` propre ; `npm test` **569/569**.
+- Frontend : `npm run typecheck` propre ; `npm run test:ci` **184/184** ;
+  client API régénéré.
+- Navigateur (org K&B) : l'onglet « Structures » affiche la table (2 lignes,
+  parente résolue, compteur membres) ; choix d'un titulaire depuis la table →
+  `PATCH` 200, `titulaire_id` persisté, valeur re-sélectionnée au rechargement ;
+  popover « Modifier » pré-rempli correctement (nom, parent, titulaire),
+  renommage + passage « Vacant » persistés ; onglet « Organigramme » intact ;
+  données de démo K&B remises en état ensuite.
+
+---
+
+## 2026-09-01 (suite) : barre d'onglets non responsive
+
+### Constat
+
+Signalé par l'utilisateur (capture du module Organisation, 5 onglets) : en
+largeur réduite, la barre `.tabs` passe sur plusieurs lignes mais son
+`border-radius: 999px` (forme « stadium ») découpe de grands arcs dans les
+onglets des coins et tronque leurs libellés (« Membres », « Structures »,
+« Organigramme » partiellement mangés, grande zone arrondie vide).
+
+### Correctif (`apps/web/src/styles.scss`, global)
+
+- `.tabs` : `border-radius` passe de `999px` à `var(--radius-lg)` (14px).
+  Identique à l'œil sur une seule ligne, propre en rectangle arrondi sur
+  N lignes. Ajout de `max-width: 100%`.
+- Nouveau bloc dans `@media (max-width: 640px)` : `.tabs { width: 100% }` et
+  `.tab { flex: 1 1 auto; text-align: center }` pour que la barre occupe
+  toute la largeur et que les onglets se répartissent au lieu de rester une
+  pastille compacte qui déborde.
+- Les onglets individuels gardent `border-radius: 999px` (pastilles).
+
+Changement purement CSS et global : profite à toutes les barres d'onglets
+(Organisation, Urbanisation, Données, Technologie, Architecture métier, Vues).
+
+### Vérifié
+
+- `ng build` (development) propre (SCSS compilé).
+- Rendu isolé des règles corrigées à 800 px (une ligne) et 380 px
+  (plusieurs lignes) : rectangle arrondi net, tous les libellés visibles,
+  aucun rognage d'angle, pastille active correcte.

@@ -49,3 +49,9 @@ export class RegisterResponseEntity {
   @ApiProperty({ description: "Message de confirmation à afficher à l'utilisateur." })
   message!: string;
 }
+
+/** Réponse générique à message unique (ex. demande de réinitialisation de mot de passe). */
+export class MessageResponseEntity {
+  @ApiProperty({ description: "Message de confirmation à afficher à l'utilisateur." })
+  message!: string;
+}

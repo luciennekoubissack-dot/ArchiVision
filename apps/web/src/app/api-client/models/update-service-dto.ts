@@ -17,4 +17,9 @@ export interface UpdateServiceDto {
    * Identifiant du service parent, ou null pour le retirer.
    */
   parentId?: string | null;
+
+  /**
+   * Identifiant du membre titulaire du poste, ou null pour le rendre vacant.
+   */
+  titulaireId?: string | null;
 }

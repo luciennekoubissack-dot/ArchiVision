@@ -48,7 +48,17 @@ describe('AuthController (HTTP)', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
-    $transaction: jest.fn((callback: (tx: typeof txMock) => unknown) => callback(txMock)),
+    passwordResetToken: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    // Supporte les deux formes utilisées par le service : callback (register)
+    // et tableau de promesses (resetPassword).
+    $transaction: jest.fn((arg: unknown) =>
+      typeof arg === 'function' ? (arg as (tx: typeof txMock) => unknown)(txMock) : Promise.all(arg as Promise<unknown>[]),
+    ),
   };
 
   beforeAll(async () => {
@@ -60,7 +70,11 @@ describe('AuthController (HTTP)', () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
-        ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => ({ JWT_SECRET: 'test-secret' })] }),
+        ConfigModule.forRoot({
+          isGlobal: true,
+          ignoreEnvFile: true,
+          load: [() => ({ JWT_SECRET: 'test-secret', FRONTEND_ORIGIN: 'http://localhost:4201' })],
+        }),
         AuthModule,
       ],
       providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
@@ -314,6 +328,72 @@ describe('AuthController (HTTP)', () => {
         data: { nom: 'Nouveau nom', avatarUrl: 'https://example.com/avatar.png' },
         select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
       });
+    });
+  });
+
+  describe('POST /auth/forgot-password', () => {
+    it('est accessible sans authentification et répond toujours pareil, compte existant ou non', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+      const responseExistant = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: mockUser.email })
+        .expect(200);
+
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      const responseInconnu = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'inconnu@archivision.local' })
+        .expect(200);
+
+      expect(responseExistant.body.message).toBe(responseInconnu.body.message);
+      expect(prismaMock.passwordResetToken.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('retourne 400 si l\'email est invalide', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'pas-un-email' })
+        .expect(400);
+    });
+  });
+
+  describe('POST /auth/reset-password', () => {
+    it('accepte un jeton valide, pose les cookies de session et retourne le profil', async () => {
+      prismaMock.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'reset-1',
+        userId: mockUser.id,
+        tokenHash: 'peu-importe',
+        expiresAt: new Date(Date.now() + 60_000),
+        usedAt: null,
+        user: mockUser,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token: 'un-jeton', password: 'NouveauMdp123!' })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('accessToken');
+      const setCookie = response.headers['set-cookie'] as unknown as string[];
+      expect(setCookie.find((c) => c.startsWith('access_token='))).toContain('HttpOnly');
+    });
+
+    it('retourne 400 si le jeton est invalide ou expiré', async () => {
+      prismaMock.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token: 'inconnu', password: 'NouveauMdp123!' })
+        .expect(400);
+    });
+
+    it('retourne 400 si le nouveau mot de passe est trop court', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token: 'un-jeton', password: 'short' })
+        .expect(400);
     });
   });
 });

@@ -68,6 +68,39 @@ export class MailService implements OnModuleInit {
     });
   }
 
+  /** Invitation à rejoindre une organisation : lien de création de compte. */
+  async sendInvitation(
+    to: string,
+    organisationNom: string,
+    inviteParNom: string,
+    joinUrl: string,
+  ): Promise<SentEmail> {
+    return this.send({
+      to,
+      subject: `Vous êtes invité à rejoindre « ${organisationNom} » sur ArchiVision`,
+      body:
+        `Bonjour,\n\n${inviteParNom} vous invite à rejoindre l'espace de travail de ` +
+        `« ${organisationNom} » sur ArchiVision. Cliquez sur le lien ci-dessous pour ` +
+        `créer votre compte et définir votre mot de passe :\n\n${joinUrl}\n\n` +
+        `Ce lien est valable 7 jours et ne peut servir qu'une seule fois. ` +
+        `Si vous n'attendiez pas cette invitation, ignorez simplement ce message.`,
+    });
+  }
+
+  /** Mot de passe oublié : lien de réinitialisation. */
+  async sendPasswordReset(to: string, resetUrl: string): Promise<SentEmail> {
+    return this.send({
+      to,
+      subject: 'ArchiVision : réinitialisation de votre mot de passe',
+      body:
+        `Bonjour,\n\nVous avez demandé la réinitialisation de votre mot de passe ArchiVision. ` +
+        `Cliquez sur le lien ci-dessous pour en choisir un nouveau :\n\n${resetUrl}\n\n` +
+        `Ce lien est valable 1 heure et ne peut servir qu'une seule fois. ` +
+        `Si vous n'êtes pas à l'origine de cette demande, ignorez simplement ce message : ` +
+        `votre mot de passe actuel reste inchangé.`,
+    });
+  }
+
   private async send(email: SentEmail): Promise<SentEmail> {
     if (!this.transporter) {
       this.logger.log(`[MAIL:SIMULÉ] À: ${email.to} | Sujet: ${email.subject}\n${email.body}`);

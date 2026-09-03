@@ -5,7 +5,7 @@ import { ServiceViewService } from './service-view.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { AuthUser, CurrentUser, requireOrganisationId } from '@archivision/shared';
-import { ServiceEntity } from './entities/service.entity';
+import { ServiceEntity, ServiceTitulaireRefEntity } from './entities/service.entity';
 import { ServiceViewEntity } from './entities/service-view.entity';
 
 @ApiTags('services')
@@ -37,6 +37,13 @@ export class ServiceController {
   @ApiOkResponse({ type: ServiceViewEntity })
   generateVue(@CurrentUser() user: AuthUser) {
     return this.viewService.generate(requireOrganisationId(user));
+  }
+
+  @ApiOperation({ summary: "Liste les membres de l'organisation (id + nom) pour choisir un titulaire." })
+  @Get('membres')
+  @ApiOkResponse({ type: [ServiceTitulaireRefEntity] })
+  listMembres(@CurrentUser() user: AuthUser) {
+    return this.service.listMembres(requireOrganisationId(user));
   }
 
   @ApiOperation({ summary: 'Récupère un service par son identifiant.' })

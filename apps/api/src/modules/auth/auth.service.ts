@@ -1,17 +1,29 @@
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@archivision/infrastructure';
-import { organisationNonValideeError } from '@archivision/shared';
+import { organisationNonValideeError, requireFrontendOrigin } from '@archivision/shared';
 import { RoleUtilisateur } from '@prisma/client';
+import { createHash, randomBytes } from 'crypto';
 import bcrypt from 'bcrypt';
+import { MailService } from '../mail/mail.service';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+
+/** Durée de validité d'un lien de réinitialisation de mot de passe. */
+const RESET_EXPIRY_MS = 60 * 60 * 1000;
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {}
 
   async login(email: string, password: string) {
@@ -150,6 +162,59 @@ export class AuthService {
       },
       select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
     });
+  }
+
+  /**
+   * Envoie un lien de réinitialisation si un compte existe pour cet e-mail.
+   * Répond toujours de la même façon côté contrôleur, que le compte existe
+   * ou non : ne jamais laisser deviner quels e-mails sont enregistrés.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    if (!user) return;
+
+    const token = randomBytes(32).toString('base64url');
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(token),
+        expiresAt: new Date(Date.now() + RESET_EXPIRY_MS),
+      },
+    });
+
+    const resetUrl = `${requireFrontendOrigin(this.config)}/reinitialiser-mot-de-passe?token=${token}`;
+    await this.mail.sendPasswordReset(user.email, resetUrl);
+  }
+
+  /** Vérifie le jeton, remplace le mot de passe et ouvre une session. */
+  async resetPassword(token: string, newPassword: string) {
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: hashToken(token) },
+      include: { user: true },
+    });
+
+    if (!resetToken || resetToken.usedAt) {
+      throw new BadRequestException('Ce lien de réinitialisation est invalide ou a déjà été utilisé.');
+    }
+    if (resetToken.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Ce lien de réinitialisation a expiré. Demandez-en un nouveau.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash } }),
+      this.prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { usedAt: new Date() } }),
+      // Un jeton utilisé invalide les autres demandes en attente pour ce
+      // compte, pour ne pas laisser traîner un lien encore valable après
+      // qu'un mot de passe a déjà été choisi.
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: resetToken.userId, usedAt: null, id: { not: resetToken.id } },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return this.buildAuthResponse(resetToken.user);
   }
 
   private buildAuthResponse(user: {

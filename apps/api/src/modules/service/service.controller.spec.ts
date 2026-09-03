@@ -29,6 +29,8 @@ describe('ServiceController (HTTP)', () => {
     organisationId: 'org-001',
   };
 
+  const TITULAIRE_ID = '33333333-3333-4333-8333-333333333333';
+
   const prismaMock = {
     service: {
       create: jest.fn(),
@@ -36,6 +38,10 @@ describe('ServiceController (HTTP)', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
+    },
+    user: {
+      findMany: jest.fn(),
       count: jest.fn(),
     },
   };
@@ -112,6 +118,32 @@ describe('ServiceController (HTTP)', () => {
     prismaMock.service.count.mockResolvedValue(1);
     prismaMock.service.delete.mockResolvedValue(mockService);
     await request(app.getHttpServer()).delete(`/services/${mockService.id}`).expect(204);
+  });
+
+  it('un Architecte peut lister les membres pour choisir un titulaire (200)', async () => {
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'u1', nom: 'Alice' }]);
+    const response = await request(app.getHttpServer()).get('/services/membres').expect(200);
+    expect(response.body).toEqual([{ id: 'u1', nom: 'Alice' }]);
+  });
+
+  it('un Architecte peut affecter un titulaire à un poste (200)', async () => {
+    prismaMock.service.count.mockResolvedValue(1);
+    prismaMock.user.count.mockResolvedValue(1);
+    prismaMock.service.update.mockResolvedValue({ ...mockService, titulaireId: TITULAIRE_ID });
+    const response = await request(app.getHttpServer())
+      .patch(`/services/${mockService.id}`)
+      .send({ titulaireId: TITULAIRE_ID })
+      .expect(200);
+    expect(response.body.titulaireId).toBe(TITULAIRE_ID);
+  });
+
+  it('refuse un titulaire hors organisation (400)', async () => {
+    prismaMock.service.count.mockResolvedValue(1);
+    prismaMock.user.count.mockResolvedValue(0);
+    await request(app.getHttpServer())
+      .patch(`/services/${mockService.id}`)
+      .send({ titulaireId: TITULAIRE_ID })
+      .expect(400);
   });
 
   it('un Superadmin sans organisation reçoit 403 en tentant de lister les services', async () => {

@@ -13,6 +13,7 @@ import { ServiceModule } from './modules/service/service.module';
 import { ObjectifModule } from './modules/objectif/objectif.module';
 import { HealthModule } from './modules/health/health.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { InvitationModule } from './modules/invitation/invitation.module';
 import { BpmnModule } from './modules/bpmn/bpmn.module';
 import { DonneesModule } from './modules/donnees/donnees.module';
 import { TechnologieModule } from './modules/technologie/technologie.module';
@@ -41,6 +42,7 @@ import { ArchitectureApplicativeModule } from './modules/architecture-applicativ
     ServiceModule,
     ObjectifModule,
     AdminModule,
+    InvitationModule,
     BpmnModule,
     DonneesModule,
     TechnologieModule,

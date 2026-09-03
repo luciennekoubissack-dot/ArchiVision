@@ -203,6 +203,35 @@ describe('AuthService', () => {
     expect(JSON.parse(localStorage.getItem('archivision_user')!)).toEqual(updatedUser);
   });
 
+  it("forgotPassword envoie l'e-mail sans toucher à la session (aucun user connecté)", () => {
+    let result: unknown;
+    service.forgotPassword('inconnu@archivision.test').subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne('/api/v1/auth/forgot-password');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ email: 'inconnu@archivision.test' });
+    const message = 'Si un compte existe avec cette adresse, un e-mail de réinitialisation vient de lui être envoyé.';
+    req.flush({ message });
+
+    expect(result).toEqual({ message });
+    expect(service.currentUser()).toBeNull();
+  });
+
+  it('resetPassword stocke la session dans localStorage et met à jour le signal currentUser', () => {
+    let result: unknown;
+    service.resetPassword({ token: 'jeton-valide', password: 'NouveauMdp123!' }).subscribe((r) => (result = r));
+
+    const req = httpMock.expectOne('/api/v1/auth/reset-password');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ token: 'jeton-valide', password: 'NouveauMdp123!' });
+    req.flush({ accessToken: 'jwt-fake', user: mockUser });
+
+    expect(result).toEqual({ accessToken: 'jwt-fake', user: mockUser });
+    expect(service.currentUser()).toEqual(mockUser);
+    expect(service.isAuthenticated()).toBe(true);
+    expect(JSON.parse(localStorage.getItem('archivision_user')!)).toEqual(mockUser);
+  });
+
   it('uploadLogo envoie le fichier en multipart et renvoie l\'URL du logo', () => {
     let result: unknown;
     const file = new File(['contenu'], 'logo.png', { type: 'image/png' });

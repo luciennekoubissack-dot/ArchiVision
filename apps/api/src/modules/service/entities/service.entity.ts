@@ -22,6 +22,15 @@ export class ServiceParentRefEntity {
   nom!: string;
 }
 
+/** Référence allégée vers le membre titulaire du poste. */
+export class ServiceTitulaireRefEntity {
+  @ApiProperty({ description: 'Identifiant du membre titulaire.' })
+  id!: string;
+
+  @ApiProperty({ description: 'Nom du membre titulaire.' })
+  nom!: string;
+}
+
 /** Compteur de membres rattachés à un service, tel que renvoyé par le `_count`
  * Prisma sur la liste des services. */
 export class ServiceMembreCountEntity {
@@ -42,6 +51,9 @@ export class ServiceEntity {
 
   @ApiPropertyOptional({ description: 'Identifiant du service parent, le cas échéant.', nullable: true, type: String })
   parentId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Identifiant du membre titulaire du poste, le cas échéant.', nullable: true, type: String })
+  titulaireId?: string | null;
 
   @ApiProperty({ description: "Identifiant de l'organisation propriétaire." })
   organisationId!: string;
@@ -72,6 +84,13 @@ export class ServiceEntity {
     description: 'Membres rattachés à ce service (uniquement sur la récupération par identifiant).',
   })
   membres?: ServiceMembreEntity[];
+
+  @ApiPropertyOptional({
+    type: () => ServiceTitulaireRefEntity,
+    nullable: true,
+    description: 'Membre qui occupe ce poste (null si vacant).',
+  })
+  titulaire?: ServiceTitulaireRefEntity | null;
 
   @ApiPropertyOptional({
     type: () => ServiceMembreCountEntity,

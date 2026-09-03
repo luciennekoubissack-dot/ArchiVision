@@ -18,4 +18,9 @@ export class CreateServiceDto {
   @IsUUID()
   @IsOptional()
   parentId?: string;
+
+  @ApiPropertyOptional({ description: 'Identifiant du membre qui occupe ce poste (titulaire).' })
+  @IsUUID()
+  @IsOptional()
+  titulaireId?: string;
 }

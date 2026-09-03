@@ -4,7 +4,8 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AuthService, RoleUtilisateur } from '../auth/auth.service';
 import { OrganisationService, Organisation } from './organisation.service';
 import { MembresService, Membre, CreateMembrePayload } from './membres.service';
-import { ServiceEntrepriseService, ServiceEntreprise } from './service-entreprise.service';
+import { InvitationsService, Invitation, CreateInvitationPayload } from './invitations.service';
+import { ServiceEntrepriseService, ServiceEntreprise, MembreRef } from './service-entreprise.service';
 import { PartiesPrenantesService, PartiePrenante } from './parties-prenantes.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
@@ -37,6 +38,8 @@ const ICONS: Record<string, string> = {
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   userPlus:
     '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/>',
+  mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
+  send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   camera: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/>',
@@ -117,8 +120,9 @@ const ICONS: Record<string, string> = {
         <div class="popover-head">
           <h3>Fiche d'identité</h3>
           <div class="popover-head-actions">
-            <button type="button" class="icon-btn" title="Exporter (Excel)" (click)="exportFicheSignaletique(org)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+            <button type="button" class="btn btn-outline" (click)="exportFicheSignaletique(org)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+              Exporter (Excel)
             </button>
             <button type="button" class="icon-btn icon-btn-danger" (click)="closeIdentite()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
@@ -211,8 +215,9 @@ const ICONS: Record<string, string> = {
         <div class="popover-head">
           <h3>Parties prenantes</h3>
           <div class="popover-head-actions">
-            <button type="button" class="icon-btn" title="Exporter (Excel)" *ngIf="partiesPrenantesTotal > 0" (click)="exportPartiesPrenantes()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+            <button type="button" class="btn btn-outline" *ngIf="partiesPrenantesTotal > 0" (click)="exportPartiesPrenantes()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+              Exporter (Excel)
             </button>
             <button type="button" class="icon-btn icon-btn-danger" (click)="partiesMode = null">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
@@ -284,11 +289,43 @@ const ICONS: Record<string, string> = {
     <section *ngIf="tab === 'membres' && canManageMembres">
       <div class="page-header">
         <h3>Membres ({{ membresTotal }})</h3>
-        <button type="button" class="btn btn-primary" (click)="openMembreCreate()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('userPlus')"></svg>
-          Ajouter un membre
-        </button>
+        <div class="actions">
+          <button type="button" class="btn btn-outline" (click)="openInvite()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('mail')"></svg>
+            Inviter par e-mail
+          </button>
+          <button type="button" class="btn btn-primary" (click)="openMembreCreate()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('userPlus')"></svg>
+            Ajouter un membre
+          </button>
+        </div>
       </div>
+
+      <section class="card" *ngIf="invitationsTotal > 0">
+        <h4 class="card-title">Invitations en attente ({{ invitationsTotal }})</h4>
+        <div class="table-scroll">
+          <table class="table">
+            <thead><tr><th>Email</th><th>Rôle</th><th>Invité par</th><th>Expire le</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let inv of invitations">
+                <td>{{ inv.email }}</td>
+                <td>{{ roleLabel(inv.role) }}</td>
+                <td>{{ inv.invitedByNom || '—' }}</td>
+                <td>{{ inv.expiresAt | date: 'dd/MM/yyyy' }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-edit" title="Renvoyer l'e-mail" (click)="resendInvitation(inv)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('send')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Révoquer" (click)="revokeInvitation(inv)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <app-pagination [page]="invitationsPage" [total]="invitationsTotal" [pageSize]="invitationsPageSize" (pageChange)="onInvitationsPageChange($event)" />
+      </section>
 
       <section class="card">
         <div class="empty-state" *ngIf="membres.length === 0">Aucun membre pour l'instant.</div>
@@ -376,6 +413,55 @@ const ICONS: Record<string, string> = {
       </form>
     </div>
 
+    <!-- ── Popover : inviter un membre par e-mail ────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="invitePopover" (click)="closeInvite()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="sendInvitation($event)">
+        <div class="popover-head">
+          <h3>Inviter un membre</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeInvite()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <p class="hint">
+          La personne reçoit un e-mail avec un lien valable 7 jours pour créer son compte et choisir son mot de passe.
+          Elle rejoint l'organisation avec le rôle choisi.
+        </p>
+        <div class="grid-2">
+          <label class="field">
+            Email
+            <input type="email" [value]="newInvitation.email" (input)="newInvitation.email = $any($event.target).value" required />
+          </label>
+          <label class="field">
+            Rôle
+            <select [value]="newInvitation.role" (change)="newInvitation.role = $any($event.target).value">
+              <option *ngFor="let role of roles" [value]="role">{{ roleLabel(role) }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="grid-2">
+          <label class="field">
+            Poste (optionnel)
+            <input type="text" [value]="newInvitation.poste || ''" (input)="newInvitation.poste = $any($event.target).value" />
+          </label>
+          <label class="field">
+            Contact (optionnel)
+            <input type="text" [value]="newInvitation.contact || ''" (input)="newInvitation.contact = $any($event.target).value" />
+          </label>
+        </div>
+        <label class="field">
+          Structure (optionnel)
+          <select [value]="newInvitation.serviceId || ''" (change)="newInvitation.serviceId = $any($event.target).value || undefined">
+            <option value="">— Aucun —</option>
+            <option *ngFor="let s of flatServices" [value]="s.id">{{ s.indent }}{{ s.nom }}</option>
+          </select>
+        </label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeInvite()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="sendingInvitation">{{ sendingInvitation ? 'Envoi…' : "Envoyer l'invitation" }}</button>
+        </div>
+      </form>
+    </div>
+
     <!-- ── Popover : consulter un membre ─────────────────────────────────── -->
     <div class="popover-backdrop" *ngIf="membrePopover === 'view' && membreTarget as m" (click)="closeMembrePopover()">
       <div class="popover-card" (click)="$event.stopPropagation()">
@@ -439,8 +525,12 @@ const ICONS: Record<string, string> = {
 
     <!-- ── Structures ────────────────────────────────────────────────────── -->
     <section *ngIf="tab === 'services'">
+      <p class="muted hint">
+        Une structure représente un poste ou un service (ex. « Secrétaire »). Choisissez qui l'occupe dans la
+        colonne « Titulaire ». La hiérarchie complète est visible dans l'onglet « Organigramme ».
+      </p>
       <div class="page-header">
-        <h3>Structures ({{ flatServices.length }})</h3>
+        <h3>Structures ({{ servicesFlat.length }})</h3>
         <button type="button" class="btn btn-primary" (click)="openServiceCreate()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
           Ajouter une structure
@@ -448,28 +538,38 @@ const ICONS: Record<string, string> = {
       </div>
 
       <section class="card">
-        <div class="empty-state" *ngIf="services.length === 0">Aucune structure définie pour cette organisation.</div>
-        <ul class="tree" *ngIf="services.length > 0">
-          <ng-container *ngFor="let root of services">
-            <ng-container *ngTemplateOutlet="serviceNode; context: { $implicit: root }"></ng-container>
-          </ng-container>
-        </ul>
-        <ng-template #serviceNode let-node>
-          <li>
-            <div class="node-row">
-              <span class="node-nom">{{ node.nom }}</span>
-              <span class="badge badge-neutral">{{ node._count?.membres || 0 }} membre(s)</span>
-              <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeService(node)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
-              </button>
-            </div>
-            <ul *ngIf="node.enfants?.length">
-              <ng-container *ngFor="let child of node.enfants">
-                <ng-container *ngTemplateOutlet="serviceNode; context: { $implicit: child }"></ng-container>
-              </ng-container>
-            </ul>
-          </li>
-        </ng-template>
+        <div class="empty-state" *ngIf="servicesFlat.length === 0">Aucune structure définie pour cette organisation.</div>
+        <div class="table-scroll" *ngIf="servicesFlat.length > 0">
+          <table class="table">
+            <thead><tr><th>Nom</th><th>Structure parente</th><th>Titulaire</th><th>Membres</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let s of servicesFlat">
+                <td><strong>{{ s.nom }}</strong></td>
+                <td>{{ serviceName(s.parentId) }}</td>
+                <td>
+                  <select
+                    class="titulaire-select"
+                    (change)="onTitulaireChange(s, $any($event.target).value)"
+                  >
+                    <option value="" [selected]="!s.titulaireId">Vacant</option>
+                    <option *ngFor="let m of membresTitulaire" [value]="m.id" [selected]="m.id === s.titulaireId">
+                      {{ m.nom }}
+                    </option>
+                  </select>
+                </td>
+                <td>{{ s._count?.membres || 0 }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-edit" title="Modifier" (click)="openServiceEdit(s)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeService(s)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
 
@@ -494,12 +594,57 @@ const ICONS: Record<string, string> = {
           </select>
         </label>
         <label class="field">
+          Titulaire (optionnel)
+          <select [value]="newService.titulaireId || ''" (change)="newService.titulaireId = $any($event.target).value || undefined">
+            <option value="">Vacant</option>
+            <option *ngFor="let m of membresTitulaire" [value]="m.id">{{ m.nom }}</option>
+          </select>
+        </label>
+        <label class="field">
           Description
           <textarea [value]="newService.description || ''" (input)="newService.description = $any($event.target).value"></textarea>
         </label>
         <div class="popover-actions">
           <button type="button" class="btn btn-ghost" (click)="closeServicePopover()">Annuler</button>
           <button type="submit" class="btn btn-primary" [disabled]="creatingService">{{ creatingService ? 'Création…' : 'Créer la structure' }}</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Popover : modifier une structure ──────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="serviceEditTarget && serviceDraft as d" (click)="closeServiceEdit()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="saveService($event)">
+        <div class="popover-head">
+          <h3>Modifier « {{ serviceEditTarget.nom }} »</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeServiceEdit()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <label class="field">
+          Nom
+          <input type="text" [value]="d.nom" (input)="d.nom = $any($event.target).value" required />
+        </label>
+        <label class="field">
+          Structure parente (optionnelle)
+          <select (change)="d.parentId = $any($event.target).value || null">
+            <option value="" [selected]="!d.parentId">— Racine —</option>
+            <option *ngFor="let s of parentOptions()" [value]="s.id" [selected]="s.id === d.parentId">{{ s.indent }}{{ s.nom }}</option>
+          </select>
+        </label>
+        <label class="field">
+          Titulaire
+          <select (change)="d.titulaireId = $any($event.target).value || null">
+            <option value="" [selected]="!d.titulaireId">Vacant</option>
+            <option *ngFor="let m of membresTitulaire" [value]="m.id" [selected]="m.id === d.titulaireId">{{ m.nom }}</option>
+          </select>
+        </label>
+        <label class="field">
+          Description
+          <textarea [value]="d.description" (input)="d.description = $any($event.target).value"></textarea>
+        </label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeServiceEdit()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingService">{{ savingService ? 'Enregistrement…' : 'Enregistrer' }}</button>
         </div>
       </form>
     </div>
@@ -515,11 +660,13 @@ const ICONS: Record<string, string> = {
           <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="organigrammeSvg" (click)="clearOrganigramme()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
           </button>
-          <button type="button" class="icon-btn" title="Exporter SVG" *ngIf="organigrammeSvg" (click)="exportOrganigramme('svg')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          <button type="button" class="btn btn-outline" *ngIf="organigrammeSvg" (click)="exportOrganigramme('svg')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+            Exporter SVG
           </button>
-          <button type="button" class="icon-btn" title="Exporter PNG" *ngIf="organigrammeSvg" (click)="exportOrganigramme('png')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          <button type="button" class="btn btn-outline" *ngIf="organigrammeSvg" (click)="exportOrganigramme('png')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+            Exporter PNG
           </button>
         </div>
       </div>
@@ -532,10 +679,12 @@ const ICONS: Record<string, string> = {
       .popover-head-actions { display: flex; align-items: center; gap: 0.5rem; }
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
       .hint { color: var(--color-text-muted); font-size: 0.9rem; margin-top: 0.75rem; }
+      .card-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; }
       .table-scroll { overflow-x: auto; }
       .table { width: 100%; min-width: 640px; border-collapse: collapse; }
       .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
       .row-actions { display: flex; gap: 0.4rem; }
+      .titulaire-select { min-width: 160px; max-width: 260px; padding: 0.35rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font: inherit; background: var(--color-white); }
       .tree { list-style: none; padding-left: 0; }
       .tree ul { list-style: none; padding-left: 1.5rem; margin-top: 0.5rem; }
       .tree li { margin-bottom: 0.6rem; }
@@ -630,11 +779,25 @@ export class OrganisationComponent implements OnInit {
   membreTarget: Membre | null = null;
   membreDraft: MembreDraft | null = null;
 
+  invitations: Invitation[] = [];
+  invitationsPage = 1;
+  invitationsTotal = 0;
+  invitationsPageSize = DEFAULT_PAGE_SIZE;
+  invitePopover = false;
+  sendingInvitation = false;
+  newInvitation: CreateInvitationPayload = { email: '', role: 'ARCHITECTE' };
+
   services: ServiceEntreprise[] = [];
+  /** Liste à plat (dédupliquée, triée par nom) pour l'affichage en tableau. */
+  servicesFlat: ServiceEntreprise[] = [];
   flatServices: { id: string; nom: string; indent: string }[] = [];
+  membresTitulaire: MembreRef[] = [];
   creatingService = false;
-  newService: { nom: string; description?: string; parentId?: string } = { nom: '' };
+  savingService = false;
+  newService: { nom: string; description?: string; parentId?: string; titulaireId?: string } = { nom: '' };
   servicePopover = false;
+  serviceEditTarget: ServiceEntreprise | null = null;
+  serviceDraft: { nom: string; description: string; parentId: string | null; titulaireId: string | null } | null = null;
 
   organigrammeSvg = '';
   organigrammeTrustedSvg: SafeHtml | null = null;
@@ -649,6 +812,7 @@ export class OrganisationComponent implements OnInit {
     public auth: AuthService,
     private organisationService: OrganisationService,
     private membresService: MembresService,
+    private invitationsService: InvitationsService,
     private serviceEntrepriseService: ServiceEntrepriseService,
     private partiesPrenantesService: PartiesPrenantesService,
     private toast: ToastService,
@@ -667,8 +831,12 @@ export class OrganisationComponent implements OnInit {
   ngOnInit(): void {
     this.loadInfos();
     this.loadServices();
+    this.loadMembresTitulaire();
     this.loadPartiesPrenantes();
-    if (this.canManageMembres) this.loadMembres();
+    if (this.canManageMembres) {
+      this.loadMembres();
+      this.loadInvitations();
+    }
   }
 
   icon(name: string): SafeHtml {
@@ -885,6 +1053,77 @@ export class OrganisationComponent implements OnInit {
     });
   }
 
+  // ── Invitations ──────────────────────────────────────────────────────────
+
+  onInvitationsPageChange(page: number): void {
+    this.invitationsPage = page;
+    this.loadInvitations();
+  }
+
+  loadInvitations(): void {
+    this.invitationsService.listPaginated(this.invitationsPage, this.invitationsPageSize).subscribe({
+      next: (result) => {
+        this.invitations = result.items;
+        this.invitationsTotal = result.total;
+        // Revenir d'une page devenue vide après une révocation/acceptation.
+        if (this.invitations.length === 0 && this.invitationsPage > 1) {
+          this.invitationsPage -= 1;
+          this.loadInvitations();
+        }
+      },
+      error: () => this.toast.error('Impossible de charger les invitations.'),
+    });
+  }
+
+  openInvite(): void {
+    this.newInvitation = { email: '', role: 'ARCHITECTE' };
+    this.invitePopover = true;
+  }
+
+  closeInvite(): void {
+    this.invitePopover = false;
+  }
+
+  sendInvitation(event: Event): void {
+    event.preventDefault();
+    this.sendingInvitation = true;
+    this.invitationsService.create(this.newInvitation).subscribe({
+      next: () => {
+        this.sendingInvitation = false;
+        this.closeInvite();
+        this.toast.success("Invitation envoyée.");
+        this.loadInvitations();
+      },
+      error: (err) => {
+        this.sendingInvitation = false;
+        this.toast.error(
+          err?.status === 409
+            ? "Un compte ou une invitation existe déjà pour cet email."
+            : "Impossible d'envoyer cette invitation.",
+        );
+      },
+    });
+  }
+
+  resendInvitation(invitation: Invitation): void {
+    this.invitationsService.resend(invitation.id).subscribe({
+      next: () => this.toast.success("E-mail d'invitation renvoyé."),
+      error: () => this.toast.error("Impossible de renvoyer cette invitation."),
+    });
+  }
+
+  async revokeInvitation(invitation: Invitation): Promise<void> {
+    const confirmed = await this.confirmDialog.confirm(`Révoquer l'invitation de « ${invitation.email} » ?`);
+    if (!confirmed) return;
+    this.invitationsService.revoke(invitation.id).subscribe({
+      next: () => {
+        this.toast.success('Invitation révoquée.');
+        this.loadInvitations();
+      },
+      error: () => this.toast.error('Impossible de révoquer cette invitation.'),
+    });
+  }
+
   // ── Services ─────────────────────────────────────────────────────────────
 
   loadServices(): void {
@@ -903,9 +1142,100 @@ export class OrganisationComponent implements OnInit {
           else this.services.push(service);
         }
         this.flatServices = this.flatten(this.services);
+        this.servicesFlat = [...deduped].sort((a, b) => a.nom.localeCompare(b.nom));
       },
       error: () => this.toast.error('Impossible de charger les structures.'),
     });
+  }
+
+  loadMembresTitulaire(): void {
+    this.serviceEntrepriseService.listMembres().subscribe({
+      next: (membres) => (this.membresTitulaire = membres),
+      error: () => this.toast.error('Impossible de charger la liste des membres.'),
+    });
+  }
+
+  /** Changement du titulaire directement depuis le tableau (persistance immédiate). */
+  onTitulaireChange(service: ServiceEntreprise, value: string): void {
+    const titulaireId = value || null;
+    this.serviceEntrepriseService.update(service.id, { titulaireId }).subscribe({
+      next: () => {
+        this.toast.success(titulaireId ? 'Titulaire mis à jour.' : 'Poste marqué vacant.');
+        this.loadServices();
+      },
+      error: () => this.toast.error("Impossible d'enregistrer le titulaire."),
+    });
+  }
+
+  openServiceEdit(service: ServiceEntreprise): void {
+    this.serviceEditTarget = service;
+    this.serviceDraft = {
+      nom: service.nom,
+      description: service.description ?? '',
+      parentId: service.parentId ?? null,
+      titulaireId: service.titulaireId ?? null,
+    };
+  }
+
+  closeServiceEdit(): void {
+    this.serviceEditTarget = null;
+    this.serviceDraft = null;
+  }
+
+  saveService(event: Event): void {
+    event.preventDefault();
+    if (!this.serviceEditTarget || !this.serviceDraft) return;
+    const d = this.serviceDraft;
+    if (!d.nom.trim()) return;
+    this.savingService = true;
+    this.serviceEntrepriseService
+      .update(this.serviceEditTarget.id, {
+        nom: d.nom.trim(),
+        description: d.description,
+        parentId: d.parentId,
+        titulaireId: d.titulaireId,
+      })
+      .subscribe({
+        next: () => {
+          this.savingService = false;
+          this.closeServiceEdit();
+          this.loadServices();
+          this.toast.success('Structure mise à jour.');
+        },
+        error: () => {
+          this.savingService = false;
+          this.toast.error('Impossible de mettre à jour cette structure.');
+        },
+      });
+  }
+
+  /** Options de parent pour l'édition : on exclut la structure elle-même et ses descendants. */
+  parentOptions(): { id: string; nom: string; indent: string }[] {
+    if (!this.serviceEditTarget) return this.flatServices;
+    const exclus = this.descendantIds(this.serviceEditTarget.id);
+    return this.flatServices.filter((s) => !exclus.has(s.id));
+  }
+
+  private descendantIds(id: string): Set<string> {
+    const childrenOf = new Map<string, string[]>();
+    for (const s of this.servicesFlat) {
+      const p = s.parentId ?? '';
+      const list = childrenOf.get(p) ?? [];
+      list.push(s.id);
+      childrenOf.set(p, list);
+    }
+    const out = new Set<string>([id]);
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      for (const c of childrenOf.get(cur) ?? []) {
+        if (!out.has(c)) {
+          out.add(c);
+          stack.push(c);
+        }
+      }
+    }
+    return out;
   }
 
   private dedupeById(nodes: ServiceEntreprise[]): ServiceEntreprise[] {
@@ -948,7 +1278,7 @@ export class OrganisationComponent implements OnInit {
   }
 
   async removeService(service: ServiceEntreprise): Promise<void> {
-    const hasChildren = (service.enfants?.length ?? 0) > 0;
+    const hasChildren = this.servicesFlat.some((s) => s.parentId === service.id);
     const hasMembres = (service._count?.membres ?? 0) > 0;
     const warning =
       hasChildren || hasMembres

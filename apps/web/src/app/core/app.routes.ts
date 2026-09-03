@@ -25,6 +25,21 @@ export const routes: Routes = [
     loadComponent: () => import('../auth/inscription-recue.component').then((m) => m.InscriptionRecueComponent),
   },
   {
+    path: 'rejoindre',
+    loadComponent: () => import('../auth/rejoindre.component').then((m) => m.RejoindreComponent),
+  },
+  {
+    path: 'mot-de-passe-oublie',
+    loadComponent: () => import('../auth/mot-de-passe-oublie.component').then((m) => m.MotDePasseOublieComponent),
+    canActivate: [GuestGuard],
+  },
+  {
+    path: 'reinitialiser-mot-de-passe',
+    loadComponent: () =>
+      import('../auth/reinitialiser-mot-de-passe.component').then((m) => m.ReinitialiserMotDePasseComponent),
+    canActivate: [GuestGuard],
+  },
+  {
     path: '',
     component: AppShellComponent,
     canActivate: [AuthGuard],

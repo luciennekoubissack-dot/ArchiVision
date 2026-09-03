@@ -49,8 +49,9 @@ const ICONS: Record<string, string> = {
     <div class="page-header">
       <h3>Objectifs ({{ total }})</h3>
       <div class="header-actions">
-        <button type="button" class="icon-btn" title="Exporter (Excel)" *ngIf="total > 0" (click)="exportObjectifs()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+        <button type="button" class="btn btn-outline" *ngIf="total > 0" (click)="exportObjectifs()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          Exporter (Excel)
         </button>
         <button type="button" class="btn btn-primary" *ngIf="canWrite" (click)="openCreate()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>

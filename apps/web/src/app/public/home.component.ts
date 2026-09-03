@@ -15,9 +15,9 @@ interface Module {
   texte: string;
 }
 
-interface Nouveaute {
-  date: string;
-  titre: string;
+interface PhaseADM {
+  phase: string;
+  module: string;
   texte: string;
 }
 
@@ -89,30 +89,56 @@ const MODULES: Module[] = [
   },
 ];
 
-const NOUVEAUTES: Nouveaute[] = [
+const PHASES_ADM: PhaseADM[] = [
   {
-    date: 'Septembre 2026',
-    titre: 'Génération automatique des diagrammes',
-    texte:
-      "À la première ouverture d'un éditeur (classe, composants, architecture applicative, déploiement), l'application dispose automatiquement les éléments déjà saisis et trace les liens. Un bouton « Réorganiser le diagramme » permet de relancer la disposition à tout moment.",
+    phase: 'Phase préliminaire',
+    module: 'Préparation de l’organisation',
+    texte: "Cadrage : identité de l’organisation, secteur, parties prenantes, principes de départ.",
   },
   {
-    date: 'Septembre 2026',
-    titre: 'Validation des organisations par la plateforme',
-    texte:
-      "Une nouvelle organisation reste en attente jusqu'à sa vérification par l'équipe ArchiVision : nom, localisation, secteur, responsable et objectif sont contrôlés avant validation. Un e-mail contenant le lien de connexion est alors envoyé.",
+    phase: 'Phase A — Vision de l’architecture',
+    module: 'Vision',
+    texte: "Objectifs métier, besoins, exigences fonctionnelles et non fonctionnelles : la couche Motivation d’ArchiMate (Vision, Objectif, Principe, Exigence).",
   },
   {
-    date: 'Septembre 2026',
-    titre: 'Diagramme de vision pré-rempli',
-    texte:
-      "Le canevas de vision (cible, besoins, produit, objectifs métier, concurrents…) est amorcé automatiquement à partir des informations d'inscription. L'utilisateur n'a plus qu'à compléter et affiner.",
+    phase: 'Phase B — Architecture métier',
+    module: 'Architecture métier',
+    texte: "Capacités, acteurs, rôles, processus et services : la couche Métier d’ArchiMate, reliée aux objectifs de la phase précédente.",
   },
   {
-    date: 'Septembre 2026',
-    titre: 'Inscription repensée et responsive',
-    texte:
-      "Le formulaire de création d'organisation regroupe les informations essentielles sur une seule étape, s'adapte au mobile et à la tablette, et n'indique une étape comme terminée que lorsque tous ses champs sont remplis.",
+    phase: 'Phase C — Architecture des systèmes d’information',
+    module: 'Architecture des données & Architecture applicative',
+    texte: "Entités de données et portefeuille applicatif : les deux volets de la phase C, traités comme deux modules distincts pour rester lisibles.",
+  },
+  {
+    phase: 'Phase D — Architecture technologique',
+    module: 'Architecture technologique',
+    texte: "Composants d’infrastructure et leurs déploiements, notation UML pour le diagramme technique.",
+  },
+  {
+    phase: 'Technique transverse — Analyse des écarts',
+    module: 'Analyse des écarts',
+    texte: "Comparaison AS-IS / TO-BE sur chaque couche : éléments conservés, éliminés, modifiés ou nouveaux, selon la matrice d’écarts classique de TOGAF.",
+  },
+  {
+    phase: 'Phase E — Opportunités et solutions',
+    module: 'Opportunités & solutions',
+    texte: "Chaque solution candidate se rattache explicitement aux écarts qu’elle adresse, pour garder la traçabilité entre le diagnostic et la solution retenue.",
+  },
+  {
+    phase: 'Phase F — Planification de la migration',
+    module: 'Roadmap',
+    texte: "Feuille de route des projets de transformation qui mettent en œuvre les solutions retenues.",
+  },
+  {
+    phase: 'Phase G — Gouvernance de la mise en œuvre',
+    module: 'Gouvernance',
+    texte: "Politiques, demandes de changement et conformité, pour encadrer l’exécution de la roadmap.",
+  },
+  {
+    phase: 'Phase H — Gestion des évolutions',
+    module: 'Évaluation et amélioration continue',
+    texte: "Bouclage du cycle ADM : les enseignements alimentent la prochaine itération de vision et d’architecture.",
   },
 ];
 
@@ -137,6 +163,37 @@ const NOUVEAUTES: Nouveaute[] = [
           <div class="hero-actions">
             <a routerLink="/register" class="btn btn-primary">Créer mon organisation</a>
             <a routerLink="/login" class="btn btn-outline btn-on-dark">Se connecter</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section methodo">
+        <div class="section-content">
+          <h2>Fondée sur TOGAF, l'ADM et ArchiMate</h2>
+          <p>
+            ArchiVision ne réinvente pas de méthode : elle outille TOGAF, le référentiel
+            d'architecture d'entreprise le plus utilisé au monde, publié par The Open Group.
+            Son cœur est l'<strong>ADM</strong> (Architecture Development Method), une démarche
+            cyclique en phases qui va de la vision stratégique jusqu'à la gestion des évolutions,
+            en passant par l'architecture métier, les données, l'applicatif, la technologie, les
+            solutions et la gouvernance de leur mise en œuvre. <strong>ArchiMate</strong>, le
+            langage de modélisation graphique du même éditeur, sert de notation commune à toutes
+            les couches : mêmes symboles, mêmes types de relations (assignation, composition,
+            réalisation, association), d'un module à l'autre.
+          </p>
+          <p>
+            Chaque module d'ArchiVision correspond à une phase (ou une technique) de l'ADM, dans
+            le même ordre. Vous n'avez pas besoin de connaître TOGAF par cœur : la progression de
+            l'assistant vous fait traverser la méthode phase après phase, et ce que vous produisez
+            reste conforme au standard — donc lisible par n'importe quel architecte qui le connaît,
+            et comparable d'une mission à l'autre.
+          </p>
+          <div class="methodo-grid">
+            <article class="methodo-card" *ngFor="let p of phasesAdm">
+              <span class="methodo-phase">{{ p.phase }}</span>
+              <h3>{{ p.module }}</h3>
+              <p>{{ p.texte }}</p>
+            </article>
           </div>
         </div>
       </section>
@@ -207,23 +264,6 @@ const NOUVEAUTES: Nouveaute[] = [
               <p>{{ m.texte }}</p>
             </article>
           </div>
-        </div>
-      </section>
-
-      <section class="section nouveautes">
-        <div class="section-content">
-          <h2>Dernières améliorations</h2>
-          <p>Ce qui a changé récemment sur la plateforme.</p>
-          <ol class="timeline">
-            <li *ngFor="let n of nouveautes">
-              <span class="timeline-dot" aria-hidden="true"></span>
-              <div class="timeline-body">
-                <span class="timeline-date">{{ n.date }}</span>
-                <h3>{{ n.titre }}</h3>
-                <p>{{ n.texte }}</p>
-              </div>
-            </li>
-          </ol>
         </div>
       </section>
 
@@ -385,45 +425,33 @@ const NOUVEAUTES: Nouveaute[] = [
       .module-card h3 { font-size: 1.02rem; margin-bottom: 0.4rem; }
       .module-card p { font-size: 0.9rem; line-height: 1.6; max-width: none; }
 
-      /* ── Nouveautés (timeline) ────────────────────────────────────────── */
-      .nouveautes { background: var(--color-primary-light); }
-      .timeline { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: 1.25rem; }
-      .timeline li { position: relative; padding-left: 1.75rem; }
-      .timeline li::before {
-        content: '';
-        position: absolute;
-        left: 6px;
-        top: 1.4rem;
-        bottom: -1.25rem;
-        width: 2px;
-        background: rgba(31, 59, 179, 0.25);
+      /* ── Méthodologie (TOGAF / ADM / ArchiMate) ──────────────────────── */
+      .methodo { background: var(--color-primary-light); }
+      .methodo-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
       }
-      .timeline li:last-child::before { display: none; }
-      .timeline-dot {
-        position: absolute;
-        left: 0;
-        top: 0.35rem;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: var(--color-primary);
-        box-shadow: 0 0 0 4px var(--color-white);
-      }
-      .timeline-body {
+      .methodo-card {
+        padding: 1.25rem 1.35rem;
+        border-radius: var(--radius-lg);
         background: var(--color-white);
         border: 1px solid var(--color-border);
-        border-radius: var(--radius-lg);
-        padding: 1.1rem 1.25rem;
+        display: grid;
+        gap: 0.35rem;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
       }
-      .timeline-date {
+      .methodo-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+      .methodo-phase {
         font-size: 0.72rem;
         font-weight: 700;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.03em;
         text-transform: uppercase;
         color: var(--color-primary);
       }
-      .timeline-body h3 { font-size: 1.05rem; margin: 0.2rem 0 0.4rem; }
-      .timeline-body p { font-size: 0.92rem; line-height: 1.65; max-width: none; }
+      .methodo-card h3 { font-size: 1.02rem; margin: 0.1rem 0 0.15rem; }
+      .methodo-card p { font-size: 0.9rem; line-height: 1.6; max-width: none; }
 
       .steps-grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 0.5rem; }
       .step-card {
@@ -473,5 +501,5 @@ const NOUVEAUTES: Nouveaute[] = [
 export class HomeComponent {
   apercus = APERCUS;
   modules = MODULES;
-  nouveautes = NOUVEAUTES;
+  phasesAdm = PHASES_ADM;
 }

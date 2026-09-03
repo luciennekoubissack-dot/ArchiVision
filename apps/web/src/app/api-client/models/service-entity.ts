@@ -4,6 +4,7 @@
 import { ServiceMembreCountEntity } from '../models/service-membre-count-entity';
 import { ServiceMembreEntity } from '../models/service-membre-entity';
 import { ServiceParentRefEntity } from '../models/service-parent-ref-entity';
+import { ServiceTitulaireRefEntity } from '../models/service-titulaire-ref-entity';
 export interface ServiceEntity {
 
   /**
@@ -56,6 +57,17 @@ export interface ServiceEntity {
    * Identifiant du service parent, le cas échéant.
    */
   parentId?: string | null;
+
+  /**
+   * Membre qui occupe ce poste (null si vacant).
+   */
+  titulaire?: (ServiceTitulaireRefEntity & {
+}) | null;
+
+  /**
+   * Identifiant du membre titulaire du poste, le cas échéant.
+   */
+  titulaireId?: string | null;
 
   /**
    * Date de dernière modification.

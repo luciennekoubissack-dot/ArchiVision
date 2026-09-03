@@ -199,8 +199,9 @@ const ICONS: Record<string, string> = {
     <section *ngIf="tab === 'rapport'">
       <div class="page-header">
         <h3>Rapport de gouvernance</h3>
-        <button type="button" class="icon-btn" title="Exporter (Excel)" (click)="exportRapport()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+        <button type="button" class="btn btn-outline" (click)="exportRapport()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          Exporter (Excel)
         </button>
       </div>
       <div class="stats-grid">

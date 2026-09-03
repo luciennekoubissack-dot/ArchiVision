@@ -17,4 +17,9 @@ export interface CreateServiceDto {
    * Identifiant du service parent.
    */
   parentId?: string;
+
+  /**
+   * Identifiant du membre qui occupe ce poste (titulaire).
+   */
+  titulaireId?: string;
 }

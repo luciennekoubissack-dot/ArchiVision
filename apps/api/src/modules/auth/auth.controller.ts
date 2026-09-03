@@ -14,13 +14,24 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { AllowPendingOrganisation, CurrentUser, AuthUser, Public, clearAuthCookies, setAuthCookies } from '@archivision/shared';
-import { AuthResponseEntity, RegisterResponseEntity } from './entities/auth-response.entity';
+import { AuthResponseEntity, MessageResponseEntity, RegisterResponseEntity } from './entities/auth-response.entity';
 import { MeEntity } from './entities/me.entity';
 
 // 5 tentatives / minute / IP : marge confortable pour un usage légitime
 // (fautes de frappe incluses) tout en freinant un brute force sur le mot de passe.
 const AUTH_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+
+// Endpoints atteints sans session, susceptibles d'être ciblés par un
+// balayage de jetons ou une énumération d'e-mails : même limite stricte que
+// login/register.
+const RESET_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+
+/** Message générique, identique que le compte existe ou non (pas d'énumération d'e-mails). */
+const FORGOT_PASSWORD_MESSAGE =
+  'Si un compte existe avec cette adresse, un e-mail de réinitialisation vient de lui être envoyé.';
 
 class LoginDto {
   @ApiProperty({ description: 'Adresse e-mail de l\'utilisateur.' })
@@ -69,6 +80,30 @@ export class AuthController {
   @ApiNoContentResponse()
   logout(@Res({ passthrough: true }) res: Response) {
     clearAuthCookies(res);
+  }
+
+  @ApiOperation({ summary: "Demande un e-mail de réinitialisation de mot de passe." })
+  @Post('forgot-password')
+  @Public()
+  @Throttle(RESET_THROTTLE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: MessageResponseEntity })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<MessageResponseEntity> {
+    await this.authService.forgotPassword(dto.email);
+    // Toujours le même message, que le compte existe ou non.
+    return { message: FORGOT_PASSWORD_MESSAGE };
+  }
+
+  @ApiOperation({ summary: "Réinitialise le mot de passe à partir du jeton reçu par e-mail et ouvre la session." })
+  @Post('reset-password')
+  @Public()
+  @Throttle(RESET_THROTTLE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: AuthResponseEntity })
+  async resetPassword(@Body() dto: ResetPasswordDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.resetPassword(dto.token, dto.password);
+    setAuthCookies(res, result.accessToken);
+    return result;
   }
 
   @ApiOperation({ summary: 'Récupère le profil de l\'utilisateur courant.' })

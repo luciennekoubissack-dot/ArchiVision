@@ -267,6 +267,11 @@ body {
   .fiche-list { grid-template-columns: 1fr; gap: 0.15rem 0; }
   .fiche-list dt { margin-top: 0.5rem; }
   .fiche-list dt:first-child { margin-top: 0; }
+
+  /* Barre d'onglets : occuper toute la largeur et laisser chaque onglet
+     s'étirer, plutôt que de garder une pastille compacte qui déborde. */
+  .tabs { width: 100%; }
+  .tab { flex: 1 1 auto; text-align: center; }
 }
 
 /* ── Badges (criticité, rôles) ───────────────────────────────────────────── */
@@ -325,11 +330,15 @@ body {
   gap: 0.4rem;
   background: var(--color-white);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  /* Rayon fini (et non 999px) : quand la barre passe sur plusieurs lignes en
+     étroit, un rayon « stadium » découpe de grands arcs dans les onglets des
+     coins et tronque leurs libellés. Un rayon fixe reste propre sur 1 ou N lignes. */
+  border-radius: var(--radius-lg);
   padding: 0.35rem;
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
   width: fit-content;
+  max-width: 100%;
   box-shadow: var(--shadow-sm);
 }
 .tab {

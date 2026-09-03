@@ -52,6 +52,10 @@ import { AuthService } from './auth.service';
           {{ loading ? 'Connexion…' : 'Se connecter' }}
         </button>
 
+        <p class="forgot">
+          <a routerLink="/mot-de-passe-oublie">Mot de passe oublié ?</a>
+        </p>
+
         <p class="switch">
           Pas encore de compte ? <a routerLink="/register">Créer mon organisation</a>
         </p>
@@ -84,6 +88,9 @@ import { AuthService } from './auth.service';
       button[type='submit'] { width: 100%; margin-top: 0.5rem; padding: 0.85rem; font-size: 1rem; border-radius: var(--radius-sm); }
       .switch { margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: var(--color-text-muted); }
       .switch a { color: var(--color-primary); font-weight: 700; text-decoration: none; }
+      .forgot { margin-top: 0.85rem; text-align: right; font-size: 0.85rem; }
+      .forgot a { color: var(--color-text-muted); text-decoration: none; }
+      .forgot a:hover { color: var(--color-primary); }
     `,
   ],
 })

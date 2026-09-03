@@ -14,12 +14,25 @@ import { authControllerLogout } from '../api-client/fn/auth/auth-controller-logo
 import { authControllerMe } from '../api-client/fn/auth/auth-controller-me';
 import { authControllerUpdateMe } from '../api-client/fn/auth/auth-controller-update-me';
 import { uploadsControllerUploadLogo } from '../api-client/fn/uploads/uploads-controller-upload-logo';
+import { uploadsControllerUploadAvatar } from '../api-client/fn/uploads/uploads-controller-upload-avatar';
+import { AcceptInvitationDto } from '../api-client/models/accept-invitation-dto';
+import { InvitationPublicEntity } from '../api-client/models/invitation-public-entity';
+import { invitationPublicControllerFindByToken } from '../api-client/fn/invitations/invitation-public-controller-find-by-token';
+import { invitationPublicControllerAccept } from '../api-client/fn/invitations/invitation-public-controller-accept';
+import { ForgotPasswordDto } from '../api-client/models/forgot-password-dto';
+import { ResetPasswordDto } from '../api-client/models/reset-password-dto';
+import { MessageResponseEntity } from '../api-client/models/message-response-entity';
+import { authControllerForgotPassword } from '../api-client/fn/auth/auth-controller-forgot-password';
+import { authControllerResetPassword } from '../api-client/fn/auth/auth-controller-reset-password';
 
 export type RoleUtilisateur = AuthUserEntity['role'];
 export type CurrentUser = AuthUserEntity;
 export type UpdateMePayload = UpdateMeDto;
 export type RegisterPayload = RegisterDto;
 export type RegisterResponse = RegisterResponseEntity;
+export type InvitationDetails = InvitationPublicEntity;
+export type AcceptInvitationPayload = AcceptInvitationDto;
+export type ResetPasswordPayload = ResetPasswordDto;
 
 export type ObjectifItem = NonNullable<RegisterDto['objectifs']>[number];
 export type PartiePrenanteItem = NonNullable<RegisterDto['partiesPrenantes']>[number];
@@ -62,8 +75,47 @@ export class AuthService {
     );
   }
 
+  /** Détails d'une invitation à partir du jeton reçu par e-mail (page « Rejoindre »). */
+  invitationDetails(token: string): Observable<InvitationDetails> {
+    return invitationPublicControllerFindByToken(this.http, this.config.rootUrl, { token }).pipe(map((r) => r.body));
+  }
+
+  /**
+   * Accepte une invitation : crée le compte du membre et ouvre sa session
+   * (mêmes cookies qu'une connexion classique).
+   */
+  acceptInvitation(payload: AcceptInvitationPayload): Observable<AuthResponseEntity> {
+    return invitationPublicControllerAccept(this.http, this.config.rootUrl, { body: payload }).pipe(
+      map((r) => r.body),
+      tap((response) => this.storeSession(response)),
+    );
+  }
+
+  /**
+   * Demande un e-mail de réinitialisation de mot de passe. Répond toujours
+   * avec le même message, que le compte existe ou non (voir auth.service.ts
+   * côté API) : le composant appelant n'a rien de spécifique à distinguer.
+   */
+  forgotPassword(email: string): Observable<MessageResponseEntity> {
+    const body: ForgotPasswordDto = { email };
+    return authControllerForgotPassword(this.http, this.config.rootUrl, { body }).pipe(map((r) => r.body));
+  }
+
+  /** Réinitialise le mot de passe à partir du jeton reçu par e-mail et ouvre la session. */
+  resetPassword(payload: ResetPasswordPayload): Observable<AuthResponseEntity> {
+    return authControllerResetPassword(this.http, this.config.rootUrl, { body: payload }).pipe(
+      map((r) => r.body),
+      tap((response) => this.storeSession(response)),
+    );
+  }
+
   uploadLogo(file: File): Observable<UploadLogoResultEntity> {
     return uploadsControllerUploadLogo(this.http, this.config.rootUrl, { body: { file } }).pipe(map((r) => r.body));
+  }
+
+  /** Téléverse la photo de profil de l'utilisateur courant et renvoie son chemin `/uploads/...`. */
+  uploadAvatar(file: File): Observable<UploadLogoResultEntity> {
+    return uploadsControllerUploadAvatar(this.http, this.config.rootUrl, { body: { file } }).pipe(map((r) => r.body));
   }
 
   logout(): void {

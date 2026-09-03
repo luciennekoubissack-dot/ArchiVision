@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '@archivision/infrastructure';
 import { ServiceService } from './service.service';
@@ -26,6 +26,10 @@ describe('ServiceService', () => {
       update: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
+    },
+    user: {
+      count: jest.fn(),
+      findMany: jest.fn(),
     },
   };
 
@@ -105,6 +109,54 @@ describe('ServiceService', () => {
     prismaMock.service.count.mockResolvedValue(0);
 
     await expect(service.update('inconnu', ORG_ID, { nom: 'x' })).rejects.toThrow(NotFoundException);
+  });
+
+  it('affecte un titulaire appartenant à l\'organisation', async () => {
+    prismaMock.service.count.mockResolvedValue(1);
+    prismaMock.user.count.mockResolvedValue(1);
+    prismaMock.service.update.mockResolvedValue({ ...mockService, titulaireId: 'user-010' });
+
+    await service.update(mockService.id, ORG_ID, { titulaireId: 'user-010' });
+
+    expect(prismaMock.user.count).toHaveBeenCalledWith({ where: { id: 'user-010', organisationId: ORG_ID } });
+    expect(prismaMock.service.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ titulaireId: 'user-010' }) }),
+    );
+  });
+
+  it('refuse un titulaire d\'une autre organisation (BadRequest)', async () => {
+    prismaMock.service.count.mockResolvedValue(1);
+    prismaMock.user.count.mockResolvedValue(0);
+
+    await expect(
+      service.update(mockService.id, ORG_ID, { titulaireId: 'user-etranger' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prismaMock.service.update).not.toHaveBeenCalled();
+  });
+
+  it('rend le poste vacant avec titulaireId: null (aucune vérification de membre)', async () => {
+    prismaMock.service.count.mockResolvedValue(1);
+    prismaMock.service.update.mockResolvedValue({ ...mockService, titulaireId: null });
+
+    await service.update(mockService.id, ORG_ID, { titulaireId: null });
+
+    expect(prismaMock.user.count).not.toHaveBeenCalled();
+    expect(prismaMock.service.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ titulaireId: null }) }),
+    );
+  });
+
+  it('liste les membres (id + nom) pour le sélecteur de titulaire', async () => {
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'u1', nom: 'Alice' }]);
+
+    const result = await service.listMembres(ORG_ID);
+
+    expect(result).toEqual([{ id: 'u1', nom: 'Alice' }]);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+      where: { organisationId: ORG_ID },
+      select: { id: true, nom: true },
+      orderBy: { nom: 'asc' },
+    });
   });
 
   it('supprime un service existant', async () => {

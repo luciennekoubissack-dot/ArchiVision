@@ -7,6 +7,10 @@ export type { AuthControllerLogin$Params as AuthControllerLogin$Params } from '.
 export { authControllerLogin as authControllerLogin } from './fn/auth/auth-controller-login';
 export type { AuthControllerLogout$Params as AuthControllerLogout$Params } from './fn/auth/auth-controller-logout';
 export { authControllerLogout as authControllerLogout } from './fn/auth/auth-controller-logout';
+export type { AuthControllerForgotPassword$Params as AuthControllerForgotPassword$Params } from './fn/auth/auth-controller-forgot-password';
+export { authControllerForgotPassword as authControllerForgotPassword } from './fn/auth/auth-controller-forgot-password';
+export type { AuthControllerResetPassword$Params as AuthControllerResetPassword$Params } from './fn/auth/auth-controller-reset-password';
+export { authControllerResetPassword as authControllerResetPassword } from './fn/auth/auth-controller-reset-password';
 export type { AuthControllerMe$Params as AuthControllerMe$Params } from './fn/auth/auth-controller-me';
 export { authControllerMe as authControllerMe } from './fn/auth/auth-controller-me';
 export type { AuthControllerUpdateMe$Params as AuthControllerUpdateMe$Params } from './fn/auth/auth-controller-update-me';
@@ -111,6 +115,8 @@ export type { ServiceControllerCreate$Params as ServiceControllerCreate$Params }
 export { serviceControllerCreate as serviceControllerCreate } from './fn/services/service-controller-create';
 export type { ServiceControllerGenerateVue$Params as ServiceControllerGenerateVue$Params } from './fn/services/service-controller-generate-vue';
 export { serviceControllerGenerateVue as serviceControllerGenerateVue } from './fn/services/service-controller-generate-vue';
+export type { ServiceControllerListMembres$Params as ServiceControllerListMembres$Params } from './fn/services/service-controller-list-membres';
+export { serviceControllerListMembres as serviceControllerListMembres } from './fn/services/service-controller-list-membres';
 export type { ServiceControllerFindOne$Params as ServiceControllerFindOne$Params } from './fn/services/service-controller-find-one';
 export { serviceControllerFindOne as serviceControllerFindOne } from './fn/services/service-controller-find-one';
 export type { ServiceControllerRemove$Params as ServiceControllerRemove$Params } from './fn/services/service-controller-remove';
@@ -141,6 +147,18 @@ export type { AdminControllerListUtilisateurs$Params as AdminControllerListUtili
 export { adminControllerListUtilisateurs as adminControllerListUtilisateurs } from './fn/admin/admin-controller-list-utilisateurs';
 export type { AdminControllerStats$Params as AdminControllerStats$Params } from './fn/admin/admin-controller-stats';
 export { adminControllerStats as adminControllerStats } from './fn/admin/admin-controller-stats';
+export type { InvitationControllerFindAll$Params as InvitationControllerFindAll$Params } from './fn/invitations/invitation-controller-find-all';
+export { invitationControllerFindAll as invitationControllerFindAll } from './fn/invitations/invitation-controller-find-all';
+export type { InvitationControllerCreate$Params as InvitationControllerCreate$Params } from './fn/invitations/invitation-controller-create';
+export { invitationControllerCreate as invitationControllerCreate } from './fn/invitations/invitation-controller-create';
+export type { InvitationControllerResend$Params as InvitationControllerResend$Params } from './fn/invitations/invitation-controller-resend';
+export { invitationControllerResend as invitationControllerResend } from './fn/invitations/invitation-controller-resend';
+export type { InvitationControllerRevoke$Params as InvitationControllerRevoke$Params } from './fn/invitations/invitation-controller-revoke';
+export { invitationControllerRevoke as invitationControllerRevoke } from './fn/invitations/invitation-controller-revoke';
+export type { InvitationPublicControllerFindByToken$Params as InvitationPublicControllerFindByToken$Params } from './fn/invitations/invitation-public-controller-find-by-token';
+export { invitationPublicControllerFindByToken as invitationPublicControllerFindByToken } from './fn/invitations/invitation-public-controller-find-by-token';
+export type { InvitationPublicControllerAccept$Params as InvitationPublicControllerAccept$Params } from './fn/invitations/invitation-public-controller-accept';
+export { invitationPublicControllerAccept as invitationPublicControllerAccept } from './fn/invitations/invitation-public-controller-accept';
 export type { BpmnControllerFindAll$Params as BpmnControllerFindAll$Params } from './fn/bpmn-processus/bpmn-controller-find-all';
 export { bpmnControllerFindAll as bpmnControllerFindAll } from './fn/bpmn-processus/bpmn-controller-find-all';
 export type { BpmnControllerCreate$Params as BpmnControllerCreate$Params } from './fn/bpmn-processus/bpmn-controller-create';
@@ -221,6 +239,8 @@ export type { PartiesPrenantesControllerRemove$Params as PartiesPrenantesControl
 export { partiesPrenantesControllerRemove as partiesPrenantesControllerRemove } from './fn/parties-prenantes/parties-prenantes-controller-remove';
 export type { UploadsControllerUploadLogo$Params as UploadsControllerUploadLogo$Params } from './fn/uploads/uploads-controller-upload-logo';
 export { uploadsControllerUploadLogo as uploadsControllerUploadLogo } from './fn/uploads/uploads-controller-upload-logo';
+export type { UploadsControllerUploadAvatar$Params as UploadsControllerUploadAvatar$Params } from './fn/uploads/uploads-controller-upload-avatar';
+export { uploadsControllerUploadAvatar as uploadsControllerUploadAvatar } from './fn/uploads/uploads-controller-upload-avatar';
 export type { SolutionControllerFindAll$Params as SolutionControllerFindAll$Params } from './fn/solutions/solution-controller-find-all';
 export { solutionControllerFindAll as solutionControllerFindAll } from './fn/solutions/solution-controller-find-all';
 export type { SolutionControllerCreate$Params as SolutionControllerCreate$Params } from './fn/solutions/solution-controller-create';

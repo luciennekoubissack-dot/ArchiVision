@@ -1,9 +1,11 @@
-import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import bcrypt from 'bcrypt';
 import { PrismaService } from '@archivision/infrastructure';
 import { RoleUtilisateur } from '@prisma/client';
+import { MailService } from '../mail/mail.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
@@ -31,12 +33,25 @@ describe('AuthService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
-    $transaction: jest.fn((callback: (tx: typeof txMock) => unknown) => callback(txMock)),
+    passwordResetToken: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    // Supporte les deux formes utilisées par le service : callback (register)
+    // et tableau de promesses (resetPassword).
+    $transaction: jest.fn((arg: unknown) =>
+      typeof arg === 'function' ? (arg as (tx: typeof txMock) => unknown)(txMock) : Promise.all(arg as Promise<unknown>[]),
+    ),
   };
 
   const jwtMock = {
     sign: jest.fn(),
   };
+
+  const configMock = { get: jest.fn().mockReturnValue('http://localhost:4201') };
+  const mailMock = { sendPasswordReset: jest.fn() };
 
   beforeAll(async () => {
     mockUser.passwordHash = await bcrypt.hash('Admin123!', 4);
@@ -50,6 +65,8 @@ describe('AuthService', () => {
         AuthService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtMock },
+        { provide: ConfigService, useValue: configMock },
+        { provide: MailService, useValue: mailMock },
       ],
     }).compile();
 
@@ -266,6 +283,83 @@ describe('AuthService', () => {
         data: {},
         select: { id: true, email: true, nom: true, avatarUrl: true, role: true, createdAt: true },
       });
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it("crée un jeton et envoie l'e-mail si le compte existe", async () => {
+      prismaMock.user.findUnique.mockResolvedValue(mockUser);
+
+      await service.forgotPassword('Admin@Archivision.local');
+
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'admin@archivision.local' },
+      });
+      expect(prismaMock.passwordResetToken.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: mockUser.id }) }),
+      );
+      expect(mailMock.sendPasswordReset).toHaveBeenCalledWith(
+        mockUser.email,
+        expect.stringContaining('http://localhost:4201/reinitialiser-mot-de-passe?token='),
+      );
+    });
+
+    it("ne fait rien (sans erreur) si le compte n'existe pas, pour ne pas révéler les e-mails enregistrés", async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.forgotPassword('inconnu@archivision.local')).resolves.toBeUndefined();
+
+      expect(prismaMock.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(mailMock.sendPasswordReset).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    const validToken = {
+      id: 'reset-1',
+      userId: mockUser.id,
+      tokenHash: 'peu-importe',
+      expiresAt: new Date(Date.now() + 60_000),
+      usedAt: null as Date | null,
+      user: mockUser,
+    };
+
+    it('met à jour le mot de passe, invalide le jeton et ouvre une session', async () => {
+      prismaMock.passwordResetToken.findUnique.mockResolvedValue(validToken);
+      jwtMock.sign.mockReturnValue('signed.jwt.token');
+
+      const result = await service.resetPassword('un-jeton', 'NouveauMdp123!');
+
+      expect(prismaMock.$transaction).toHaveBeenCalled();
+      expect(result.accessToken).toBe('signed.jwt.token');
+      expect(result.user).toEqual({
+        id: mockUser.id,
+        email: mockUser.email,
+        nom: mockUser.nom,
+        avatarUrl: null,
+        role: mockUser.role,
+      });
+    });
+
+    it('lève BadRequestException si le jeton est introuvable', async () => {
+      prismaMock.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await expect(service.resetPassword('inconnu', 'NouveauMdp123!')).rejects.toThrow(BadRequestException);
+    });
+
+    it('lève BadRequestException si le jeton a déjà été utilisé', async () => {
+      prismaMock.passwordResetToken.findUnique.mockResolvedValue({ ...validToken, usedAt: new Date() });
+
+      await expect(service.resetPassword('deja-utilise', 'NouveauMdp123!')).rejects.toThrow(BadRequestException);
+    });
+
+    it('lève BadRequestException si le jeton a expiré', async () => {
+      prismaMock.passwordResetToken.findUnique.mockResolvedValue({
+        ...validToken,
+        expiresAt: new Date(Date.now() - 60_000),
+      });
+
+      await expect(service.resetPassword('expire', 'NouveauMdp123!')).rejects.toThrow(BadRequestException);
     });
   });
 });

@@ -7,16 +7,19 @@ import { ServiceEntity } from '../api-client/models/service-entity';
 import { ServiceViewEntity } from '../api-client/models/service-view-entity';
 import { CreateServiceDto } from '../api-client/models/create-service-dto';
 import { UpdateServiceDto } from '../api-client/models/update-service-dto';
+import { ServiceTitulaireRefEntity } from '../api-client/models/service-titulaire-ref-entity';
 import { serviceControllerFindAll } from '../api-client/fn/services/service-controller-find-all';
 import { serviceControllerCreate } from '../api-client/fn/services/service-controller-create';
 import { serviceControllerUpdate } from '../api-client/fn/services/service-controller-update';
 import { serviceControllerRemove } from '../api-client/fn/services/service-controller-remove';
 import { serviceControllerGenerateVue } from '../api-client/fn/services/service-controller-generate-vue';
+import { serviceControllerListMembres } from '../api-client/fn/services/service-controller-list-membres';
 
 export type ServiceEntreprise = ServiceEntity;
 export type CreateServiceEntreprisePayload = CreateServiceDto;
 export type UpdateServiceEntreprisePayload = UpdateServiceDto;
 export type OrganigrammeView = ServiceViewEntity;
+export type MembreRef = ServiceTitulaireRefEntity;
 
 /**
  * Enveloppe fine autour du client généré depuis le contrat OpenAPI
@@ -45,5 +48,10 @@ export class ServiceEntrepriseService {
 
   generateView(): Observable<OrganigrammeView> {
     return serviceControllerGenerateVue(this.http, this.config.rootUrl).pipe(map((r) => r.body));
+  }
+
+  /** Membres de l'organisation (id + nom) pour le sélecteur de titulaire de poste. */
+  listMembres(): Observable<MembreRef[]> {
+    return serviceControllerListMembres(this.http, this.config.rootUrl).pipe(map((r) => r.body));
   }
 }

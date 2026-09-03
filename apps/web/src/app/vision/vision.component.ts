@@ -132,11 +132,13 @@ const ICONS: Record<string, string> = {
       <div class="page-header">
         <h3>Exigences ({{ exigences.length }})</h3>
         <div class="header-actions">
-          <button type="button" class="icon-btn" title="Exporter (Excel)" *ngIf="exigences.length > 0" (click)="exportExigences()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+          <button type="button" class="btn btn-outline" *ngIf="exigences.length > 0" (click)="exportExigences()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
+            Exporter (Excel)
           </button>
-          <label class="icon-btn file-btn" title="Importer (Excel)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('upload')"></svg>
+          <label class="btn btn-outline file-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('upload')"></svg>
+            Importer (Excel)
             <input type="file" accept=".xlsx,.xls,.csv" (change)="importExigences($event)" hidden />
           </label>
           <button type="button" class="btn btn-primary" (click)="openCreate()">
