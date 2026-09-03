@@ -19,7 +19,11 @@ import { technologieControllerUndeployer } from '../api-client/fn/tech-component
 import { technologieControllerGenerateLayout } from '../api-client/fn/tech-components/technologie-controller-generate-layout';
 import { DiagramLayoutResultEntity } from '../api-client/models/diagram-layout-result-entity';
 
-export type TypeTechComponent = 'SERVEUR' | 'RESEAU' | 'CLOUD' | 'BASE_DE_DONNEES' | 'MIDDLEWARE';
+export type TypeTechComponent =
+  | 'SERVEUR' | 'RESEAU' | 'CLOUD' | 'BASE_DE_DONNEES' | 'MIDDLEWARE'
+  | 'ORDINATEUR_PORTABLE' | 'ROUTEUR_RESEAU' | 'CAPTEUR_IOT_CONSOMMATION' | 'SMARTPHONE_PROFESSIONNEL' | 'STOCKAGE_NAS'
+  | 'BASE_DE_DONNEES_POSTGRESQL' | 'SERVEUR_APPLICATIONS' | 'API_REST' | 'LOGICIEL_CYBERSECURITE' | 'SYSTEME_EXPLOITATION_LINUX' | 'PLATEFORME_CLOUD'
+  | 'PARE_FEU' | 'SWITCH' | 'VPN' | 'CONNEXION_INTERNET_FIBRE' | 'AUTRE';
 export type StatutElement = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
 
 /** Forme imbriquée dans TechComponent.deploiements : inclut l'application déployée. */

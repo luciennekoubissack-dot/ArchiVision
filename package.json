@@ -5,6 +5,7 @@
   "scripts": {
     "start": "nest start api",
     "start:dev": "nest start api --watch",
+    "start:web": "npm --prefix apps/web start",
     "build": "nest build api",
     "typecheck": "tsc -p apps/api/tsconfig.app.json --noEmit",
     "test": "jest --runInBand",
@@ -13,7 +14,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node --transpile-only apps/api/prisma/seed.ts"
+    "prisma:seed": "ts-node --transpile-only apps/api/prisma/seed.ts",
+    "generate:api-client": "npm --prefix apps/web run generate:api-client"
   },
   "prisma": {
     "schema": "apps/api/prisma/schema.prisma",

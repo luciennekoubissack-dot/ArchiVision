@@ -15,6 +15,7 @@ import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { downloadPng, downloadSvg } from '../shared/download.util';
 import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 import { BpmnVuesComponent } from './bpmn-vues.component';
+import { CanevasComponent } from '../canevas/canevas.component';
 import { PaginationComponent } from '../shared/pagination.component';
 import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
@@ -55,12 +56,13 @@ const ICONS: Record<string, string> = {
   trash:
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
 };
 
 @Component({
   selector: 'app-architecture-metier',
   standalone: true,
-  imports: [CommonModule, BpmnVuesComponent, DownloadMenuComponent, PaginationComponent],
+  imports: [CommonModule, BpmnVuesComponent, CanevasComponent, DownloadMenuComponent, PaginationComponent],
   template: `
     <p class="muted step-question">Comment l'entreprise crée-t-elle de la valeur ? Quels sont ses processus, acteurs, rôles, services et capacités métier ?</p>
 
@@ -80,13 +82,19 @@ const ICONS: Record<string, string> = {
       <button class="tab" *ngIf="!hideDiagram" [class.active]="tab === 'diagramme'" (click)="tab = 'diagramme'">Diagramme</button>
     </div>
 
-    <!-- ── Diagramme (SVG) ───────────────────────────────────────────────── -->
+    <!-- ── Éditeur et diagramme ArchiMate ────────────────────────────────── -->
+    <app-canevas *ngIf="mainTab === 'archimate' && tab === 'diagramme' && !hideDiagram" />
+
+    <!-- Le diagramme généré apparaît sous l'éditeur après validation. -->
     <section class="card" *ngIf="mainTab === 'archimate' && tab === 'diagramme' && !hideDiagram">
       <div class="page-header">
         <p class="summary">{{ diagrammeSummary || (diagrammeLoading ? 'Génération de la vue…' : '') }}</p>
         <div class="actions">
           <button type="button" class="icon-btn" title="Rafraîchir le diagramme" [disabled]="diagrammeLoading" (click)="generateDiagramme()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+          </button>
+          <button type="button" class="icon-btn icon-btn-danger" title="Vider le diagramme" [disabled]="diagrammeLoading || !diagrammeSvg" (click)="clearDiagramme()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
           </button>
           <app-download-menu [formats]="svgPngFormats" [disabled]="!diagrammeSvg" (download)="exportDiagramme($event)" />
         </div>
@@ -833,5 +841,11 @@ export class ArchitectureMetierComponent implements OnInit {
     const filename = `diagramme-archimate.${format}`;
     if (format === 'svg') downloadSvg(this.diagrammeSvg, filename);
     else downloadPng(this.diagrammeSvg, filename);
+  }
+
+  clearDiagramme(): void {
+    this.diagrammeSvg = '';
+    this.diagrammeTrustedSvg = null;
+    this.diagrammeSummary = '';
   }
 }

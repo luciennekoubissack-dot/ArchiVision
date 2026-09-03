@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { ArchimateService } from '../architecture-metier/archimate.service';
 import { ServiceEntrepriseService } from '../organisation/service-entreprise.service';
 import { ToastService } from '../shared/toast.service';
-import { downloadPng, downloadSvg } from '../shared/download.util';
+import { downloadPng, downloadSvg, downloadSvgPdf } from '../shared/download.util';
 import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 
 type VueTab = 'archimate' | 'organigramme';
@@ -13,6 +13,11 @@ type VueTab = 'archimate' | 'organigramme';
 const SVG_PNG_FORMATS: DownloadFormatOption[] = [
   { value: 'svg', label: 'SVG' },
   { value: 'png', label: 'PNG' },
+];
+
+const SVG_PDF_FORMATS: DownloadFormatOption[] = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'svg', label: 'SVG' },
 ];
 
 interface VueState {
@@ -29,6 +34,7 @@ function emptyState(): VueState {
 
 const ICONS: Record<string, string> = {
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
 };
 
 @Component({
@@ -48,7 +54,10 @@ const ICONS: Record<string, string> = {
           <button type="button" class="icon-btn" title="Rafraîchir la vue" [disabled]="current.loading" (click)="generate(tab)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
           </button>
-          <app-download-menu [formats]="svgPngFormats" [disabled]="!current.svg" (download)="export($event)" />
+          <button type="button" class="icon-btn icon-btn-danger" title="Vider la vue" [disabled]="current.loading || !current.svg" (click)="clearCurrent()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
+          </button>
+          <app-download-menu [formats]="tab === 'organigramme' ? svgPdfFormats : svgPngFormats" [disabled]="!current.svg" (download)="export($event)" />
         </div>
       </div>
       <div class="empty-state" *ngIf="current.loading && !current.svg">Génération de la vue…</div>
@@ -67,6 +76,7 @@ const ICONS: Record<string, string> = {
 export class VuesComponent implements OnInit {
   tab: VueTab = 'archimate';
   svgPngFormats = SVG_PNG_FORMATS;
+  svgPdfFormats = SVG_PDF_FORMATS;
 
   states: Record<VueTab, VueState> = {
     archimate: emptyState(),
@@ -95,6 +105,10 @@ export class VuesComponent implements OnInit {
   select(tab: VueTab): void {
     this.tab = tab;
     if (!this.states[tab].loaded && !this.states[tab].loading) this.generate(tab);
+  }
+
+  clearCurrent(): void {
+    this.states[this.tab] = emptyState();
   }
 
   generate(tab: VueTab): void {
@@ -131,6 +145,7 @@ export class VuesComponent implements OnInit {
     if (!state.svg) return;
     const filename = `${this.tab}.${format}`;
     if (format === 'svg') downloadSvg(state.svg, filename);
+    else if (format === 'pdf') downloadSvgPdf(state.svg, filename);
     else downloadPng(state.svg, filename);
   }
 }

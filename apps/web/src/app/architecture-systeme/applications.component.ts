@@ -27,6 +27,7 @@ const ICONS: Record<string, string> = {
   trash:
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
 };
 
 @Component({
@@ -53,6 +54,9 @@ const ICONS: Record<string, string> = {
             <button type="button" class="icon-btn" title="Rafraîchir le diagramme" [disabled]="diagLoading" (click)="generateDiagramme()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
             </button>
+            <button type="button" class="icon-btn icon-btn-danger" title="Vider le diagramme" [disabled]="diagLoading || !diagSvg" (click)="clearDiagramme()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
+            </button>
             <app-download-menu [formats]="svgPngFormats" [disabled]="!diagSvg" (download)="exportDiagramme($event)" />
           </div>
         </div>
@@ -71,6 +75,9 @@ const ICONS: Record<string, string> = {
           <div class="actions">
             <button type="button" class="icon-btn" title="Rafraîchir le diagramme" [disabled]="archiLoading" (click)="generateArchi()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn-danger" title="Vider le diagramme" [disabled]="archiLoading || !archiSvg" (click)="clearArchi()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
             </button>
             <app-download-menu [formats]="svgPngFormats" [disabled]="!archiSvg" (download)="exportArchi($event)" />
           </div>
@@ -483,6 +490,12 @@ export class ApplicationsComponent implements OnInit {
     else downloadPng(this.diagSvg, filename);
   }
 
+  clearDiagramme(): void {
+    this.diagSvg = '';
+    this.diagTrustedSvg = null;
+    this.diagSummary = '';
+  }
+
   // ── Architecture applicative : diagramme généré ─────────────────────────
 
   onArchiChanged(): void {
@@ -510,5 +523,11 @@ export class ApplicationsComponent implements OnInit {
     const filename = `architecture-applicative.${format}`;
     if (format === 'svg') downloadSvg(this.archiSvg, filename);
     else downloadPng(this.archiSvg, filename);
+  }
+
+  clearArchi(): void {
+    this.archiSvg = '';
+    this.archiTrustedSvg = null;
+    this.archiSummary = '';
   }
 }

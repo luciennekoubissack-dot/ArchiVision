@@ -9,16 +9,22 @@ import { ServiceEntrepriseService, ServiceEntreprise, MembreRef } from './servic
 import { PartiesPrenantesService, PartiePrenante } from './parties-prenantes.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
-import { downloadPng, downloadSvg } from '../shared/download.util';
+import { downloadSvg, downloadSvgPdf } from '../shared/download.util';
 import { exportToExcel } from '../shared/excel.util';
 import { ObjectifsComponent } from './objectifs.component';
 import { PaginationComponent } from '../shared/pagination.component';
+import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
 
 type Tab = 'infos' | 'strategie' | 'membres' | 'services' | 'organigramme';
 type IdentiteMode = 'view' | 'edit' | null;
 type PartiesMode = 'view' | 'edit' | null;
 type MembrePopover = 'create' | 'view' | 'edit' | null;
+
+const ORGANIGRAMME_FORMATS: DownloadFormatOption[] = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'svg', label: 'SVG' },
+];
 
 interface MembreDraft {
   role: RoleUtilisateur;
@@ -53,7 +59,7 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-organisation',
   standalone: true,
-  imports: [CommonModule, ObjectifsComponent, PaginationComponent],
+  imports: [CommonModule, ObjectifsComponent, PaginationComponent, DownloadMenuComponent],
   template: `
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'infos'" (click)="tab = 'infos'">Identité</button>
@@ -62,7 +68,7 @@ const ICONS: Record<string, string> = {
         Membres
       </button>
       <button class="tab" [class.active]="tab === 'services'" (click)="tab = 'services'">Structures</button>
-      <button class="tab" [class.active]="tab === 'organigramme'" (click)="tab = 'organigramme'">Organigramme</button>
+      <button class="tab" [class.active]="tab === 'organigramme'" (click)="selectTab('organigramme')">Organigramme</button>
     </div>
 
     <!-- ── Objectifs ─────────────────────────────────────────────────────── -->
@@ -660,14 +666,7 @@ const ICONS: Record<string, string> = {
           <button type="button" class="icon-btn icon-btn-danger" title="Effacer" *ngIf="organigrammeSvg" (click)="clearOrganigramme()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
           </button>
-          <button type="button" class="btn btn-outline" *ngIf="organigrammeSvg" (click)="exportOrganigramme('svg')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-            Exporter SVG
-          </button>
-          <button type="button" class="btn btn-outline" *ngIf="organigrammeSvg" (click)="exportOrganigramme('png')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
-            Exporter PNG
-          </button>
+          <app-download-menu [formats]="organigrammeFormats" [disabled]="!organigrammeSvg" (download)="exportOrganigramme($event)" />
         </div>
       </div>
       <div class="empty-state" *ngIf="!organigrammeSvg">Cliquez sur « Générer » pour afficher l'organigramme.</div>
@@ -800,6 +799,7 @@ export class OrganisationComponent implements OnInit {
   serviceDraft: { nom: string; description: string; parentId: string | null; titulaireId: string | null } | null = null;
 
   organigrammeSvg = '';
+  organigrammeFormats = ORGANIGRAMME_FORMATS;
   organigrammeTrustedSvg: SafeHtml | null = null;
 
   partiesPrenantes: PartiePrenante[] = [];
@@ -841,6 +841,11 @@ export class OrganisationComponent implements OnInit {
 
   icon(name: string): SafeHtml {
     return this.sanitizer.bypassSecurityTrustHtml(ICONS[name] ?? '');
+  }
+
+  selectTab(tab: Tab): void {
+    this.tab = tab;
+    if (tab === 'organigramme' && !this.organigrammeSvg) this.openOrganigramme();
   }
 
   initials(nom: string): string {
@@ -1313,11 +1318,11 @@ export class OrganisationComponent implements OnInit {
     this.organigrammeTrustedSvg = null;
   }
 
-  exportOrganigramme(format: 'svg' | 'png'): void {
+  exportOrganigramme(format: string): void {
     if (!this.organigrammeSvg) return;
     const filename = `organigramme.${format}`;
     if (format === 'svg') downloadSvg(this.organigrammeSvg, filename);
-    else downloadPng(this.organigrammeSvg, filename);
+    else if (format === 'pdf') downloadSvgPdf(this.organigrammeSvg, filename);
   }
 
   // ── Parties prenantes ────────────────────────────────────────────────────

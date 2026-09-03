@@ -29,6 +29,9 @@ export const TYPE_TECH_COMPONENT_LABEL: Record<TypeTechComponent, string> = {
   CLOUD: 'Cloud',
   BASE_DE_DONNEES: 'Base de données',
   MIDDLEWARE: 'Middleware',
+  ORDINATEUR_PORTABLE: 'Ordinateur portable', ROUTEUR_RESEAU: 'Routeur réseau', CAPTEUR_IOT_CONSOMMATION: 'Capteur IoT de consommation énergétique', SMARTPHONE_PROFESSIONNEL: 'Smartphone professionnel', STOCKAGE_NAS: 'Stockage NAS',
+  BASE_DE_DONNEES_POSTGRESQL: 'Base de données PostgreSQL', SERVEUR_APPLICATIONS: "Serveur d'applications", API_REST: 'API REST', LOGICIEL_CYBERSECURITE: 'Logiciel de cybersécurité', SYSTEME_EXPLOITATION_LINUX: "Système d'exploitation Linux", PLATEFORME_CLOUD: 'Plateforme Cloud (AWS ou Azure)', PARE_FEU: 'Pare-feu', SWITCH: 'Switchs', VPN: 'VPN', CONNEXION_INTERNET_FIBRE: 'Connexion Internet fibre',
+    AUTRE: 'Autre',
 };
 
 export const MOTIVATION_TYPES: TypeElement[] = ['VISION', 'OBJECTIF_ARCHIMATE', 'PRINCIPE', 'EXIGENCE'];
@@ -39,7 +42,7 @@ export const METIER_TYPES: TypeElement[] = [
   'SERVICE_METIER',
   'OBJET_METIER',
 ];
-export const TECH_COMPONENT_TYPES: TypeTechComponent[] = ['SERVEUR', 'RESEAU', 'CLOUD', 'BASE_DE_DONNEES', 'MIDDLEWARE'];
+export const TECH_COMPONENT_TYPES: TypeTechComponent[] = ['SERVEUR', 'ORDINATEUR_PORTABLE', 'ROUTEUR_RESEAU', 'CAPTEUR_IOT_CONSOMMATION', 'SMARTPHONE_PROFESSIONNEL', 'STOCKAGE_NAS', 'BASE_DE_DONNEES_POSTGRESQL', 'SERVEUR_APPLICATIONS', 'API_REST', 'LOGICIEL_CYBERSECURITE', 'SYSTEME_EXPLOITATION_LINUX', 'PLATEFORME_CLOUD', 'PARE_FEU', 'SWITCH', 'VPN', 'CONNEXION_INTERNET_FIBRE', 'AUTRE'];
 
 /** Couleurs des couches non-ArchiMate (Motivation/Métier restent gérées à
  * part dans canevas.component.ts car elles partagent le même kind ARCHIMATE). */

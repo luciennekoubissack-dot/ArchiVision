@@ -193,7 +193,7 @@ const ICONS: Record<string, string> = {
           Objectif AS-IS d'origine (optionnel)
           <select [value]="draft.objectifAsIsId || ''" (change)="draft.objectifAsIsId = $any($event.target).value || undefined">
             <option value="">— Aucun (objectif entièrement nouveau) —</option>
-            <option *ngFor="let o of asIsObjectifs" [value]="o.id" [disabled]="o.id === editTarget?.id">{{ o.nom }}</option>
+            <option *ngFor="let o of asIsObjectifs" [value]="o.id" [disabled]="o.id === editTarget.id">{{ o.nom }}</option>
           </select>
         </label>
         <div class="popover-actions">

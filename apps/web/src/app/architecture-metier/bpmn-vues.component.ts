@@ -19,6 +19,7 @@ const SVG_PNG_FORMATS: DownloadFormatOption[] = [
 
 const ICONS: Record<string, string> = {
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
 };
 
 @Component({
@@ -63,6 +64,9 @@ const ICONS: Record<string, string> = {
           <div class="actions">
             <button type="button" class="icon-btn" title="Rafraîchir le diagramme" [disabled]="loading" (click)="generate()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn-danger" title="Vider le diagramme" [disabled]="loading || !svg" (click)="clear()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
             </button>
             <app-download-menu [formats]="svgPngFormats" [disabled]="!svg" (download)="export($event)" />
           </div>
@@ -160,5 +164,11 @@ export class BpmnVuesComponent implements OnInit {
     const filename = `bpmn-${this.selected.nom}.${format}`;
     if (format === 'svg') downloadSvg(this.svg, filename);
     else downloadPng(this.svg, filename);
+  }
+
+  clear(): void {
+    this.svg = '';
+    this.trustedSvg = null;
+    this.summary = '';
   }
 }

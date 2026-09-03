@@ -24,6 +24,8 @@ const ICONS: Record<string, string> = {
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   trash:
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
 };
@@ -47,7 +49,7 @@ const ICONS: Record<string, string> = {
     <!-- ── Onglet : hiérarchie des zones ─────────────────────────────────── -->
     <ng-container *ngIf="tab === 'zones'">
       <div class="page-header">
-        <h3>Hiérarchie Zone &gt; Quartier &gt; Îlot</h3>
+        <h3>Zones ({{ flatZones.length }})</h3>
         <button type="button" class="btn btn-primary" (click)="openCreateZone()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('plus')"></svg>
           Ajouter une zone
@@ -55,29 +57,28 @@ const ICONS: Record<string, string> = {
       </div>
 
       <section class="card">
-        <div class="empty-state" *ngIf="zones.length === 0">Aucune zone définie.</div>
-        <ul class="tree" *ngIf="zones.length > 0">
-          <ng-container *ngFor="let root of zones">
-            <ng-container *ngTemplateOutlet="zoneNode; context: { $implicit: root }"></ng-container>
-          </ng-container>
-        </ul>
-        <ng-template #zoneNode let-node>
-          <li>
-            <div class="node-row">
-              <span class="node-nom">{{ node.nom }}</span>
-              <span class="badge badge-neutral">{{ node.type }}</span>
-              <span class="badge badge-neutral" *ngIf="node.type === 'ILOT'">{{ node._count?.applications || 0 }} application(s)</span>
-              <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeZone(node)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
-              </button>
-            </div>
-            <ul *ngIf="node.enfants?.length">
-              <ng-container *ngFor="let child of node.enfants">
-                <ng-container *ngTemplateOutlet="zoneNode; context: { $implicit: child }"></ng-container>
-              </ng-container>
-            </ul>
-          </li>
-        </ng-template>
+        <div class="empty-state" *ngIf="flatZones.length === 0">Aucune zone définie.</div>
+        <div class="table-scroll" *ngIf="flatZones.length > 0">
+          <table class="table">
+            <thead><tr><th>Nom</th><th>Type</th><th>Zone parente</th><th>Applications</th><th></th></tr></thead>
+            <tbody>
+              <tr *ngFor="let zone of flatZones">
+                <td><strong>{{ zone.nom }}</strong></td>
+                <td><span class="badge badge-neutral">{{ zoneTypeLabel(zone.type) }}</span></td>
+                <td>{{ zoneName(zone.parentId) }}</td>
+                <td>{{ zone._count?.applications || 0 }}</td>
+                <td class="row-actions">
+                  <button type="button" class="icon-btn icon-btn-edit" title="Modifier" (click)="openEditZone(zone)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('edit')"></svg>
+                  </button>
+                  <button type="button" class="icon-btn icon-btn-danger" title="Supprimer" (click)="removeZone(zone)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('trash')"></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </ng-container>
 
@@ -113,6 +114,9 @@ const ICONS: Record<string, string> = {
           <div class="actions">
             <button type="button" class="icon-btn" title="Rafraîchir le plan" [disabled]="posLoading" (click)="generatePos()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('refresh')"></svg>
+            </button>
+            <button type="button" class="icon-btn icon-btn-danger" title="Vider le plan" [disabled]="posLoading || !posSvg" (click)="clearPos()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
             </button>
             <app-download-menu [formats]="svgPngFormats" [disabled]="!posSvg" (download)="exportPos($event)" />
           </div>
@@ -155,16 +159,42 @@ const ICONS: Record<string, string> = {
         </div>
       </form>
     </div>
+
+    <!-- ── Popover : modifier une zone ───────────────────────────────────── -->
+    <div class="popover-backdrop" *ngIf="editZoneTarget && editZoneDraft as draft" (click)="closeEditZone()">
+      <form class="popover-card" (click)="$event.stopPropagation()" (submit)="saveZone($event)">
+        <div class="popover-head">
+          <h3>Modifier « {{ editZoneTarget.nom }} »</h3>
+          <button type="button" class="icon-btn icon-btn-danger" (click)="closeEditZone()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('close')"></svg>
+          </button>
+        </div>
+        <label class="field">
+          Nom
+          <input type="text" [value]="draft.nom" (input)="draft.nom = $any($event.target).value" required />
+        </label>
+        <label class="field">
+          Zone parente (optionnelle)
+          <select [value]="draft.parentId || ''" (change)="draft.parentId = $any($event.target).value || null">
+            <option value="">— Racine —</option>
+            <option *ngFor="let parent of editZoneParentOptions" [value]="parent.id">{{ parent.nom }}</option>
+          </select>
+        </label>
+        <div class="popover-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeEditZone()">Annuler</button>
+          <button type="submit" class="btn btn-primary" [disabled]="savingZone">{{ savingZone ? 'Enregistrement…' : 'Enregistrer' }}</button>
+        </div>
+      </form>
+    </div>
   `,
   styles: [
     `
       .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
       .form-card { margin-bottom: 1.5rem; }
-      .tree { list-style: none; padding-left: 0; }
-      .tree ul { list-style: none; padding-left: 1.5rem; margin-top: 0.5rem; }
-      .tree li { margin-bottom: 0.6rem; }
-      .node-row { display: flex; align-items: center; gap: 0.6rem; }
-      .node-nom { font-weight: 700; }
+      .table-scroll { overflow-x: auto; }
+      .table { width: 100%; min-width: 620px; border-collapse: collapse; }
+      .table th, .table td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+      .row-actions { display: flex; gap: 0.4rem; }
       .summary { color: var(--color-text-muted); }
       .actions { display: flex; gap: 0.5rem; }
       .svg-container { overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; }
@@ -183,6 +213,9 @@ export class UrbanisationComponent implements OnInit {
   newZone: { nom: string; type: TypeZone; parentId?: string } = { nom: '', type: 'ZONE' };
   creatingZone = false;
   createZonePopover = false;
+  editZoneTarget: ZoneUrbanisation | null = null;
+  editZoneDraft: { nom: string; parentId: string | null } | null = null;
+  savingZone = false;
 
   affectation: { applicationId: string; zoneId: string } = { applicationId: '', zoneId: '' };
   affecting = false;
@@ -218,6 +251,16 @@ export class UrbanisationComponent implements OnInit {
     this.createZonePopover = false;
   }
 
+  openEditZone(zone: ZoneUrbanisation): void {
+    this.editZoneTarget = zone;
+    this.editZoneDraft = { nom: zone.nom, parentId: zone.parentId ?? null };
+  }
+
+  closeEditZone(): void {
+    this.editZoneTarget = null;
+    this.editZoneDraft = null;
+  }
+
   ngOnInit(): void {
     this.loadZones();
     this.urbanisationService.listApplications().subscribe({
@@ -232,8 +275,26 @@ export class UrbanisationComponent implements OnInit {
     return [];
   }
 
+  get editZoneParentOptions(): ZoneUrbanisation[] {
+    if (!this.editZoneTarget) return [];
+    const parentType: TypeZone | null =
+      this.editZoneTarget.type === 'QUARTIER' ? 'ZONE' : this.editZoneTarget.type === 'ILOT' ? 'QUARTIER' : null;
+    return this.flatZones.filter(
+      (zone) => zone.id !== this.editZoneTarget!.id && (!parentType || zone.type === parentType),
+    );
+  }
+
   get ilots(): ZoneUrbanisation[] {
     return this.flatZones.filter((z) => z.type === 'ILOT');
+  }
+
+  zoneName(zoneId?: string | null): string {
+    if (!zoneId) return '—';
+    return this.flatZones.find((zone) => zone.id === zoneId)?.nom ?? '—';
+  }
+
+  zoneTypeLabel(type: TypeZone): string {
+    return type === 'ZONE' ? 'Zone' : type === 'QUARTIER' ? 'Quartier' : 'Îlot';
   }
 
   onTypeChange(type: TypeZone): void {
@@ -304,6 +365,25 @@ export class UrbanisationComponent implements OnInit {
     });
   }
 
+  saveZone(event: Event): void {
+    event.preventDefault();
+    if (!this.editZoneTarget || !this.editZoneDraft || !this.editZoneDraft.nom.trim()) return;
+    this.savingZone = true;
+    this.urbanisationService.updateZone(this.editZoneTarget.id, this.editZoneDraft).subscribe({
+      next: () => {
+        this.savingZone = false;
+        this.closeEditZone();
+        this.loadZones();
+        this.invalidatePos();
+        this.toast.success('Zone modifiée.');
+      },
+      error: () => {
+        this.savingZone = false;
+        this.toast.error('Impossible de modifier cette zone.');
+      },
+    });
+  }
+
   affecter(event: Event): void {
     event.preventDefault();
     if (!this.affectation.applicationId || !this.affectation.zoneId) return;
@@ -355,5 +435,11 @@ export class UrbanisationComponent implements OnInit {
     const filename = `plan-occupation-des-sols.${format}`;
     if (format === 'svg') downloadSvg(this.posSvg, filename);
     else downloadPng(this.posSvg, filename);
+  }
+
+  clearPos(): void {
+    this.posSvg = '';
+    this.posTrustedSvg = null;
+    this.posSummary = '';
   }
 }

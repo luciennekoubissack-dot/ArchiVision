@@ -4,18 +4,24 @@ import Konva from 'konva';
 import { Subject } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { TechComponent, TechnologieService, TypeTechComponent } from './technologie.service';
+import { CanevasRelation, CanevasService } from '../canevas/canevas.service';
 import { ToastService } from '../shared/toast.service';
 import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { downloadDataUrl } from '../shared/download.util';
 import { DownloadMenuComponent, DownloadFormatOption } from '../shared/download-menu.component';
 
-const TYPES: TypeTechComponent[] = ['SERVEUR', 'RESEAU', 'CLOUD', 'BASE_DE_DONNEES', 'MIDDLEWARE'];
+const TYPES: TypeTechComponent[] = ['SERVEUR', 'ORDINATEUR_PORTABLE', 'ROUTEUR_RESEAU', 'CAPTEUR_IOT_CONSOMMATION', 'SMARTPHONE_PROFESSIONNEL', 'STOCKAGE_NAS', 'BASE_DE_DONNEES_POSTGRESQL', 'SERVEUR_APPLICATIONS', 'API_REST', 'LOGICIEL_CYBERSECURITE', 'SYSTEME_EXPLOITATION_LINUX', 'PLATEFORME_CLOUD', 'PARE_FEU', 'SWITCH', 'VPN', 'CONNEXION_INTERNET_FIBRE', 'AUTRE'];
 const PNG_FORMAT: DownloadFormatOption[] = [{ value: 'png', label: 'PNG' }];
 
 interface PendingCreate {
   type: TypeTechComponent;
   x: number;
   y: number;
+  nom: string;
+  description: string;
+}
+
+interface PendingEdit {
   nom: string;
   description: string;
 }
@@ -55,6 +61,8 @@ const TYPE_LABEL: Record<TypeTechComponent, string> = {
   CLOUD: 'Cloud',
   BASE_DE_DONNEES: 'Base de données',
   MIDDLEWARE: 'Middleware',
+  ORDINATEUR_PORTABLE: 'Ordinateur portable', ROUTEUR_RESEAU: 'Routeur réseau', CAPTEUR_IOT_CONSOMMATION: 'Capteur IoT de consommation énergétique', SMARTPHONE_PROFESSIONNEL: 'Smartphone professionnel', STOCKAGE_NAS: 'Stockage NAS',
+  BASE_DE_DONNEES_POSTGRESQL: 'Base de données PostgreSQL', SERVEUR_APPLICATIONS: "Serveur d'applications", API_REST: 'API REST', LOGICIEL_CYBERSECURITE: 'Logiciel de cybersécurité', SYSTEME_EXPLOITATION_LINUX: "Système d'exploitation Linux", PLATEFORME_CLOUD: 'Plateforme Cloud (AWS ou Azure)', PARE_FEU: 'Pare-feu', SWITCH: 'Switchs', VPN: 'VPN', CONNEXION_INTERNET_FIBRE: 'Connexion Internet fibre', AUTRE: 'Autre',
 };
 
 /** «device» pour le matériel physique, «executionEnvironment» (mot-clé UML) pour un environnement logiciel. */
@@ -64,6 +72,9 @@ const TYPE_STEREOTYPE: Record<TypeTechComponent, string> = {
   CLOUD: '«executionEnvironment»',
   BASE_DE_DONNEES: '«executionEnvironment»',
   MIDDLEWARE: '«executionEnvironment»',
+  ORDINATEUR_PORTABLE: '«device»', ROUTEUR_RESEAU: '«device»', CAPTEUR_IOT_CONSOMMATION: '«device»', SMARTPHONE_PROFESSIONNEL: '«device»', STOCKAGE_NAS: '«device»',
+  BASE_DE_DONNEES_POSTGRESQL: '«executionEnvironment»', SERVEUR_APPLICATIONS: '«executionEnvironment»', API_REST: '«executionEnvironment»', LOGICIEL_CYBERSECURITE: '«executionEnvironment»', SYSTEME_EXPLOITATION_LINUX: '«executionEnvironment»', PLATEFORME_CLOUD: '«executionEnvironment»',
+  PARE_FEU: '«device»', SWITCH: '«device»', VPN: '«executionEnvironment»', CONNEXION_INTERNET_FIBRE: '«device»', AUTRE: '«node»',
 };
 
 const TYPE_COLOR: Record<TypeTechComponent, string> = {
@@ -72,6 +83,9 @@ const TYPE_COLOR: Record<TypeTechComponent, string> = {
   CLOUD: '#7C3AED',
   BASE_DE_DONNEES: '#B45309',
   MIDDLEWARE: '#BE185D',
+  ORDINATEUR_PORTABLE: '#2563EB', ROUTEUR_RESEAU: '#0F766E', CAPTEUR_IOT_CONSOMMATION: '#0891B2', SMARTPHONE_PROFESSIONNEL: '#2563EB', STOCKAGE_NAS: '#475569',
+  BASE_DE_DONNEES_POSTGRESQL: '#B45309', SERVEUR_APPLICATIONS: '#BE185D', API_REST: '#BE185D', LOGICIEL_CYBERSECURITE: '#B91C1C', SYSTEME_EXPLOITATION_LINUX: '#475569', PLATEFORME_CLOUD: '#7C3AED',
+  PARE_FEU: '#B91C1C', SWITCH: '#0F766E', VPN: '#7C3AED', CONNEXION_INTERNET_FIBRE: '#0F766E', AUTRE: '#64748B',
 };
 
 const TYPE_FILL: Record<TypeTechComponent, string> = {
@@ -80,6 +94,9 @@ const TYPE_FILL: Record<TypeTechComponent, string> = {
   CLOUD: '#E9E1FB',
   BASE_DE_DONNEES: '#FBE9D6',
   MIDDLEWARE: '#FBDCEA',
+  ORDINATEUR_PORTABLE: '#DBEAFE', ROUTEUR_RESEAU: '#D6F0EC', CAPTEUR_IOT_CONSOMMATION: '#CFFAFE', SMARTPHONE_PROFESSIONNEL: '#DBEAFE', STOCKAGE_NAS: '#E2E8F0',
+  BASE_DE_DONNEES_POSTGRESQL: '#FBE9D6', SERVEUR_APPLICATIONS: '#FBDCEA', API_REST: '#FBDCEA', LOGICIEL_CYBERSECURITE: '#FEE2E2', SYSTEME_EXPLOITATION_LINUX: '#E2E8F0', PLATEFORME_CLOUD: '#E9E1FB',
+  PARE_FEU: '#FEE2E2', SWITCH: '#D6F0EC', VPN: '#E9E1FB', CONNEXION_INTERNET_FIBRE: '#D6F0EC', AUTRE: '#E2E8F0',
 };
 
 interface Pos {
@@ -103,6 +120,9 @@ interface Pos {
         >
           {{ layingOut ? 'Génération…' : 'Réorganiser le diagramme' }}
         </button>
+        <button type="button" class="btn btn-outline" [disabled]="!selectedComponent || layingOut" (click)="openEdit()">Modifier</button>
+        <button type="button" class="btn btn-outline" [disabled]="!selectedComponent || layingOut" (click)="startLinking()">Lier</button>
+        <button type="button" class="btn btn-danger" [disabled]="!selectedComponent || layingOut" (click)="removeSelected()">Supprimer</button>
         <app-download-menu [formats]="pngFormat" [disabled]="components.length === 0" (download)="exportPng()" />
       </div>
     </div>
@@ -138,6 +158,24 @@ interface Pos {
           <button type="button" class="btn btn-ghost" (click)="cancelCreate()">Annuler</button>
           <button type="submit" class="btn btn-primary">Créer</button>
         </div>
+      </form>
+    </div>
+
+    <div class="pending-form" *ngIf="pendingEdit as draft">
+      <form class="card form-card" (submit)="confirmEdit($event)">
+        <h3>Modifier le composant</h3>
+        <label class="field">Nom<input type="text" [value]="draft.nom" (input)="draft.nom = $any($event.target).value" required autofocus /></label>
+        <label class="field">Description<textarea [value]="draft.description" (input)="draft.description = $any($event.target).value"></textarea></label>
+        <div class="pending-actions"><button type="button" class="btn btn-ghost" (click)="pendingEdit = null">Annuler</button><button type="submit" class="btn btn-primary">Enregistrer</button></div>
+      </form>
+    </div>
+
+    <div class="pending-form" *ngIf="linkSource as source">
+      <form class="card form-card" (submit)="confirmLink($event)">
+        <h3>Lier un composant</h3>
+        <p class="hint">Chemin de communication UML entre « {{ source.nom }} » et un autre nœud.</p>
+        <label class="field">Composant cible<select [value]="linkTargetId" (change)="linkTargetId = $any($event.target).value" required><option value="" disabled>Choisir un composant</option><option *ngFor="let component of linkTargets" [value]="component.id">{{ component.nom }}</option></select></label>
+        <div class="pending-actions"><button type="button" class="btn btn-ghost" (click)="linkSource = null">Annuler</button><button type="submit" class="btn btn-primary">Créer le lien</button></div>
       </form>
     </div>
   `,
@@ -196,6 +234,11 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
   loading = true;
   layingOut = false;
   components: TechComponent[] = [];
+  relations: CanevasRelation[] = [];
+  selectedComponent: TechComponent | null = null;
+  pendingEdit: PendingEdit | null = null;
+  linkSource: TechComponent | null = null;
+  linkTargetId = '';
   pendingCreate: PendingCreate | null = null;
 
   private stage!: Konva.Stage;
@@ -207,6 +250,7 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
     private readonly technologieService: TechnologieService,
     private readonly toast: ToastService,
     private readonly confirmDialog: ConfirmDialogService,
+    private readonly canevasService: CanevasService,
   ) {}
 
   ngAfterViewInit(): void {
@@ -237,6 +281,7 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
     this.technologieService.list().subscribe({
       next: (components) => {
         this.components = components;
+        this.canevasService.listRelations().subscribe((relations) => (this.relations = relations.filter((r) => r.sourceKind === 'TECH_COMPONENT' && r.targetKind === 'TECH_COMPONENT')));
         this.loading = false;
         this.maybeAutoLayout();
         this.render();
@@ -290,6 +335,13 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
 
   private render(): void {
     this.layer.destroyChildren();
+
+    const positions = new Map(this.components.map((component) => [component.id, component.positionX != null && component.positionY != null ? { x: component.positionX, y: component.positionY } : null]));
+    for (const relation of this.relations) {
+      const source = positions.get(relation.sourceId);
+      const target = positions.get(relation.targetId);
+      if (source && target) this.layer.add(new Konva.Line({ points: [source.x + NODE_W / 2, source.y + NODE_H / 2, target.x + NODE_W / 2, target.y + NODE_H / 2], stroke: '#5b6478', strokeWidth: 1.4, dash: [7, 4] }));
+    }
 
     let cursorX = 40;
     for (const comp of this.components) {
@@ -399,6 +451,7 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
 
     group.on('mouseenter', () => (document.body.style.cursor = 'grab'));
     group.on('mouseleave', () => (document.body.style.cursor = 'default'));
+    group.on('click tap', () => (this.selectedComponent = comp));
     group.on('dragend', () => {
       comp.positionX = group.x();
       comp.positionY = group.y();
@@ -521,6 +574,49 @@ export class TechnologieCanevasComponent implements AfterViewInit, OnDestroy {
 
   typeColor(type: TypeTechComponent): string {
     return TYPE_COLOR[type];
+  }
+
+  get linkTargets(): TechComponent[] {
+    return this.components.filter((component) => component.id !== this.linkSource?.id);
+  }
+
+  openEdit(): void {
+    if (!this.selectedComponent) return;
+    this.pendingEdit = { nom: this.selectedComponent.nom, description: this.selectedComponent.description ?? '' };
+  }
+
+  confirmEdit(event: Event): void {
+    event.preventDefault();
+    if (!this.selectedComponent || !this.pendingEdit?.nom.trim()) return;
+    this.technologieService.update(this.selectedComponent.id, this.pendingEdit).subscribe({
+      next: (updated) => { this.components = this.components.map((component) => component.id === updated.id ? { ...component, ...updated } : component); this.pendingEdit = null; this.selectedComponent = null; this.render(); this.changed.emit(); },
+      error: () => this.toast.error('Impossible de modifier ce composant.'),
+    });
+  }
+
+  async removeSelected(): Promise<void> {
+    if (!this.selectedComponent) return;
+    const component = this.selectedComponent;
+    if (!await this.confirmDialog.confirm(`Supprimer le composant « ${component.nom} » ?`)) return;
+    this.technologieService.delete(component.id).subscribe({
+      next: () => { this.components = this.components.filter((item) => item.id !== component.id); this.relations = this.relations.filter((relation) => relation.sourceId !== component.id && relation.targetId !== component.id); this.selectedComponent = null; this.render(); this.changed.emit(); this.toast.success('Composant supprimé.'); },
+      error: () => this.toast.error('Impossible de supprimer ce composant.'),
+    });
+  }
+
+  startLinking(): void {
+    if (!this.selectedComponent) return;
+    this.linkSource = this.selectedComponent;
+    this.linkTargetId = '';
+  }
+
+  confirmLink(event: Event): void {
+    event.preventDefault();
+    if (!this.linkSource || !this.linkTargetId) return;
+    this.canevasService.createRelation({ sourceKind: 'TECH_COMPONENT', sourceId: this.linkSource.id, targetKind: 'TECH_COMPONENT', targetId: this.linkTargetId, type: 'ASSOCIATION' }).subscribe({
+      next: (relation) => { this.relations = [relation, ...this.relations]; this.linkSource = null; this.selectedComponent = null; this.render(); this.toast.success('Chemin de communication créé.'); },
+      error: () => this.toast.error('Impossible de créer ce lien.'),
+    });
   }
 
   /** Ce canevas est le diagramme lui-même (pas de génération SVG backend pour ce module) : export direct du rendu Konva. */

@@ -40,7 +40,7 @@ import { RouterLink } from '@angular/router';
         width: 100%;
         max-width: 440px;
         background: var(--color-white);
-        border-radius: var(--radius-lg);
+        border-radius: 8px;
         box-shadow: var(--shadow-md);
         padding: 2.75rem 2.25rem;
         text-align: center;

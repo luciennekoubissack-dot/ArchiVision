@@ -152,7 +152,7 @@ cd apps/web
 npm start
 ```
 
-Le frontend sera disponible sur .
+Le frontend sera disponible sur http://localhost:4200.
 
 ### Alternative avec Docker
 
@@ -177,6 +177,17 @@ npm run prisma:seed
 ```
 
 Initialise un utilisateur admin (`admin@archivision.local` / `Admin123!`).
+
+Le seed crée également le compte plateforme `superadmin@archivision.local` avec
+le mot de passe `SuperAdmin123!` pour accéder à l'administration des organisations.
+
+### Régénérer le client Angular
+
+Après une modification des contrôleurs ou DTO de l'API, démarrer l'API puis exécuter :
+
+```bash
+npm run generate:api-client
+```
 
 ---
 

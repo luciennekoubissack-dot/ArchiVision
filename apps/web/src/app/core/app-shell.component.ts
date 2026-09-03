@@ -45,7 +45,6 @@ const TENANT_NAV_GROUPS: NavGroup[] = [
   {
     label: 'Modélisation',
     items: [
-      { label: 'Canevas', path: '/canevas', icon: 'canvas' },
       { label: 'Vues générées', path: '/vues', icon: 'eye' },
     ],
   },

@@ -97,7 +97,7 @@ const ICONS: Record<string, string> = {
                 <td>{{ solution.nom }}</td>
                 <td><span class="badge" [class]="statutBadge(solution.statut)">{{ statutLabel(solution.statut) }}</span></td>
                 <td>{{ noteMoyenne(solution) ?? '—' }}</td>
-                <td>{{ solution.gaps?.length || 0 }}</td>
+                <td>{{ solution.gaps.length }}</td>
                 <td class="row-actions">
                   <button type="button" class="icon-btn icon-btn-view" title="Consulter" (click)="openView(solution)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('eye')"></svg>

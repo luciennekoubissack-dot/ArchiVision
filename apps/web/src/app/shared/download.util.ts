@@ -146,6 +146,48 @@ export function downloadSvg(svg: string, filename: string): void {
   triggerDownload(blob, filename);
 }
 
+/** Exporte un SVG en PDF en le rasterisant dans un canvas côté client. */
+export function downloadSvgPdf(svg: string, filename: string): void {
+  const svgBlob = new Blob([svg], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(svgBlob);
+  const image = new Image();
+
+  image.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+    const context = canvas.getContext('2d');
+
+    if (!context || canvas.width === 0 || canvas.height === 0) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0);
+    URL.revokeObjectURL(url);
+
+    const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation });
+    const pageWidth = orientation === 'landscape' ? 297 : 210;
+    const pageHeight = orientation === 'landscape' ? 210 : 297;
+    const margin = 10;
+    const ratio = Math.min(
+      (pageWidth - margin * 2) / canvas.width,
+      (pageHeight - margin * 2) / canvas.height,
+    );
+    const width = canvas.width * ratio;
+    const height = canvas.height * ratio;
+
+    doc.addImage(canvas, 'PNG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height);
+    doc.save(filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
+  };
+
+  image.onerror = () => URL.revokeObjectURL(url);
+  image.src = url;
+}
+
 /** Convertit un SVG (avec width/height explicites sur la racine) en PNG côté client. */
 export function downloadPng(svg: string, filename: string): void {
   const svgBlob = new Blob([svg], { type: 'image/svg+xml' });

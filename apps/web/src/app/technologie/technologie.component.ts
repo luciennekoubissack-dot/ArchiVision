@@ -16,7 +16,18 @@ const TYPE_LABEL: Record<TypeTechComponent, string> = {
   CLOUD: 'Cloud',
   BASE_DE_DONNEES: 'Base de données',
   MIDDLEWARE: 'Middleware',
+  ORDINATEUR_PORTABLE: 'Ordinateur portable', ROUTEUR_RESEAU: 'Routeur réseau', CAPTEUR_IOT_CONSOMMATION: 'Capteur IoT de consommation énergétique',
+  SMARTPHONE_PROFESSIONNEL: 'Smartphone professionnel', STOCKAGE_NAS: 'Stockage NAS', BASE_DE_DONNEES_POSTGRESQL: 'Base de données PostgreSQL',
+  SERVEUR_APPLICATIONS: "Serveur d'applications", API_REST: 'API REST', LOGICIEL_CYBERSECURITE: 'Logiciel de cybersécurité',
+  SYSTEME_EXPLOITATION_LINUX: "Système d'exploitation Linux", PLATEFORME_CLOUD: 'Plateforme Cloud (AWS ou Azure)', PARE_FEU: 'Pare-feu',
+  SWITCH: 'Switchs', VPN: 'VPN', CONNEXION_INTERNET_FIBRE: 'Connexion Internet fibre', AUTRE: 'Autre',
 };
+const TYPE_GROUPS = [
+  { label: 'Composants matériels', types: ['SERVEUR', 'ORDINATEUR_PORTABLE', 'ROUTEUR_RESEAU', 'CAPTEUR_IOT_CONSOMMATION', 'SMARTPHONE_PROFESSIONNEL', 'STOCKAGE_NAS'] as TypeTechComponent[] },
+  { label: 'Composants logiciels', types: ['CLOUD', 'BASE_DE_DONNEES', 'MIDDLEWARE', 'BASE_DE_DONNEES_POSTGRESQL', 'SERVEUR_APPLICATIONS', 'API_REST', 'LOGICIEL_CYBERSECURITE', 'SYSTEME_EXPLOITATION_LINUX', 'PLATEFORME_CLOUD'] as TypeTechComponent[] },
+  { label: 'Composants réseau', types: ['RESEAU', 'PARE_FEU', 'SWITCH', 'VPN', 'CONNEXION_INTERNET_FIBRE'] as TypeTechComponent[] },
+  { label: 'Autre', types: ['AUTRE'] as TypeTechComponent[] },
+];
 const TYPES: TypeTechComponent[] = Object.keys(TYPE_LABEL) as TypeTechComponent[];
 
 const ICONS: Record<string, string> = {
@@ -86,11 +97,11 @@ const ICONS: Record<string, string> = {
           </button>
         </div>
         <div class="grid-2">
-          <label class="field">Nom<input type="text" [value]="newComponent.nom" (input)="newComponent.nom = $any($event.target).value" required /></label>
+          <label class="field">Nom<input type="text" [placeholder]="newComponent.type === 'AUTRE' ? 'Saisissez le nom du composant' : ''" [value]="newComponent.nom" (input)="newComponent.nom = $any($event.target).value" required /></label>
           <label class="field">
             Type
             <select [value]="newComponent.type" (change)="newComponent.type = $any($event.target).value">
-              <option *ngFor="let t of types" [value]="t">{{ typeLabel(t) }}</option>
+              <optgroup *ngFor="let group of typeGroups" [label]="group.label"><option *ngFor="let t of group.types" [value]="t">{{ typeLabel(t) }}</option></optgroup>
             </select>
           </label>
         </div>
@@ -116,7 +127,7 @@ const ICONS: Record<string, string> = {
           <label class="field">
             Type
             <select [value]="draft.type" (change)="draft.type = $any($event.target).value">
-              <option *ngFor="let t of types" [value]="t">{{ typeLabel(t) }}</option>
+              <optgroup *ngFor="let group of typeGroups" [label]="group.label"><option *ngFor="let t of group.types" [value]="t">{{ typeLabel(t) }}</option></optgroup>
             </select>
           </label>
         </div>
@@ -145,6 +156,7 @@ export class TechnologieComponent implements OnInit {
 
   tab: Tab = 'composants';
   types = TYPES;
+  typeGroups = TYPE_GROUPS;
   components: TechComponent[] = [];
   componentsPage = 1;
   componentsTotal = 0;

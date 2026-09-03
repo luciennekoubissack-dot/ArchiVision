@@ -71,9 +71,7 @@ export const routes: Routes = [
       },
       {
         path: 'canevas',
-        loadComponent: () => import('../canevas/canevas.component').then((m) => m.CanevasComponent),
-        canActivate: [RoleGuard],
-        data: { roles: TENANT_ROLES },
+        redirectTo: 'architecture-metier',
       },
       {
         path: 'architecture-systeme',

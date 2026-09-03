@@ -109,6 +109,7 @@ const ICONS: Record<string, string> = {
     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  clear: '<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>',
   download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>',
   upload: '<path d="M12 20V8"/><path d="M7 13l5-5 5 5"/><path d="M4 3h16"/>',
 };
@@ -202,7 +203,12 @@ const ICONS: Record<string, string> = {
     <!-- ── Diagramme de vision (canevas à 8 blocs) ───────────────────────── -->
     <div class="page-header" *ngIf="tab === 'diagramme'">
       <h3>Diagramme de vision</h3>
-      <app-download-menu [formats]="visionFormats" (download)="exportVision($event)" />
+      <div class="actions">
+        <button type="button" class="icon-btn icon-btn-danger" title="Vider le plan" [disabled]="canvasLoading || isCanvasEmpty()" (click)="clearCanvas()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('clear')"></svg>
+        </button>
+        <app-download-menu [formats]="visionFormats" [disabled]="canvasLoading || isCanvasEmpty()" (download)="exportVision($event)" />
+      </div>
     </div>
     <section class="vc" *ngIf="tab === 'diagramme'">
       <div class="vc-header">
@@ -232,6 +238,7 @@ const ICONS: Record<string, string> = {
   styles: [
     `
       .header-actions { display: flex; align-items: center; gap: 0.5rem; }
+      .page-header .actions { display: flex; align-items: center; gap: 0.5rem; }
       .file-btn { cursor: pointer; }
       .table-scroll { overflow-x: auto; }
       .table { width: 100%; min-width: 640px; border-collapse: collapse; }
@@ -463,8 +470,31 @@ export class VisionComponent implements OnInit {
     });
   }
 
-  private isCanvasEmpty(): boolean {
+  isCanvasEmpty(): boolean {
     return this.blocks.every((b) => !(this.canvas[b.field] ?? '').trim());
+  }
+
+  async clearCanvas(): Promise<void> {
+    if (this.isCanvasEmpty()) return;
+    const confirmed = await this.confirmDialog.confirm('Vider tous les blocs du diagramme de vision ?');
+    if (!confirmed) return;
+
+    const payload = this.blocks.reduce<UpdateVisionCanvasPayload>((values, block) => {
+      values[block.field] = '';
+      return values;
+    }, {});
+    this.canvasLoading = true;
+    this.visionCanvasService.update(payload).subscribe({
+      next: (canvas) => {
+        this.canvas = canvas;
+        this.canvasLoading = false;
+        this.toast.success('Diagramme de vision vidé.');
+      },
+      error: () => {
+        this.canvasLoading = false;
+        this.toast.error('Impossible de vider le diagramme de vision.');
+      },
+    });
   }
 
   /**
