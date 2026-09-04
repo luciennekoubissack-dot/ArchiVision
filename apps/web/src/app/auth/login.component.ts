@@ -70,7 +70,7 @@ import { AuthService } from './auth.service';
         align-items: center;
         justify-content: center;
         padding: 2rem;
-        background: var(--color-black);
+        background: #f8f8f6;
       }
       .auth-card {
         width: 100%;
