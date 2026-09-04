@@ -1,6 +1,6 @@
 version: '3.9'
 
-# Stack v1 — postgres + api uniquement.
+# Stack v2 — postgres + migrate + api + web (Nginx).
 # Pas de Redis, pas de realtime, pas de worker (voir docs/stack.md).
 
 services:
@@ -54,27 +54,41 @@ services:
       # n'est pas exporté avant `docker compose up` (voir requireJwtSecret()).
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET doit être défini (export JWT_SECRET=... avant docker compose up)}
       PORT: 3000
-      # Pas de valeur par défaut ici non plus (voir JWT_SECRET ci-dessus) :
-      # un `:-http://localhost:4201` masquerait le contrôle fait par
-      # requireFrontendOrigin() côté code, qui ne verrait jamais l'absence de
-      # configuration puisque docker compose l'aurait déjà comblée en silence.
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN doit être défini (export FRONTEND_ORIGIN=... avant docker compose up)}
+      # FRONTEND_ORIGIN = URL publique du service web (Nginx).
+      # En local : http://localhost:4280 (port exposé du service web ci-dessous).
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4280}
       # Envoi d'e-mails (validation/rejet d'organisation) : facultatifs, la
       # valeur par défaut de MailService reste le mode simulé (journalisation
-      # seule) si SMTP_HOST est absent — voir apps/api/src/modules/mail/mail.service.ts.
+      # seule) si SMTP_HOST est absent.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-ArchiVision <no-reply@archivision.local>}
-    ports:
-      - '3000:3000'
+    # L'API n'est pas exposée directement — tout le trafic passe par Nginx (web).
+    # Le réseau Docker interne suffit pour que web puisse proxyer vers api:3000.
+    expose:
+      - '3000'
     depends_on:
       postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    environment:
+      # URL interne Docker du service API, utilisée par Nginx pour le proxy.
+      # En Docker Compose : "api" est le nom du service, port 3000.
+      NGINX_API_URL: http://api:3000
+    ports:
+      - '4280:80'
+    depends_on:
+      - api
 
 volumes:
   postgres_data:
