@@ -74,6 +74,13 @@ describe('BpmnService', () => {
       expect(result).toEqual(mockProcessus);
       expect(prismaMock.bpmnProcessus.create).toHaveBeenCalledWith({
         data: { nom: mockProcessus.nom, organisationId: ORG_ID },
+        include: {
+          objectifs: {
+            include: {
+              objectif: { select: { id: true, nom: true, statut: true } },
+            },
+          },
+        },
       });
     });
 
