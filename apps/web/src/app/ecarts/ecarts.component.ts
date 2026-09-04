@@ -438,7 +438,7 @@ export class EcartsComponent implements OnInit {
 
     if (solutionsLiees.length === 0) return 'non_adresse';
 
-    const toutesTerminees = solutionsLiees.every((g) => g.solution.avancement === 'TERMINEE');
+    const toutesTerminees = solutionsLiees.every((g) => g.solution.avancement === 'TERMINE');
     if (toutesTerminees) return 'realise';
 
     const unEnCours = solutionsLiees.some(

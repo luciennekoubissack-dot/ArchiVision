@@ -97,7 +97,7 @@ export class GapAnalysisService {
       if (solutionsLiees.length === 0) return row;
 
       const toutesTerminees = solutionsLiees.every(
-        (g) => (g.solution as { avancement?: string })?.avancement === 'TERMINEE',
+        (g) => (g.solution as { avancement?: string })?.avancement === 'TERMINE',
       );
       if (toutesTerminees) {
         return { ...row, etat: 'Réalisé' as EtatGap };

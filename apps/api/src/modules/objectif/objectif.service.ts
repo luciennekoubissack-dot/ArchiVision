@@ -86,7 +86,7 @@ export class ObjectifService {
         "Cet objectif n'est adressé par aucune solution. Associez-lui au moins une solution TERMINEE avant de le marquer comme atteint.",
       );
     }
-    const toutesTerminees = gaps.every((g) => g.solution.avancement === 'TERMINEE');
+    const toutesTerminees = gaps.every((g) => g.solution.avancement === 'TERMINE');
     if (!toutesTerminees) {
       throw new BadRequestException(
         "Toutes les solutions liées à cet objectif doivent être TERMINEE avant de le marquer comme atteint.",

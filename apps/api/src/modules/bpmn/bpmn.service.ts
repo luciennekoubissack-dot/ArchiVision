@@ -196,7 +196,7 @@ export class BpmnService {
         });
 
         const solutionsTotal = gaps.length;
-        const solutionsTerminees = gaps.filter((g) => g.solution.avancement === 'TERMINEE').length;
+        const solutionsTerminees = gaps.filter((g) => g.solution.avancement === 'TERMINE').length;
         const peutEtreMarqueAtteint =
           solutionsTotal > 0 && solutionsTerminees === solutionsTotal && objectif.statut === 'AS_IS';
 

@@ -16,5 +16,5 @@ export interface SolutionGapRefEntity {
   /**
    * Avancement de la mise en oeuvre de la solution.
    */
-  avancement: 'NON_DEMARRE' | 'EN_COURS' | 'TERMINEE' | 'BLOQUE';
+  avancement: 'NON_DEMARRE' | 'EN_COURS' | 'TERMINE' | 'BLOQUE';
 }

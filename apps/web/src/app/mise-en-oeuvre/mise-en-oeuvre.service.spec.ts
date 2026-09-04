@@ -6,8 +6,8 @@ import { RoadmapService } from '../roadmap/roadmap.service';
 
 describe('MiseEnOeuvreService', () => {
   let service: MiseEnOeuvreService;
-  let solutionServiceMock: jest.Mocked<Pick<SolutionService, 'list' | 'update'>>;
-  let roadmapServiceMock: jest.Mocked<Pick<RoadmapService, 'list'>>;
+  let solutionServiceMock: jasmine.SpyObj<Pick<SolutionService, 'list' | 'update'>>;
+  let roadmapServiceMock: jasmine.SpyObj<Pick<RoadmapService, 'list'>>;
 
   const now = '2026-09-01T00:00:00.000Z';
 
@@ -58,8 +58,8 @@ describe('MiseEnOeuvreService', () => {
   ];
 
   beforeEach(() => {
-    solutionServiceMock = { list: jest.fn(), update: jest.fn() };
-    roadmapServiceMock = { list: jest.fn() };
+    solutionServiceMock = jasmine.createSpyObj<Pick<SolutionService, 'list' | 'update'>>('SolutionService', ['list', 'update']);
+    roadmapServiceMock = jasmine.createSpyObj<Pick<RoadmapService, 'list'>>('RoadmapService', ['list']);
 
     TestBed.configureTestingModule({
       providers: [
@@ -73,31 +73,31 @@ describe('MiseEnOeuvreService', () => {
   });
 
   it('filtre uniquement les solutions retenues', (done) => {
-    solutionServiceMock.list.mockReturnValue(of(mockSolutions as any[]));
-    roadmapServiceMock.list.mockReturnValue(of(mockProjets as any[]));
+    solutionServiceMock.list.and.returnValue(of(mockSolutions as any[]));
+    roadmapServiceMock.list.and.returnValue(of(mockProjets as any[]));
 
     service.loadSuivi().subscribe(({ suivi }) => {
-      expect(suivi).toHaveLength(3);
+      expect(suivi.length).toBe(3);
       expect(suivi.every((s) => s.solution.statut === 'RETENUE')).toBe(true);
       done();
     });
   });
 
   it('associe les projets dont le nom contient le nom de la solution', (done) => {
-    solutionServiceMock.list.mockReturnValue(of(mockSolutions as any[]));
-    roadmapServiceMock.list.mockReturnValue(of(mockProjets as any[]));
+    solutionServiceMock.list.and.returnValue(of(mockSolutions as any[]));
+    roadmapServiceMock.list.and.returnValue(of(mockProjets as any[]));
 
     service.loadSuivi().subscribe(({ suivi }) => {
       const crm = suivi.find((s) => s.solution.id === 's1')!;
       expect(crm.projetsLies.map((p) => p.id)).toContain('p1');
-      expect(crm.projetsLies).toHaveLength(1);
+      expect(crm.projetsLies.length).toBe(1);
       done();
     });
   });
 
   it('calcule correctement les KPIs', (done) => {
-    solutionServiceMock.list.mockReturnValue(of(mockSolutions as any[]));
-    roadmapServiceMock.list.mockReturnValue(of(mockProjets as any[]));
+    solutionServiceMock.list.and.returnValue(of(mockSolutions as any[]));
+    roadmapServiceMock.list.and.returnValue(of(mockProjets as any[]));
 
     service.loadSuivi().subscribe(({ stats }) => {
       expect(stats.total).toBe(3);
@@ -111,8 +111,8 @@ describe('MiseEnOeuvreService', () => {
   });
 
   it('retourne taux=0 si aucune solution retenue', (done) => {
-    solutionServiceMock.list.mockReturnValue(of([]));
-    roadmapServiceMock.list.mockReturnValue(of([]));
+    solutionServiceMock.list.and.returnValue(of([]));
+    roadmapServiceMock.list.and.returnValue(of([]));
 
     service.loadSuivi().subscribe(({ stats }) => {
       expect(stats.total).toBe(0);
@@ -123,7 +123,7 @@ describe('MiseEnOeuvreService', () => {
 
   it('délègue la mise à jour d\'avancement à SolutionService', () => {
     const updated = { ...mockSolutions[0], avancement: 'TERMINE' as const };
-    solutionServiceMock.update.mockReturnValue(of(updated as any));
+    solutionServiceMock.update.and.returnValue(of(updated as any));
 
     let result: unknown;
     service.updateAvancement('s1', 'TERMINE', 'Livré').subscribe((r) => (result = r));
