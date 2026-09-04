@@ -297,6 +297,7 @@ export class ArchitectureApplicativeCanevasComponent implements AfterViewInit, O
   private readonly positionChange$ = new Subject<{ id: string; x: number; y: number }>();
   private readonly resizeHandler = () => this.resizeStage();
   private readonly windowMouseUpHandler = () => this.cancelLinking();
+  private resizeObserver?: ResizeObserver;
 
   constructor(
     private readonly service: ArchitectureApplicativeService,
@@ -305,29 +306,33 @@ export class ArchitectureApplicativeCanevasComponent implements AfterViewInit, O
   ) {}
 
   ngAfterViewInit(): void {
-    this.stage = new Konva.Stage({
-      container: this.stageHost.nativeElement,
-      width: this.stageHost.nativeElement.clientWidth,
-      height: this.stageHost.nativeElement.clientHeight,
-      draggable: true,
-    });
+    setTimeout(() => this.initStage(), 0);
+  }
+
+  private initStage(): void {
+    const host = this.stageHost.nativeElement;
+    const w = host.clientWidth || host.offsetWidth || 900;
+    const h = host.clientHeight || host.offsetHeight || 500;
+    this.stage = new Konva.Stage({ container: host, width: w, height: h, draggable: true });
     this.layer = new Konva.Layer();
     this.stage.add(this.layer);
-
     this.stage.on('wheel', (e) => this.onWheel(e));
     this.stage.on('mousemove', () => this.onStageMouseMove());
     this.stage.on('mouseup', (e) => this.onStageMouseUp(e));
     window.addEventListener('resize', this.resizeHandler);
     window.addEventListener('mouseup', this.windowMouseUpHandler);
-
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.resizeStage());
+      this.resizeObserver.observe(host);
+    }
     this.positionChange$.pipe(debounceTime(400)).subscribe(({ id, x, y }) => this.savePosition(id, x, y));
-
     this.load();
   }
 
   ngOnDestroy(): void {
     window.removeEventListener('resize', this.resizeHandler);
     window.removeEventListener('mouseup', this.windowMouseUpHandler);
+    this.resizeObserver?.disconnect();
     this.stage?.destroy();
   }
 
@@ -791,8 +796,11 @@ export class ArchitectureApplicativeCanevasComponent implements AfterViewInit, O
 
   private resizeStage(): void {
     if (!this.stage) return;
-    this.stage.width(this.stageHost.nativeElement.clientWidth);
-    this.stage.height(this.stageHost.nativeElement.clientHeight);
+    const host = this.stageHost.nativeElement;
+    const w = host.clientWidth || host.offsetWidth;
+    const h = host.clientHeight || host.offsetHeight;
+    if (w > 0) this.stage.width(w);
+    if (h > 0) this.stage.height(h);
   }
 
   // ── Drop depuis la palette ───────────────────────────────────────────────

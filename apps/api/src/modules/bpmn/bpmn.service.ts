@@ -8,6 +8,14 @@ import { UpdateBpmnElementDto } from './dto/update-bpmn-element.dto';
 import { CreateBpmnFlowDto } from './dto/create-bpmn-flow.dto';
 import { construirePropositionDiagramme } from './bpmn-diagramme-proposal';
 
+const OBJECTIFS_INCLUDE = {
+  objectifs: {
+    include: {
+      objectif: { select: { id: true, nom: true, statut: true } },
+    },
+  },
+};
+
 @Injectable()
 export class BpmnService {
   constructor(private readonly prisma: PrismaService) {}
@@ -15,7 +23,10 @@ export class BpmnService {
   // ── Processus ────────────────────────────────────────────────────────────
 
   async create(organisationId: string, dto: CreateBpmnProcessusDto) {
-    const processus = await this.prisma.bpmnProcessus.create({ data: { ...dto, organisationId } });
+    const processus = await this.prisma.bpmnProcessus.create({
+      data: { ...dto, organisationId },
+      include: OBJECTIFS_INCLUDE,
+    });
     if (dto.etapes?.trim()) {
       await this.genererDiagramme(processus.id, organisationId);
     }
@@ -83,7 +94,11 @@ export class BpmnService {
   findAll(organisationId: string, pagination?: PaginationQueryDto) {
     return paginateFindMany(
       this.prisma.bpmnProcessus,
-      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { _count: { select: { elements: true } } } },
+      {
+        where: { organisationId },
+        orderBy: { nom: 'asc' },
+        include: { _count: { select: { elements: true } }, ...OBJECTIFS_INCLUDE },
+      },
       pagination,
     );
   }
@@ -96,6 +111,7 @@ export class BpmnService {
           orderBy: { createdAt: 'asc' },
           include: { flowsSource: true, flowsTarget: true },
         },
+        ...OBJECTIFS_INCLUDE,
       },
     });
     if (!processus || processus.organisationId !== organisationId) {
@@ -106,7 +122,11 @@ export class BpmnService {
 
   async update(id: string, organisationId: string, dto: UpdateBpmnProcessusDto) {
     await this.assertProcessusExists(id, organisationId);
-    const processus = await this.prisma.bpmnProcessus.update({ where: { id }, data: dto });
+    const processus = await this.prisma.bpmnProcessus.update({
+      where: { id },
+      data: dto,
+      include: OBJECTIFS_INCLUDE,
+    });
     // Même comportement qu'à la création : des étapes renseignées sur un
     // diagramme encore vide déclenchent la génération d'une proposition.
     if (dto.etapes?.trim()) {
@@ -121,6 +141,85 @@ export class BpmnService {
   async remove(id: string, organisationId: string) {
     await this.assertProcessusExists(id, organisationId);
     return this.prisma.bpmnProcessus.delete({ where: { id } });
+  }
+
+  // ── Objectifs visés ──────────────────────────────────────────────────────
+
+  /**
+   * Remplace la liste des objectifs visés par ce processus.
+   * Valide que tous les objectifs appartiennent à la même organisation.
+   */
+  async updateObjectifs(id: string, organisationId: string, objectifIds: string[]) {
+    await this.assertProcessusExists(id, organisationId);
+
+    if (objectifIds.length > 0) {
+      const count = await this.prisma.objectif.count({
+        where: { id: { in: objectifIds }, organisationId },
+      });
+      if (count !== new Set(objectifIds).size) {
+        throw new BadRequestException('Un ou plusieurs objectifs introuvables.');
+      }
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.objectifProcessus.deleteMany({ where: { processusId: id } }),
+      this.prisma.objectifProcessus.createMany({
+        data: objectifIds.map((objectifId) => ({ processusId: id, objectifId })),
+      }),
+    ]);
+
+    return this.findOne(id, organisationId);
+  }
+
+  /**
+   * Calcule la progression d'un processus BPMN vers ses objectifs cibles.
+   * Pour chaque objectif visé, détermine si toutes les solutions liées sont TERMINEE.
+   */
+  async getProgression(id: string, organisationId: string) {
+    const processus = await this.findOne(id, organisationId);
+    const elements = processus.elements;
+
+    const totalElements = elements.length;
+    const elementsAsIs = elements.filter((e) => e.statut === 'AS_IS').length;
+    const elementsToBe = elements.filter((e) => e.statut === 'TO_BE').length;
+    const elementsInchanges = elements.filter((e) => e.statut === 'LES_DEUX').length;
+    const tauxTransition =
+      totalElements > 0 ? Math.round((elementsInchanges / totalElements) * 100) : 0;
+
+    const objectifsProgression = await Promise.all(
+      processus.objectifs.map(async (link) => {
+        const objectif = link.objectif;
+
+        const gaps = await this.prisma.solutionGap.findMany({
+          where: { solution: { organisationId }, domaine: 'OBJECTIF', elementId: objectif.id },
+          include: { solution: { select: { avancement: true } } },
+        });
+
+        const solutionsTotal = gaps.length;
+        const solutionsTerminees = gaps.filter((g) => g.solution.avancement === 'TERMINEE').length;
+        const peutEtreMarqueAtteint =
+          solutionsTotal > 0 && solutionsTerminees === solutionsTotal && objectif.statut === 'AS_IS';
+
+        return {
+          id: objectif.id,
+          nom: objectif.nom,
+          statut: objectif.statut as string,
+          solutionsTotal,
+          solutionsTerminees,
+          peutEtreMarqueAtteint,
+        };
+      }),
+    );
+
+    return {
+      processusId: id,
+      totalElements,
+      elementsAsIs,
+      elementsToBe,
+      elementsInchanges,
+      tauxTransition,
+      objectifs: objectifsProgression,
+    };
   }
 
   // ── Éléments ─────────────────────────────────────────────────────────────

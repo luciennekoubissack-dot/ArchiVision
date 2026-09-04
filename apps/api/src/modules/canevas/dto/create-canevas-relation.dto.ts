@@ -1,11 +1,16 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { ElementKind, TypeRelation } from '@prisma/client';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCanevasRelationDto {
   @ApiProperty({ enum: TypeRelation, description: 'Type de relation entre les deux éléments du canevas.' })
   @IsEnum(TypeRelation)
   type!: TypeRelation;
+
+  @ApiPropertyOptional({ description: 'Annotation libre (ex. type de lien réseau pour le diagramme de déploiement : "VPN", "HTTPS", "Fibre"…).' })
+  @IsString()
+  @IsOptional()
+  label?: string;
 
   @ApiProperty({ enum: ElementKind, description: "Nature de l'élément source (type de brique du canevas)." })
   @IsEnum(ElementKind)

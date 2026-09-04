@@ -4,6 +4,11 @@
 export interface CreateCanevasRelationDto {
 
   /**
+   * Annotation libre (ex. type de lien réseau pour le diagramme de déploiement : "VPN", "HTTPS", "Fibre"…).
+   */
+  label?: string;
+
+  /**
    * Identifiant de l'élément source.
    */
   sourceId: string;

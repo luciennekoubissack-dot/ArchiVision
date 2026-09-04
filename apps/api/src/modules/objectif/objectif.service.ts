@@ -63,6 +63,43 @@ export class ObjectifService {
     return this.prisma.objectif.delete({ where: { id } });
   }
 
+  /**
+   * Marque un objectif AS-IS comme atteint (passage à LES_DEUX = conservé dans
+   * la cible). Possible uniquement si toutes les solutions qui adressent les
+   * écarts de cet objectif ont un avancement TERMINEE, et qu'il en existe au
+   * moins une. Empêche un passage manuel arbitraire non justifié par l'avancement
+   * réel des solutions.
+   */
+  async marquerAtteint(id: string, organisationId: string) {
+    const objectif = await this.getOwned(id, organisationId);
+    if (objectif.statut !== 'AS_IS') {
+      throw new BadRequestException("Seul un objectif AS-IS peut être marqué comme atteint.");
+    }
+
+    const gaps = await this.prisma.solutionGap.findMany({
+      where: { solution: { organisationId }, domaine: 'OBJECTIF', elementId: id },
+      include: { solution: { select: { avancement: true } } },
+    });
+
+    if (gaps.length === 0) {
+      throw new BadRequestException(
+        "Cet objectif n'est adressé par aucune solution. Associez-lui au moins une solution TERMINEE avant de le marquer comme atteint.",
+      );
+    }
+    const toutesTerminees = gaps.every((g) => g.solution.avancement === 'TERMINEE');
+    if (!toutesTerminees) {
+      throw new BadRequestException(
+        "Toutes les solutions liées à cet objectif doivent être TERMINEE avant de le marquer comme atteint.",
+      );
+    }
+
+    return this.prisma.objectif.update({
+      where: { id },
+      data: { statut: 'LES_DEUX' },
+      include: EVOLUTION_INCLUDE,
+    });
+  }
+
   private async getOwned(id: string, organisationId: string) {
     const objectif = await this.prisma.objectif.findUnique({ where: { id } });
     if (!objectif || objectif.organisationId !== organisationId) {

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { DomaineEcart } from '@prisma/client';
+import { AvancementSolution, DomaineEcart } from '@prisma/client';
 
 export class SolutionGapEntity {
   @ApiProperty({ description: 'Identifiant du lien.' })
@@ -21,13 +21,16 @@ export class SolutionGapEntity {
   createdAt!: Date;
 }
 
-/** Référence légère vers une solution, utilisée dans la liste globale des écarts adressés (toutes solutions confondues). */
+/** Référence légère vers une solution, utilisée dans la liste globale des écarts adressés. */
 export class SolutionGapRefEntity {
   @ApiProperty({ description: 'Identifiant de la solution.' })
   id!: string;
 
   @ApiProperty({ description: 'Nom de la solution.' })
   nom!: string;
+
+  @ApiProperty({ enum: AvancementSolution, description: "Avancement de la mise en oeuvre de la solution." })
+  avancement!: AvancementSolution;
 }
 
 export class SolutionGapWithSolutionEntity extends SolutionGapEntity {

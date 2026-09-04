@@ -8,6 +8,7 @@ import { UrbanisationService } from '../urbanisation/urbanisation.service';
 import { MembresService } from '../organisation/membres.service';
 import { AuthService } from '../auth/auth.service';
 import { Organisation, OrganisationService } from '../organisation/organisation.service';
+import { ManuelService } from '../shared/manuel.service';
 
 Chart.register(...registerables);
 
@@ -68,6 +69,16 @@ const KPIS: Kpi[] = [
           </span>
         </div>
       </div>
+
+      <button class="btn-manuel" type="button" title="Télécharger le manuel utilisateur (PDF)" (click)="telechargerManuel()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <polyline points="9 15 12 18 15 15"/>
+        </svg>
+        Manuel utilisateur
+      </button>
     </section>
 
     <section class="kpi-row">
@@ -156,7 +167,25 @@ const KPIS: Kpi[] = [
 
       @media (max-width: 700px) {
         .hero-org { width: 100%; }
+        .btn-manuel { width: 100%; justify-content: center; }
       }
+
+      .btn-manuel {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.55rem 1rem;
+        background: var(--color-primary);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 0.15s;
+      }
+      .btn-manuel:hover { background: var(--color-primary-dark, #1a3bb3); }
 
       .kpi-row {
         display: grid;
@@ -197,10 +226,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private membresService: MembresService,
     private organisationService: OrganisationService,
     public auth: AuthService,
+    private manuelService: ManuelService,
   ) {}
 
   get orgInitial(): string {
     return this.organisation?.nom?.[0]?.toUpperCase() ?? '';
+  }
+
+  telechargerManuel(): void {
+    this.manuelService.telecharger();
   }
 
   get greeting(): string {

@@ -12,4 +12,9 @@ export interface SolutionGapRefEntity {
    * Nom de la solution.
    */
   nom: string;
+
+  /**
+   * Avancement de la mise en oeuvre de la solution.
+   */
+  avancement: 'NON_DEMARRE' | 'EN_COURS' | 'TERMINEE' | 'BLOQUE';
 }

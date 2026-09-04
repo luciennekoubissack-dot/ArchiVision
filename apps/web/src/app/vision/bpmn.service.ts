@@ -10,6 +10,7 @@ import { UpdateBpmnElementDto } from '../api-client/models/update-bpmn-element-d
 import { CreateBpmnFlowDto } from '../api-client/models/create-bpmn-flow-dto';
 import { CreateBpmnProcessusDto } from '../api-client/models/create-bpmn-processus-dto';
 import { UpdateBpmnProcessusDto } from '../api-client/models/update-bpmn-processus-dto';
+import { ProcessusProgressionEntity } from '../api-client/models/processus-progression-entity';
 import { bpmnControllerFindAll } from '../api-client/fn/bpmn-processus/bpmn-controller-find-all';
 import { bpmnControllerFindOne } from '../api-client/fn/bpmn-processus/bpmn-controller-find-one';
 import { bpmnControllerGenerateVue } from '../api-client/fn/bpmn-processus/bpmn-controller-generate-vue';
@@ -65,6 +66,8 @@ export interface BpmnProcessus {
   createdAt: string;
   updatedAt: string;
   _count?: { elements: number };
+  /** Objectifs stratégiques visés par ce processus. */
+  objectifs?: Array<{ objectif: { id: string; nom: string; statut: string } }>;
 }
 
 /**
@@ -185,5 +188,23 @@ export class BpmnService {
 
   deleteFlow(flowId: string): Observable<void> {
     return bpmnControllerRemoveFlow(this.http, this.config.rootUrl, { flowId }).pipe(map(() => undefined));
+  }
+
+  // ── Objectifs visés ────────────────────────────────────────────────────────
+
+  /** Met à jour les objectifs stratégiques visés par un processus. */
+  updateObjectifs(processusId: string, objectifIds: string[]): Observable<BpmnProcessusDetail> {
+    return this.http
+      .patch<BpmnProcessusDetail>(
+        `${this.config.rootUrl}/api/v1/bpmn-processus/${processusId}/objectifs`,
+        { objectifIds },
+      );
+  }
+
+  /** Calcule la progression d'un processus vers ses objectifs cibles. */
+  getProgression(processusId: string): Observable<ProcessusProgressionEntity> {
+    return this.http.get<ProcessusProgressionEntity>(
+      `${this.config.rootUrl}/api/v1/bpmn-processus/${processusId}/progression`,
+    );
   }
 }

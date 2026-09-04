@@ -196,6 +196,8 @@ model Objectif {
   objectifAsIsId String?       @map("objectif_as_is_id")
   objectifAsIs   Objectif?     @relation("ObjectifEvolution", fields: [objectifAsIsId], references: [id], onDelete: SetNull)
   objectifsToBe  Objectif[]    @relation("ObjectifEvolution")
+  /// Processus BPMN qui visent cet objectif (lien inverse de ObjectifProcessus).
+  processus      ObjectifProcessus[]
   organisationId String
   organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now())
@@ -319,6 +321,9 @@ enum ElementKind {
 model CanevasRelation {
   id             String       @id @default(uuid())
   type           TypeRelation
+  /// Annotation libre sur le lien — utilisée par le diagramme de déploiement
+  /// pour stocker le type de lien réseau (ex. "VPN", "HTTPS", "Fibre").
+  label          String?
   sourceKind     ElementKind
   sourceId       String
   targetKind     ElementKind
@@ -571,10 +576,27 @@ model BpmnProcessus {
   organisationId String
   organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   elements       BpmnElement[]
+  /// Objectifs stratégiques visés par ce processus (lien explicite pour l'analyse des écarts).
+  objectifs      ObjectifProcessus[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@index([organisationId])
+}
+
+/// Table de jointure entre un processus BPMN et un objectif stratégique.
+/// Permet de savoir quels processus visent quel objectif, et donc de calculer
+/// la progression AS-IS → TO-BE d'un objectif à partir de l'avancement des
+/// solutions qui adressent les écarts de ses processus.
+model ObjectifProcessus {
+  processusId String
+  processus   BpmnProcessus @relation(fields: [processusId], references: [id], onDelete: Cascade)
+  objectifId  String
+  objectif    Objectif      @relation(fields: [objectifId], references: [id], onDelete: Cascade)
+
+  @@id([processusId, objectifId])
+  @@index([processusId])
+  @@index([objectifId])
 }
 
 model BpmnElement {

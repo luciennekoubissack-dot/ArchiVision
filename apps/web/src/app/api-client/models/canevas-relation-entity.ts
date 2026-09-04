@@ -14,6 +14,11 @@ export interface CanevasRelationEntity {
   id: string;
 
   /**
+   * Annotation libre (ex. type de lien réseau pour le diagramme de déploiement).
+   */
+  label?: string | null;
+
+  /**
    * Identifiant de l'organisation propriétaire.
    */
   organisationId: string;

@@ -23,6 +23,8 @@ import { BpmnProcessusDetailEntity } from './entities/bpmn-processus-detail.enti
 import { BpmnElementEntity } from './entities/bpmn-element.entity';
 import { BpmnFlowEntity } from './entities/bpmn-flow.entity';
 import { BpmnViewResultEntity } from './entities/bpmn-view-result.entity';
+import { LinkObjectifsDto } from './dto/link-objectifs.dto';
+import { ProcessusProgressionEntity } from './entities/processus-progression.entity';
 
 @ApiTags('bpmn-processus')
 @ApiBearerAuth('access-token')
@@ -99,6 +101,29 @@ export class BpmnController {
   @ApiNoContentResponse()
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.bpmnService.remove(id, requireOrganisationId(user));
+  }
+
+  @ApiOperation({
+    summary: 'Mettre à jour les objectifs stratégiques visés par un processus',
+    description: 'Remplace la liste complète des objectifs liés à ce processus.',
+  })
+  @Patch(':id/objectifs')
+  @UseGuards(RolesGuard)
+  @Roles(RoleUtilisateur.ADMINISTRATEUR, RoleUtilisateur.ARCHITECTE)
+  @ApiOkResponse({ type: BpmnProcessusDetailEntity })
+  updateObjectifs(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: LinkObjectifsDto) {
+    return this.bpmnService.updateObjectifs(id, requireOrganisationId(user), dto.objectifIds);
+  }
+
+  @ApiOperation({
+    summary: "Calculer la progression d'un processus vers ses objectifs cibles",
+    description:
+      "Retourne le taux de transition AS-IS → TO-BE des éléments, et pour chaque objectif visé, le nombre de solutions liées et leur avancement.",
+  })
+  @Get(':id/progression')
+  @ApiOkResponse({ type: ProcessusProgressionEntity })
+  getProgression(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.bpmnService.getProgression(id, requireOrganisationId(user));
   }
 
   @ApiOperation({ summary: 'Ajouter un element a un processus BPMN' })

@@ -3646,3 +3646,130 @@ Changement purement CSS et global : profite à toutes les barres d'onglets
 - Rendu isolé des règles corrigées à 800 px (une ligne) et 380 px
   (plusieurs lignes) : rectangle arrondi net, tous les libellés visibles,
   aucun rognage d'angle, pastille active correcte.
+
+---
+
+## 2026-09-04 : types de lien réseau sur le diagramme de déploiement
+
+### Ce qui a été fait
+
+Implémentation complète du typage des liens de communication dans le
+diagramme de déploiement (module Architecture technologique).
+
+**Modèle de données :**
+
+- Champ `label String?` ajouté sur `CanevasRelation` dans `schema.prisma`.
+  Stocke l'annotation du lien réseau (ex. "VPN", "HTTPS", "FIBRE").
+- Migration `20260904000000_add_canevas_relation_label` :
+  `ALTER TABLE "CanevasRelation" ADD COLUMN "label" TEXT;`
+
+**Backend (`apps/api`) :**
+
+- `CreateCanevasRelationDto` : champ `label?: string` avec `@IsOptional()`
+  + `@ApiPropertyOptional()`.
+- `CanevasRelationEntity` : champ `label?: string | null` avec
+  `@ApiPropertyOptional()`.
+
+**Client API généré (`apps/web/src/app/api-client`) :**
+
+- `CanevasRelationEntity` : `label?: string | null` ajouté ; typo `id!: string`
+  corrigé en `id: string` (le `!` non nul n'a pas de sens sur une interface
+  TypeScript, contrairement à une classe).
+- `CreateCanevasRelationDto` : `label?: string` ajouté.
+
+**Frontend (`technologie-canevas.component.ts`) :**
+
+- Type `TypeLienCommunication` : `TCP_IP | HTTPS | VPN | FIBRE | WIFI |
+  ETHERNET | AUTRE`.
+- Tables de métadonnées `LIEN_LABEL`, `LIEN_COLOR`, `LIEN_DASH` : rendu visuel
+  différencié par type (couleur + style de tirets + libellé).
+- `PendingLien` : interface de la modale de choix (fromId, toId, typeLien).
+- `onStageMouseUp` : ouvre la modale au lieu de créer le lien directement.
+- Modale dans le template : noms source et cible, `<select>` des 7 types,
+  aperçu SVG inline en temps réel.
+- `confirmLien()` : crée la relation avec `type: 'ASSOCIATION'` et
+  `label: p.typeLien` ; le `as any` supprimé maintenant que `CreateCanevasRelationDto`
+  accepte `label`.
+- `extractLienType(rel)` : lit `rel.label` et tombe sur `TCP_IP` par défaut.
+- `redrawRelations()` : trait coloré, style de tirets selon le type, fond blanc
+  derrière l'annotation textuelle.
+- `exportPng()` : garde-fou contre canvas 0×0.
+
+### Vérifié
+
+- `tsc --noEmit` (frontend) sur les 3 fichiers modifiés : aucune erreur.
+- Diagnostics TypeScript via l'IDE : 0 erreur sur `technologie-canevas.component.ts`,
+  `canevas-relation-entity.ts` et `create-canevas-relation-dto.ts`.
+
+---
+
+## 2026-09-04 : analyse des écarts enrichie — progression TOGAF ADM complète
+
+### Contexte
+
+L'analyse des écarts (module Écarts) fonctionnait de façon statique : la matrice
+lisait le champ `statut` (AS_IS/TO_BE/LES_DEUX) de chaque élément et le
+classifiait, sans jamais prendre en compte l'avancement réel des solutions. Un
+objectif AS_IS restait AS_IS pour toujours, même si toutes ses solutions avaient
+l'avancement TERMINEE. Il n'y avait aucun lien entre processus BPMN et objectifs
+stratégiques, et aucune vue de progression.
+
+### Ce qui a été fait
+
+**Modèle de données (schéma + migration) :**
+
+- Nouveau modèle `ObjectifProcessus` : table de jointure `BpmnProcessus ↔ Objectif`
+  (clé primaire composite, cascade sur suppression). Migration
+  `20260904100000_add_objectif_processus_link`.
+- `BpmnProcessus.objectifs` et `Objectif.processus` : relations inverses ajoutées
+  dans `schema.prisma`.
+
+**Backend :**
+
+- `BpmnService.updateObjectifs()` : remplace la liste des objectifs visés par un
+  processus, avec validation d'appartenance à l'organisation.
+- `BpmnService.getProgression()` : calcule pour un processus le taux de transition
+  AS-IS vers TO-BE (éléments LES_DEUX / total) et, pour chaque objectif visé,
+  le nombre de solutions liées et leur avancement, plus le booléen
+  `peutEtreMarqueAtteint` (toutes solutions TERMINEE et objectif encore AS_IS).
+- `ObjectifService.marquerAtteint()` : passe un objectif AS_IS à LES_DEUX après
+  vérification que toutes les solutions liées sont bien TERMINEE. Refuse avec
+  `BadRequestException` si aucune solution n'est liée ou si l'une d'elles n'est
+  pas TERMINEE.
+- `SolutionService.listGaps()` : inclut désormais `avancement` sur la solution
+  (champ `solution.avancement` dans la réponse), nécessaire pour calculer l'état
+  Réalisé côté frontend.
+- Deux nouveaux endpoints sur `BpmnController` :
+  `PATCH /bpmn-processus/:id/objectifs` et `GET /bpmn-processus/:id/progression`.
+- Nouvel endpoint `PATCH /objectifs/:id/marquer-atteint`.
+- Nouvelles entités Swagger : `ProcessusProgressionEntity`,
+  `ObjectifProgressionItemEntity`.
+
+**Frontend :**
+
+- `bpmn.service.ts` : `BpmnProcessus.objectifs` ajouté, deux nouvelles méthodes
+  `updateObjectifs()` et `getProgression()`.
+- `objectif.service.ts` : méthode `marquerAtteint()`.
+- `gap-analysis.service.ts` : nouveau type `EtatGap` (Conservé/Éliminé/Modifié/
+  Nouveau/Réalisé), méthode `applyRealise()` qui applique l'état Réalisé aux
+  lignes dont toutes les solutions liées ont `avancement = TERMINEE`.
+- `ecarts.component.ts` entièrement enrichi :
+  - Colonne « Couverture solution » dans la matrice : Non adressé / Adressé /
+    En cours / Réalisé (calcul `coverageOf()` basé sur l'avancement réel des
+    solutions, pas juste leur existence).
+  - Compteur « Réalisés » dans le bandeau de stats.
+  - Bouton « Marquer atteint » sur les lignes Objectifs dont toutes les solutions
+    sont TERMINEE, avec retour d'erreur serveur si la condition n'est pas remplie.
+  - Vue Processus : barre de progression (taux de transition + stats éléments),
+    section « Objectifs stratégiques visés » avec mini-barre par objectif et
+    bouton « Marquer atteint » depuis la vue processus également.
+  - Badge sur chaque ligne de la liste de processus indiquant le nombre d'objectifs
+    liés.
+- Nouveaux fichiers api-client : `processus-progression-entity.ts`,
+  `solution-gap-ref-entity.ts` mis à jour (ajout de `avancement`).
+
+### Vérifié
+
+- Diagnostics TypeScript : 0 erreur sur tous les fichiers modifiés (backend et frontend).
+- Logique TOGAF : la chaîne causale complète est désormais traçable dans l'application
+  (Processus → Objectif → Écart → Solution TERMINEE → Marquer atteint).

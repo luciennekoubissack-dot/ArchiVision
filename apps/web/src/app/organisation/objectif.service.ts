@@ -47,4 +47,11 @@ export class ObjectifService {
   delete(id: string): Observable<void> {
     return objectifControllerRemove(this.http, this.config.rootUrl, { id }).pipe(map(() => undefined));
   }
+
+  /** Marque un objectif AS-IS comme atteint (LES_DEUX) via PATCH :id/marquer-atteint. */
+  marquerAtteint(id: string): Observable<Objectif> {
+    return this.http
+      .patch<Objectif>(`${this.config.rootUrl}/api/v1/objectifs/${id}/marquer-atteint`, {})
+      .pipe(map((r) => r));
+  }
 }

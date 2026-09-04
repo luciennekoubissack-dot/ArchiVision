@@ -1010,6 +1010,9 @@ export class OrganisationComponent implements OnInit {
         this.closeMembrePopover();
         this.toast.success('Membre créé.');
         this.loadMembres();
+        // Rafraîchir la liste des titulaires pour que le nouveau membre
+        // apparaisse immédiatement dans le sélecteur de la section Structures.
+        this.loadMembresTitulaire();
       },
       error: (err) => {
         this.creatingMembre = false;
@@ -1050,6 +1053,7 @@ export class OrganisationComponent implements OnInit {
       next: () => {
         this.toast.success('Membre supprimé.');
         this.loadMembres();
+        this.loadMembresTitulaire();
       },
       error: (err) =>
         this.toast.error(

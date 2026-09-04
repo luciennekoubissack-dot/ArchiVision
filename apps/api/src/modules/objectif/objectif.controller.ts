@@ -67,4 +67,17 @@ export class ObjectifController {
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(id, requireOrganisationId(user));
   }
+
+  @ApiOperation({
+    summary: "Marquer un objectif AS-IS comme atteint (passage à LES_DEUX).",
+    description:
+      "Possible uniquement si toutes les solutions liées aux écarts de cet objectif ont un avancement TERMINEE. Le statut passe de AS_IS à LES_DEUX (objectif atteint, conservé dans l'architecture cible).",
+  })
+  @Patch(':id/marquer-atteint')
+  @UseGuards(RolesGuard)
+  @Roles(RoleUtilisateur.ADMINISTRATEUR, RoleUtilisateur.ARCHITECTE)
+  @ApiOkResponse({ type: ObjectifEntity })
+  marquerAtteint(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.marquerAtteint(id, requireOrganisationId(user));
+  }
 }

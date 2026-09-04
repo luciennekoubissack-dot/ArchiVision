@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ElementKind, TypeRelation } from '@prisma/client';
 
 /** Relation entre deux éléments du canevas, potentiellement de couches
@@ -11,6 +11,9 @@ export class CanevasRelationEntity {
 
   @ApiProperty({ enum: TypeRelation, description: 'Type de relation entre les deux éléments du canevas.' })
   type!: TypeRelation;
+
+  @ApiPropertyOptional({ description: 'Annotation libre (ex. type de lien réseau pour le diagramme de déploiement).' })
+  label?: string | null;
 
   @ApiProperty({ enum: ElementKind, description: "Nature de l'élément source (type de brique du canevas)." })
   sourceKind!: ElementKind;

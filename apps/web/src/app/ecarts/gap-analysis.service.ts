@@ -5,11 +5,11 @@ import { ArchimateService } from '../architecture-metier/archimate.service';
 import { DonneesService } from '../donnees/donnees.service';
 import { UrbanisationService } from '../urbanisation/urbanisation.service';
 import { TechnologieService } from '../technologie/technologie.service';
-import { DomaineEcart } from '../opportunites/solution.service';
+import { DomaineEcart, SolutionGap } from '../opportunites/solution.service';
 
 export type DomainTab = 'objectifs' | 'metier' | 'donnees' | 'applicatif' | 'technologique';
 
-/** Correspondance entre l'onglet de domaine (Analyse des écarts) et l'enum `DomaineEcart` du lien Solution↔écart (Opportunités & solutions). */
+/** Correspondance entre l'onglet de domaine (Analyse des écarts) et l'enum `DomaineEcart`. */
 export const DOMAIN_TO_DOMAINE_ECART: Record<DomainTab, DomaineEcart> = {
   objectifs: 'OBJECTIF',
   metier: 'METIER',
@@ -24,11 +24,21 @@ export interface GapItem {
   nom: string;
 }
 
-/** Une ligne de la matrice d'écarts TOGAF : un élément AS-IS et/ou TO-BE, avec son état de transition. */
+/**
+ * État d'un écart dans la matrice TOGAF.
+ * - Conservé : élément inchangé entre AS-IS et TO-BE.
+ * - Éliminé : élément AS-IS sans évolution déclarée.
+ * - Modifié : élément AS-IS avec une ou plusieurs évolutions TO-BE déclarées.
+ * - Nouveau : élément TO-BE sans origine AS-IS déclarée.
+ * - Réalisé : état Éliminé ou Modifié dont toutes les solutions liées sont TERMINEE.
+ */
+export type EtatGap = 'Conservé' | 'Éliminé' | 'Modifié' | 'Nouveau' | 'Réalisé';
+
+/** Une ligne de la matrice d'écarts TOGAF. */
 export interface GapRow {
   asIs: GapItem | null;
   toBe: GapItem[];
-  etat: 'Conservé' | 'Éliminé' | 'Modifié' | 'Nouveau';
+  etat: EtatGap;
 }
 
 export const DOMAIN_LABEL: Record<DomainTab, string> = {
@@ -40,11 +50,9 @@ export const DOMAIN_LABEL: Record<DomainTab, string> = {
 };
 
 /**
- * Construit les matrices d'écarts TOGAF (Baseline AS-IS / Target TO-BE /
- * État) pour les 5 domaines qui portent un `statut` AS_IS/TO_BE/LES_DEUX.
- * Partagé entre Analyse des écarts (affichage) et Opportunités & solutions
- * (sélection de l'écart adressé par une solution), pour ne calculer cette
- * logique qu'à un seul endroit.
+ * Construit les matrices d'écarts TOGAF (Baseline AS-IS / Target TO-BE / État)
+ * pour les 5 domaines portant un `statut` AS_IS/TO_BE/LES_DEUX.
+ * Partagé entre Analyse des écarts et Opportunités & solutions.
  */
 @Injectable({ providedIn: 'root' })
 export class GapAnalysisService {
@@ -73,13 +81,31 @@ export class GapAnalysisService {
   }
 
   /**
-   * Matrice d'écarts TOGAF pour les objectifs : une ligne par objectif AS-IS
-   * (conservé, éliminé ou modifié selon qu'il a ou non une évolution TO-BE
-   * déclarée), plus une ligne par objectif TO-BE sans origine déclarée
-   * (nouveau). Seuls les objectifs portent un lien d'évolution explicite
-   * (`objectifAsIsId`) : c'est le seul domaine qui peut produire l'état
-   * « Modifié ».
+   * Applique l'état "Réalisé" aux lignes dont toutes les solutions liées sont TERMINEE.
+   * À appeler après avoir récupéré les gaps via SolutionService.listGaps().
    */
+  applyRealise(rows: GapRow[], allGaps: SolutionGap[], domaine: DomaineEcart): GapRow[] {
+    return rows.map((row) => {
+      // Seules les lignes Éliminé ou Modifié peuvent devenir Réalisé
+      if (row.etat !== 'Éliminé' && row.etat !== 'Modifié') return row;
+
+      const targets = row.toBe.length > 0 ? row.toBe : row.asIs ? [row.asIs] : [];
+      const solutionsLiees = targets.flatMap((t) =>
+        allGaps.filter((g) => g.domaine === domaine && g.elementId === t.id),
+      );
+
+      if (solutionsLiees.length === 0) return row;
+
+      const toutesTerminees = solutionsLiees.every(
+        (g) => (g.solution as { avancement?: string })?.avancement === 'TERMINEE',
+      );
+      if (toutesTerminees) {
+        return { ...row, etat: 'Réalisé' as EtatGap };
+      }
+      return row;
+    });
+  }
+
   private buildObjectifRows(objectifs: Objectif[]): GapRow[] {
     const rows: GapRow[] = [];
 
@@ -97,13 +123,6 @@ export class GapAnalysisService {
     return rows;
   }
 
-  /**
-   * Matrice d'écarts générique pour les domaines sans lien d'évolution
-   * explicite (architecture métier, données, applicatif, technologique) :
-   * LES_DEUX → Conservé, AS_IS → Éliminé, TO_BE → Nouveau. Sans donnée de
-   * correspondance entre un élément AS-IS précis et son successeur TO-BE,
-   * l'état « Modifié » n'est pas déductible pour ces domaines.
-   */
   private buildSimpleGapRows(items: { id: string; nom: string; statut: string }[]): GapRow[] {
     const rows: GapRow[] = [];
     for (const item of items.filter((i) => i.statut === 'LES_DEUX')) {

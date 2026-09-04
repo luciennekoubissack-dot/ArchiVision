@@ -55,12 +55,13 @@ export class SolutionService {
   /**
    * Liste, pour toute l'organisation, tous les écarts déjà adressés par au
    * moins une solution — utilisé par Analyse des écarts pour repérer les
-   * écarts qui n'ont encore aucune solution proposée.
+   * écarts qui n'ont encore aucune solution proposée, et pour calculer l'état
+   * Réalisé (solution TERMINEE).
    */
   listGaps(organisationId: string) {
     return this.prisma.solutionGap.findMany({
       where: { solution: { organisationId } },
-      include: { solution: { select: { id: true, nom: true } } },
+      include: { solution: { select: { id: true, nom: true, avancement: true } } },
       orderBy: { createdAt: 'asc' },
     });
   }
