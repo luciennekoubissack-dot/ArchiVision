@@ -34,11 +34,9 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: Dockerfile.api
-      target: builder
+      dockerfile: Dockerfile.migrate
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/archivision?schema=public
-    command: ['./node_modules/.bin/prisma', 'migrate', 'deploy', '--schema', 'apps/api/prisma/schema.prisma']
     depends_on:
       postgres:
         condition: service_healthy

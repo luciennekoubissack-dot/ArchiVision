@@ -1,0 +1,20 @@
+# Image légère dédiée aux migrations Prisma.
+# Installe TOUTES les dépendances (y compris devDependencies = CLI Prisma),
+# génère le client, puis exécute `prisma migrate deploy`.
+# Utilisé comme service one-shot dans Railway avant le démarrage de l'API.
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY nest-cli.json tsconfig*.json prisma.config.ts ./
+COPY libs/ libs/
+COPY apps/api/ apps/api/
+
+# Toutes les dépendances : inclut la CLI Prisma (devDependency)
+RUN npm ci --ignore-scripts
+
+# Générer le client Prisma
+RUN npx prisma generate --schema apps/api/prisma/schema.prisma
+
+CMD ["npx", "prisma", "migrate", "deploy", "--schema", "apps/api/prisma/schema.prisma"]
