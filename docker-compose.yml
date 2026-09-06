@@ -38,7 +38,7 @@ services:
       target: builder
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/archivision?schema=public
-    command: ['npx', 'prisma', 'migrate', 'deploy', '--schema', 'apps/api/prisma/schema.prisma']
+    command: ['./node_modules/.bin/prisma', 'migrate', 'deploy', '--schema', 'apps/api/prisma/schema.prisma']
     depends_on:
       postgres:
         condition: service_healthy

@@ -45,6 +45,10 @@ RUN npm ci --omit=dev --omit=optional --ignore-scripts
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+# Copier la CLI Prisma (devDependency absente du runtime) pour permettre
+# au service `migrate` de lancer `prisma migrate deploy` depuis cette image.
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY apps/api/prisma/schema.prisma ./apps/api/prisma/schema.prisma
 
 # Le conteneur tourne en utilisateur non-root (image node:alpine par défaut :
