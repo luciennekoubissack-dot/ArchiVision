@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TypeFluxEchange } from '@prisma/client';
 import { ApplicationEntity } from './application.entity';
 
 /**
@@ -20,8 +21,14 @@ export class EchangeEntity {
   @ApiPropertyOptional({ description: "Description de l'échange.", nullable: true, type: String })
   description?: string | null;
 
-  @ApiPropertyOptional({ description: "Protocole utilisé pour l'échange.", nullable: true, type: String })
+  @ApiPropertyOptional({ description: "Protocole utilisé pour l'échange (ex. REST, SOAP, EDI, SFTP).", nullable: true, type: String })
   protocole?: string | null;
+
+  @ApiProperty({
+    enum: TypeFluxEchange,
+    description: "Nature du couplage : SYNCHRONE (appel direct REST/SOAP), ASYNCHRONE (bus/événement), BATCH (fichier/ETL).",
+  })
+  typeFlux!: TypeFluxEchange;
 
   @ApiProperty({ description: "Date de création de l'échange.", type: String, format: 'date-time' })
   createdAt!: Date;

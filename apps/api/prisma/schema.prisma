@@ -374,17 +374,28 @@ model ApplicationService {
   @@index([applicationId])
 }
 
+/// Type d'un flux d'échange entre deux applications — qualifie la nature
+/// du couplage entre blocs applicatifs dans la démarche d'urbanisation du SI.
+enum TypeFluxEchange {
+  SYNCHRONE   // appel direct, réponse immédiate attendue (REST, SOAP)
+  ASYNCHRONE  // message envoyé sans attente de réponse (file, événement, ESB)
+  BATCH       // traitement différé en lot (fichier, ETL, nuit)
+}
+
 /// Flux d'échange entre deux applications — diagramme de composants UML
 /// (architecture applicative, étape 5 de l'assistant TOGAF ADM).
+/// `typeFlux` qualifie la nature du couplage pour l'urbanisation du SI :
+/// synchrone (REST/SOAP), asynchrone (bus/événement) ou batch (fichier/ETL).
 model ApplicationEchange {
-  id          String      @id @default(uuid())
+  id          String           @id @default(uuid())
   sourceId    String
-  source      Application @relation("EchangeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  source      Application      @relation("EchangeSource", fields: [sourceId], references: [id], onDelete: Cascade)
   targetId    String
-  target      Application @relation("EchangeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  target      Application      @relation("EchangeTarget", fields: [targetId], references: [id], onDelete: Cascade)
   description String?
   protocole   String?
-  createdAt   DateTime    @default(now())
+  typeFlux    TypeFluxEchange  @default(SYNCHRONE)
+  createdAt   DateTime         @default(now())
 
   @@index([sourceId])
   @@index([targetId])

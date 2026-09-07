@@ -9,7 +9,7 @@ export interface CreateEchangeDto {
   description?: string;
 
   /**
-   * Protocole utilisé pour l'échange.
+   * Protocole utilisé pour l'échange (ex. REST, SOAP, EDI, SFTP).
    */
   protocole?: string;
 
@@ -22,4 +22,9 @@ export interface CreateEchangeDto {
    * Identifiant de l'application cible de l'échange.
    */
   targetId: string;
+
+  /**
+   * Nature du couplage : SYNCHRONE (appel direct), ASYNCHRONE (bus/événement), BATCH (fichier/ETL).
+   */
+  typeFlux?: 'SYNCHRONE' | 'ASYNCHRONE' | 'BATCH';
 }

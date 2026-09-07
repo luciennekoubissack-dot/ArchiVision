@@ -20,9 +20,14 @@ export interface EchangeEntity {
   id: string;
 
   /**
-   * Protocole utilisé pour l'échange.
+   * Protocole utilisé pour l'échange (ex. REST, SOAP, EDI, SFTP).
    */
   protocole?: string | null;
+
+  /**
+   * Nature du couplage : SYNCHRONE (appel direct REST/SOAP), ASYNCHRONE (bus/événement), BATCH (fichier/ETL).
+   */
+  typeFlux: 'SYNCHRONE' | 'ASYNCHRONE' | 'BATCH';
 
   /**
    * Application source de l'échange.
