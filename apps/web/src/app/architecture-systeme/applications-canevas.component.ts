@@ -26,6 +26,7 @@ interface PendingEchange {
   targetId: string;
   description: string;
   protocole: string;
+  typeFlux: 'SYNCHRONE' | 'ASYNCHRONE' | 'BATCH';
 }
 
 interface PendingCreate {
@@ -77,6 +78,14 @@ interface PendingCreate {
       <form class="card form-card" (submit)="confirmEchange($event)">
         <h3>Nouvel échange</h3>
         <p class="muted">{{ appLabel(pe.sourceId) }} → {{ appLabel(pe.targetId) }}</p>
+        <label class="field">
+          Type de flux *
+          <select [value]="pe.typeFlux" (change)="pe.typeFlux = $any($event.target).value">
+            <option value="SYNCHRONE">Synchrone — appel direct (REST, SOAP)</option>
+            <option value="ASYNCHRONE">Asynchrone — bus / événement (ESB, MQ)</option>
+            <option value="BATCH">Batch — traitement différé (ETL, fichier)</option>
+          </select>
+        </label>
         <label class="field">
           Description (facultatif)
           <input type="text" placeholder="ex. Synchronisation des commandes" [value]="pe.description" (input)="pe.description = $any($event.target).value" />
