@@ -1,5 +1,10 @@
--- CreateEnum
-CREATE TYPE "TypeFluxEchange" AS ENUM ('SYNCHRONE', 'ASYNCHRONE', 'BATCH');
+-- Duplicate of 20260907145920_add_flux_echange_type (same enum + column).
+-- Made idempotent so production can retry after the failed deploy (P3009).
 
--- AlterTable
-ALTER TABLE "ApplicationEchange" ADD COLUMN "typeFlux" "TypeFluxEchange" NOT NULL DEFAULT 'SYNCHRONE';
+DO $$ BEGIN
+    CREATE TYPE "TypeFluxEchange" AS ENUM ('SYNCHRONE', 'ASYNCHRONE', 'BATCH');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+ALTER TABLE "ApplicationEchange" ADD COLUMN IF NOT EXISTS "typeFlux" "TypeFluxEchange" NOT NULL DEFAULT 'SYNCHRONE';
