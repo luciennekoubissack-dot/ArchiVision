@@ -299,17 +299,20 @@ export class ApplicationsComponent implements OnInit {
 
   /** Fusionne échangesSource/échangesTarget en une liste unique orientée depuis `app`. */
   appLinks(app: Application): { id: string; direction: string; otherNom: string; meta: string }[] {
+    const FLUX_LABEL: Record<string, string> = {
+      SYNCHRONE: 'Synchrone', ASYNCHRONE: 'Asynchrone', BATCH: 'Batch',
+    };
     const asSource = (app.echangesSource ?? []).map((e) => ({
       id: e.id,
       direction: '→',
       otherNom: e.target?.nom ?? '?',
-      meta: [e.description, e.protocole].filter(Boolean).join(' · '),
+      meta: [e.typeFlux ? FLUX_LABEL[e.typeFlux] : null, e.description, e.protocole].filter(Boolean).join(' · '),
     }));
     const asTarget = (app.echangesTarget ?? []).map((e) => ({
       id: e.id,
       direction: '←',
       otherNom: e.source?.nom ?? '?',
-      meta: [e.description, e.protocole].filter(Boolean).join(' · '),
+      meta: [e.typeFlux ? FLUX_LABEL[e.typeFlux] : null, e.description, e.protocole].filter(Boolean).join(' · '),
     }));
     return [...asSource, ...asTarget];
   }

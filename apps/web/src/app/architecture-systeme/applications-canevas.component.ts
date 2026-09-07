@@ -619,7 +619,13 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
       }),
     );
 
-    const label = [echange.description, echange.protocole].filter(Boolean).join(' · ');
+    const FLUX_LABEL: Record<string, string> = {
+      SYNCHRONE: '⇒ sync',
+      ASYNCHRONE: '⇢ async',
+      BATCH: '⇒ batch',
+    };
+    const fluxTag = echange.typeFlux ? FLUX_LABEL[echange.typeFlux] ?? '' : '';
+    const label = [fluxTag, echange.description, echange.protocole].filter(Boolean).join(' · ');
     if (label) {
       const midX = (start.x + end.x) / 2;
       const midY = (start.y + end.y) / 2;
@@ -687,7 +693,7 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
     this.layer.batchDraw();
 
     if (targetId && targetId !== fromId) {
-      this.pendingEchange = { sourceId: fromId, targetId, description: '', protocole: '' };
+      this.pendingEchange = { sourceId: fromId, targetId, description: '', protocole: '', typeFlux: 'SYNCHRONE' };
     }
   }
 
@@ -720,6 +726,7 @@ export class ApplicationsCanevasComponent implements AfterViewInit, OnDestroy {
         targetId: pe.targetId,
         description: pe.description || undefined,
         protocole: pe.protocole || undefined,
+        typeFlux: pe.typeFlux,
       })
       .subscribe({
         next: () => {

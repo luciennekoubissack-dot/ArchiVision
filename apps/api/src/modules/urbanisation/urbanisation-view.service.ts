@@ -114,6 +114,15 @@ interface AppRef {
   nom: string;
 }
 
+interface EchangeRef {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  description?: string | null;
+  protocole?: string | null;
+  typeFlux?: string | null;
+}
+
 interface ZoneApplicationRef {
   application: AppRef;
 }
@@ -144,29 +153,39 @@ export class UrbanisationViewService {
   constructor(private readonly prisma: PrismaService) {}
 
   async generate(organisationId: string): Promise<UrbanisationViewResult> {
-    const roots = (await this.prisma.zoneUrbanisation.findMany({
-      where: { organisationId, parentId: null },
-      orderBy: { nom: 'asc' },
-      include: {
-        applications: { include: { application: { select: { id: true, nom: true } } } },
-        enfants: {
-          orderBy: { nom: 'asc' },
-          include: {
-            applications: {
-              include: { application: { select: { id: true, nom: true } } },
-            },
-            enfants: {
-              orderBy: { nom: 'asc' },
-              include: {
-                applications: {
-                  include: { application: { select: { id: true, nom: true } } },
+    const [roots, echanges] = await Promise.all([
+      this.prisma.zoneUrbanisation.findMany({
+        where: { organisationId, parentId: null },
+        orderBy: { nom: 'asc' },
+        include: {
+          applications: { include: { application: { select: { id: true, nom: true } } } },
+          enfants: {
+            orderBy: { nom: 'asc' },
+            include: {
+              applications: {
+                include: { application: { select: { id: true, nom: true } } },
+              },
+              enfants: {
+                orderBy: { nom: 'asc' },
+                include: {
+                  applications: {
+                    include: { application: { select: { id: true, nom: true } } },
+                  },
                 },
               },
             },
           },
         },
-      },
-    })) as unknown as ZoneNode[];
+      }) as unknown as ZoneNode[],
+      this.prisma.applicationEchange.findMany({
+        where: { source: { organisationId } },
+        select: {
+          id: true, sourceId: true, targetId: true,
+          description: true, protocole: true,
+          typeFlux: true,
+        },
+      }),
+    ]);
 
     const zoneCount = this.countZones(roots);
     const applicationCount = this.countApplications(roots);
@@ -206,22 +225,29 @@ export class UrbanisationViewService {
     };
     const bottomBand: Rect = { x: contentX, y: midY + POS_CENTER_H + POS_GAP, w: contentW, h: POS_BAND_H };
 
+    // Carte appId → centre de l'îlot contenant cette application
+    const appToIlotCenter = new Map<string, { x: number; y: number; ilotId: string }>();
+
     const layers = [
-      this.renderPosLayer('ECHANGE', topBand, byLayer.ECHANGE, 'row'),
-      this.renderPosLayer('PILOTAGE', leftCol, byLayer.PILOTAGE, 'col'),
-      this.renderPosLayer('OPERATION', centerCol, byLayer.OPERATION, 'quartiers'),
-      this.renderPosLayer('DONNEES', rightCol, byLayer.DONNEES, 'col'),
-      this.renderPosLayer('RESSOURCE', bottomBand, byLayer.RESSOURCE, 'row'),
+      this.renderPosLayer('ECHANGE', topBand, byLayer.ECHANGE, 'row', appToIlotCenter),
+      this.renderPosLayer('PILOTAGE', leftCol, byLayer.PILOTAGE, 'col', appToIlotCenter),
+      this.renderPosLayer('OPERATION', centerCol, byLayer.OPERATION, 'quartiers', appToIlotCenter),
+      this.renderPosLayer('DONNEES', rightCol, byLayer.DONNEES, 'col', appToIlotCenter),
+      this.renderPosLayer('RESSOURCE', bottomBand, byLayer.RESSOURCE, 'row', appToIlotCenter),
     ].join('\n');
+
+    // Flux inter-îlots : flèches entre centres des îlots de deux applications différentes
+    const fluxSvg = this.renderFluxInterIlots(echanges as EchangeRef[], appToIlotCenter);
 
     const midX = width / 2;
     const annotations = `  <text x="${POS_ANNOT_W - 4}" y="${height / 2}" transform="rotate(-90 ${POS_ANNOT_W - 4} ${height / 2})" text-anchor="middle" font-size="11" fill="#90A4AE">Vision transverse</text>
   <text x="${width - POS_ANNOT_W + 4}" y="${height / 2}" transform="rotate(90 ${width - POS_ANNOT_W + 4} ${height / 2})" text-anchor="middle" font-size="11" fill="#90A4AE">Vision métier</text>
-  <text x="${midX}" y="${height - 6}" text-anchor="middle" font-size="10" fill="#B0BEC5">Zones du POS, décomposables en quartiers puis en îlots</text>`;
+  <text x="${midX}" y="${height - 6}" text-anchor="middle" font-size="10" fill="#B0BEC5">Zones du POS, décomposables en quartiers puis en îlots — les flèches représentent les flux inter-îlots</text>`;
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="Arial, sans-serif">
   <rect x="0" y="0" width="${width}" height="${height}" fill="#FAFAFA" />
 ${layers}
+${fluxSvg}
 ${annotations}
 </svg>`;
 
@@ -247,7 +273,7 @@ ${annotations}
    * colonnes transverses (Pilotage & Contrôle, Données), `quartiers` pour
    * l'Opération (zones numérotées comme des quartiers).
    */
-  private renderPosLayer(layer: PosLayer, rect: Rect, zones: ZoneNode[], mode: 'row' | 'col' | 'quartiers'): string {
+  private renderPosLayer(layer: PosLayer, rect: Rect, zones: ZoneNode[], mode: 'row' | 'col' | 'quartiers', appToIlotCenter: Map<string, { x: number; y: number; ilotId: string }>): string {
     const meta = POS_LAYER_META[layer];
     const frame = `<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" fill="${meta.fill}" stroke="${meta.stroke}" stroke-width="1.6" rx="6" />
   <text x="${rect.x + 10}" y="${rect.y + 17}" font-size="12" font-weight="bold" fill="${meta.ink}">${this.escape(meta.title)}</text>`;
