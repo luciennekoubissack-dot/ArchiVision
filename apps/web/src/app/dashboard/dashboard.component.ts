@@ -9,6 +9,8 @@ import { MembresService } from '../organisation/membres.service';
 import { AuthService } from '../auth/auth.service';
 import { Organisation, OrganisationService } from '../organisation/organisation.service';
 import { ManuelService } from '../shared/manuel.service';
+import { CompletudeDashboardComponent } from '../shared/completude-dashboard.component';
+import { SuggestionToBeComponent } from '../shared/suggestion-tobe.component';
 
 Chart.register(...registerables);
 
@@ -42,7 +44,7 @@ const KPIS: Kpi[] = [
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CompletudeDashboardComponent, SuggestionToBeComponent],
   template: `
     <section class="card hero-banner">
       <div class="hero-user" *ngIf="auth.currentUser() as user">
@@ -79,7 +81,19 @@ const KPIS: Kpi[] = [
         </svg>
         Manuel utilisateur
       </button>
+      <button class="btn-suggestions" type="button" title="Générer des suggestions TO-BE" (click)="showSuggestions = true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+        </svg>
+        Suggestions TO-BE
+      </button>
     </section>
+
+    <!-- Modal suggestions TO-BE -->
+    <app-suggestion-tobe
+      *ngIf="showSuggestions"
+      (closed)="showSuggestions = false"
+    ></app-suggestion-tobe>
 
     <section class="kpi-row">
       <div class="card kpi card-hover" *ngFor="let kpi of kpis">
@@ -108,6 +122,8 @@ const KPIS: Kpi[] = [
         </div>
       </section>
     </section>
+
+    <app-completude-dashboard />
   `,
   styles: [
     `
@@ -187,6 +203,23 @@ const KPIS: Kpi[] = [
       }
       .btn-manuel:hover { background: var(--color-primary-dark, #1a3bb3); }
 
+      .btn-suggestions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.55rem 1rem;
+        background: transparent;
+        color: var(--color-primary);
+        border: 1.5px solid var(--color-primary);
+        border-radius: var(--radius-md);
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: all 0.15s;
+      }
+      .btn-suggestions:hover { background: var(--color-primary); color: #fff; }
+
       .kpi-row {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -216,6 +249,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   counts = { capacites: 0, elements: 0, applications: 0, zones: 0, membres: null as number | null };
   loaded = false;
   organisation?: Organisation;
+  showSuggestions = false;
   private elements: ElementArchimate[] = [];
   private viewReady = false;
   private elementsChart?: Chart;

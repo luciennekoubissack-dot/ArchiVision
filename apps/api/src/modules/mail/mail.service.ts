@@ -106,13 +106,21 @@ export class MailService implements OnModuleInit {
       this.logger.log(`[MAIL:SIMULÉ] À: ${email.to} | Sujet: ${email.subject}\n${email.body}`);
       return email;
     }
-    await this.transporter.sendMail({
-      from: this.from,
-      to: email.to,
-      subject: email.subject,
-      text: email.body,
-    });
-    this.logger.log(`E-mail envoyé à ${email.to} (${email.subject}).`);
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: email.to,
+        subject: email.subject,
+        text: email.body,
+      });
+      this.logger.log(`E-mail envoyé à ${email.to} (${email.subject}).`);
+    } catch (err) {
+      this.logger.error(
+        `Échec de l'envoi à ${email.to} (${email.subject}) : ${(err as Error).message}`,
+      );
+      // On laisse remonter l'erreur : l'appelant décide si c'est bloquant ou non.
+      throw err;
+    }
     return email;
   }
 }

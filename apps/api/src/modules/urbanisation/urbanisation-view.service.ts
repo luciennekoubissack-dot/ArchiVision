@@ -231,11 +231,11 @@ export class UrbanisationViewService {
     const appToIlotCenter = new Map<string, { x: number; y: number; ilotId: string }>();
 
     const layers = [
-      this.renderPosLayer('ECHANGE', topBand, byLayer.ECHANGE, 'row'),
-      this.renderPosLayer('PILOTAGE', leftCol, byLayer.PILOTAGE, 'col'),
-      this.renderPosLayer('OPERATION', centerCol, byLayer.OPERATION, 'quartiers'),
-      this.renderPosLayer('DONNEES', rightCol, byLayer.DONNEES, 'col'),
-      this.renderPosLayer('RESSOURCE', bottomBand, byLayer.RESSOURCE, 'row'),
+      this.renderPosLayer('ECHANGE', topBand, byLayer.ECHANGE, 'row', appToIlotCenter),
+      this.renderPosLayer('PILOTAGE', leftCol, byLayer.PILOTAGE, 'col', appToIlotCenter),
+      this.renderPosLayer('OPERATION', centerCol, byLayer.OPERATION, 'quartiers', appToIlotCenter),
+      this.renderPosLayer('DONNEES', rightCol, byLayer.DONNEES, 'col', appToIlotCenter),
+      this.renderPosLayer('RESSOURCE', bottomBand, byLayer.RESSOURCE, 'row', appToIlotCenter),
     ].join('\n');
 
     // Flux inter-îlots : flèches entre centres des îlots de deux applications différentes
@@ -247,6 +247,11 @@ export class UrbanisationViewService {
   <text x="${midX}" y="${height - 6}" text-anchor="middle" font-size="10" fill="#B0BEC5">Zones du POS, décomposables en quartiers puis en îlots — les flèches représentent les flux inter-îlots</text>`;
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="Arial, sans-serif">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4E79A7" />
+    </marker>
+  </defs>
   <rect x="0" y="0" width="${width}" height="${height}" fill="#FAFAFA" />
 ${layers}
 ${fluxSvg}
@@ -275,7 +280,7 @@ ${annotations}
    * colonnes transverses (Pilotage & Contrôle, Données), `quartiers` pour
    * l'Opération (zones numérotées comme des quartiers).
    */
-  private renderPosLayer(layer: PosLayer, rect: Rect, zones: ZoneNode[], mode: 'row' | 'col' | 'quartiers'): string {
+  private renderPosLayer(layer: PosLayer, rect: Rect, zones: ZoneNode[], mode: 'row' | 'col' | 'quartiers', appToIlotCenter: Map<string, { x: number; y: number; ilotId: string }>): string {
     const meta = POS_LAYER_META[layer];
     const frame = `<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" fill="${meta.fill}" stroke="${meta.stroke}" stroke-width="1.6" rx="6" />
   <text x="${rect.x + 10}" y="${rect.y + 17}" font-size="12" font-weight="bold" fill="${meta.ink}">${this.escape(meta.title)}</text>`;
@@ -304,7 +309,7 @@ ${annotations}
     const numbered = mode === 'quartiers';
     const body = zones
       .map((zone, i) =>
-        this.renderNode(numbered ? { ...zone, nom: `${i + 1}. ${zone.nom}` } : zone, cells[i]),
+        this.renderNode(numbered ? { ...zone, nom: `${i + 1}. ${zone.nom}` } : zone, cells[i], appToIlotCenter),
       )
       .join('\n');
     return `<g>\n${frame}\n${body}\n</g>`;
@@ -508,7 +513,7 @@ ${boxesSvg}
     return { x: fromCx + dx * scale, y: fromCy + dy * scale };
   }
 
-  private renderNode(node: ZoneNode, rect: Rect): string {
+  private renderNode(node: ZoneNode, rect: Rect, appToIlotCenter: Map<string, { x: number; y: number; ilotId: string }>): string {
     const style = STYLE_BY_TYPE[node.type];
     const header = `<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" fill="${style.fill}" stroke="${style.stroke}" stroke-width="1.5" rx="4" />
   <text x="${rect.x + 6}" y="${rect.y + 15}" font-size="11" font-weight="bold" fill="${style.stroke}">${this.escape(this.truncate(node.nom, 28))}</text>`;
@@ -518,10 +523,19 @@ ${boxesSvg}
     const innerW = rect.w - INNER_PADDING * 2;
     const innerH = rect.h - HEADER_HEIGHT - INNER_PADDING;
 
+    // Pour les îlots : enregistrer le centre dans la carte des flux
+    if (node.type === 'ILOT') {
+      const centerX = rect.x + rect.w / 2;
+      const centerY = rect.y + rect.h / 2;
+      for (const ref of node.applications) {
+        appToIlotCenter.set(ref.application.id, { x: centerX, y: centerY, ilotId: node.id });
+      }
+    }
+
     if (node.enfants && node.enfants.length > 0) {
       const childCells = this.gridCells(node.enfants.length, innerX, innerY, innerW, innerH);
       const children = node.enfants
-        .map((child, i) => this.renderNode(child, childCells[i]))
+        .map((child, i) => this.renderNode(child, childCells[i], appToIlotCenter))
         .join('\n');
       return `<g>\n${header}\n${children}\n</g>`;
     }

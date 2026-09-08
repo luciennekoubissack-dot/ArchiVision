@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@archivision/infrastructure';
 import { requireFrontendOrigin } from '@archivision/shared';
@@ -20,6 +20,8 @@ const CHAMP_LABELS: Record<string, string> = {
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -86,7 +88,15 @@ export class AdminService {
     });
 
     const loginUrl = `${requireFrontendOrigin(this.config)}/login`;
-    const email = await this.mail.sendOrganisationValidee(admin.email, organisation.nom, loginUrl);
+    let email: SentEmail;
+    try {
+      email = await this.mail.sendOrganisationValidee(admin.email, organisation.nom, loginUrl);
+    } catch (err) {
+      // L'envoi du mail est non-bloquant : l'organisation est déjà validée en base.
+      // On journalise l'erreur sans faire échouer la requête.
+      this.logger.error(`Impossible d'envoyer l'e-mail de validation à ${admin.email} : ${(err as Error).message}`);
+      email = { to: admin.email, subject: 'Validation (mail non envoyé)', body: '' };
+    }
     return { organisation, email };
   }
 
@@ -102,10 +112,16 @@ export class AdminService {
       where: { organisationId: id, role: RoleUtilisateur.ADMINISTRATEUR },
       select: { email: true },
     });
-    const email = await this.mail.sendOrganisationRejetee(
-      admin?.email ?? '(destinataire introuvable)',
-      organisation.nom,
-    );
+    let email: SentEmail;
+    try {
+      email = await this.mail.sendOrganisationRejetee(
+        admin?.email ?? '(destinataire introuvable)',
+        organisation.nom,
+      );
+    } catch (err) {
+      this.logger.error(`Impossible d'envoyer l'e-mail de rejet : ${(err as Error).message}`);
+      email = { to: admin?.email ?? '', subject: 'Rejet (mail non envoyé)', body: '' };
+    }
     return { organisation, email };
   }
 

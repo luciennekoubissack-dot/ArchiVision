@@ -1,11 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { BpmnElement, BpmnProcessus, BpmnService, TypeBpmn, TypeProcessus } from '../vision/bpmn.service';
 import { DomainTab, DOMAIN_LABEL, DOMAIN_TO_DOMAINE_ECART, EtatGap, GapAnalysisService, GapRow } from './gap-analysis.service';
 import { SolutionGap, SolutionService } from '../opportunites/solution.service';
 import { ObjectifService } from '../organisation/objectif.service';
 import { ObjectifProgressionItemEntity, ProcessusProgressionEntity } from '../api-client/models/processus-progression-entity';
 import { ToastService } from '../shared/toast.service';
+import { OrganisationService } from '../organisation/organisation.service';
+import { CompletudeSummary } from '../api-client/models/completude-entity';
 
 type MainTab = 'processus' | DomainTab;
 
@@ -57,13 +60,37 @@ interface GapElement extends BpmnElement {
 @Component({
   selector: 'app-ecarts',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   template: `
     <p class="muted step-question">
       Une fois les objectifs connus et les processus décrits, quels écarts existent entre l'état actuel
       (AS-IS) et la cible souhaitée (TO-BE) ? Cette analyse compare ce qui doit disparaître, apparaître ou
       rester inchangé, domaine par domaine.
     </p>
+
+    <!-- ── Barre de complétude globale ────────────────────────────────────── -->
+    <section class="card completude-summary-bar" *ngIf="completude">
+      <div class="csb-header">
+        <span class="csb-title">Couverture TO-BE par domaine</span>
+        <div class="csb-maturite" [class]="maturiteClass">
+          <span class="csb-score">{{ completude.maturite }}</span><span class="csb-max">/100</span>
+          <span class="csb-label">Maturité</span>
+        </div>
+      </div>
+      <div class="csb-domains">
+        <div class="csb-domain" *ngFor="let d of completudeDomains" (click)="selectDomain(d.tab)" [class.active]="mainTab === d.tab">
+          <span class="csb-dname">{{ d.label }}</span>
+          <div class="csb-bar-wrap">
+            <div class="csb-bar-fill" [style.width.%]="d.pct" [style.background]="barColor(d.pct)"></div>
+          </div>
+          <span class="csb-pct" [style.color]="barColor(d.pct)">{{ d.pct }}%</span>
+          <span class="csb-alert" *ngIf="d.pct === 0" title="Aucun élément TO-BE pour ce domaine">⚠</span>
+        </div>
+      </div>
+      <p class="csb-hint" *ngIf="nonAdressesGlobal > 0">
+        {{ nonAdressesGlobal }} écart{{ nonAdressesGlobal > 1 ? 's' : '' }} non adressé{{ nonAdressesGlobal > 1 ? 's' : '' }} — rendez-vous dans <a routerLink="/opportunites">Opportunités & Solutions</a> pour les couvrir.
+      </p>
+    </section>
 
     <div class="tabs">
       <button class="tab" [class.active]="mainTab === 'processus'" (click)="mainTab = 'processus'">Processus</button>
@@ -288,6 +315,33 @@ interface GapElement extends BpmnElement {
   `,
   styles: [
     `
+      /* ── Barre de complétude ───────────────────────────────────────────────── */
+      .completude-summary-bar { margin-bottom: 1.25rem; }
+      .csb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; gap: 1rem; }
+      .csb-title { font-weight: 700; font-size: 0.95rem; }
+      .csb-maturite { display: flex; align-items: baseline; gap: 0.15rem; padding: 0.35rem 0.75rem; border-radius: var(--radius-lg); flex-direction: column; text-align: center; flex-shrink: 0; }
+      .csb-maturite.green  { background: #f0fdf4; border: 1.5px solid #16a34a; }
+      .csb-maturite.orange { background: #fff7ed; border: 1.5px solid #ea580c; }
+      .csb-maturite.red    { background: #fef2f2; border: 1.5px solid #dc2626; }
+      .csb-score { font-size: 1.3rem; font-weight: 800; line-height: 1; }
+      .csb-max   { font-size: 0.75rem; color: var(--color-text-muted); }
+      .csb-label { font-size: 0.68rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+      .csb-domains { display: grid; gap: 0.45rem; }
+      .csb-domain {
+        display: grid; grid-template-columns: 170px 1fr 40px 18px;
+        align-items: center; gap: 0.6rem; cursor: pointer;
+        padding: 0.25rem 0.4rem; border-radius: 6px;
+        transition: background 0.15s;
+      }
+      .csb-domain:hover, .csb-domain.active { background: var(--color-surface); }
+      .csb-dname { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .csb-bar-wrap { height: 8px; background: var(--color-border); border-radius: 999px; overflow: hidden; }
+      .csb-bar-fill { height: 100%; border-radius: 999px; transition: width 0.4s; }
+      .csb-pct { font-size: 0.82rem; font-weight: 700; text-align: right; }
+      .csb-alert { font-size: 0.85rem; color: #ea580c; }
+      .csb-hint { font-size: 0.78rem; color: var(--color-text-muted); margin: 0.75rem 0 0; }
+      .csb-hint a { color: var(--color-primary); text-decoration: underline; }
+
       .layout { display: grid; grid-template-columns: 320px 1fr; gap: 1.25rem; align-items: start; }
       .processus-groupe { margin-bottom: 1.25rem; }
       .processus-groupe h4 { margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
@@ -374,6 +428,9 @@ export class EcartsComponent implements OnInit {
     technologique: emptyGapState(),
   };
 
+  /** Données de complétude AS-IS / TO-BE chargées depuis l'API. */
+  completude: CompletudeSummary | null = null;
+
   private allGaps: SolutionGap[] = [];
 
   constructor(
@@ -381,6 +438,7 @@ export class EcartsComponent implements OnInit {
     private gapAnalysisService: GapAnalysisService,
     private solutionService: SolutionService,
     private objectifService: ObjectifService,
+    private organisationService: OrganisationService,
     private toast: ToastService,
   ) {}
 
@@ -392,6 +450,10 @@ export class EcartsComponent implements OnInit {
     this.solutionService.listGaps().subscribe({
       next: (gaps) => (this.allGaps = gaps),
       error: () => this.toast.error('Impossible de charger les écarts adressés par les solutions.'),
+    });
+    this.organisationService.getCompletude().subscribe({
+      next: (c) => (this.completude = c),
+      error: () => { /* non-bloquant */ },
     });
   }
 
@@ -560,5 +622,45 @@ export class EcartsComponent implements OnInit {
         this.toast.error(err?.error?.message ?? "Impossible de marquer cet objectif comme atteint.");
       },
     });
+  }
+
+  // ── Complétude ────────────────────────────────────────────────────────────
+
+  get completudeDomains(): { label: string; tab: DomainTab; pct: number }[] {
+    if (!this.completude) return [];
+    return [
+      { label: 'Objectifs', tab: 'objectifs', pct: this.completude.objectifs.pct },
+      { label: 'Métier', tab: 'metier', pct: this.completude.metier.pct },
+      { label: 'Données', tab: 'donnees', pct: this.completude.donnees.pct },
+      { label: 'Applicatif', tab: 'applicatif', pct: this.completude.applicatif.pct },
+      { label: 'Technologique', tab: 'technologique', pct: this.completude.technologique.pct },
+    ];
+  }
+
+  get maturiteClass(): string {
+    const m = this.completude?.maturite ?? 0;
+    if (m >= 70) return 'green';
+    if (m >= 40) return 'orange';
+    return 'red';
+  }
+
+  barColor(pct: number): string {
+    if (pct >= 70) return '#16a34a';
+    if (pct >= 40) return '#ea580c';
+    return '#dc2626';
+  }
+
+  /** Nombre total d'écarts non adressés dans tous les domaines chargés. */
+  get nonAdressesGlobal(): number {
+    return (Object.keys(this.domains) as DomainTab[])
+      .filter((tab) => this.domains[tab].loaded)
+      .reduce((sum, tab) => {
+        const domaine = DOMAIN_TO_DOMAINE_ECART[tab];
+        return sum + this.domains[tab].rows.filter((row) => {
+          const targets = row.toBe.length > 0 ? row.toBe : row.asIs ? [row.asIs] : [];
+          const linked = targets.flatMap((t) => this.allGaps.filter((g) => g.domaine === domaine && g.elementId === t.id));
+          return linked.length === 0;
+        }).length;
+      }, 0);
   }
 }
