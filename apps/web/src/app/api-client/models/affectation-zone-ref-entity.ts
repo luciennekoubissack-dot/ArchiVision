@@ -16,5 +16,5 @@ export interface AffectationZoneRefEntity {
   /**
    * Type de la zone (doit être ILOT pour une affectation).
    */
-  type: 'ZONE' | 'QUARTIER' | 'ILOT';
+  type: 'VILLE' | 'IMMEUBLE' | 'ZONE' | 'QUARTIER' | 'ILOT';
 }

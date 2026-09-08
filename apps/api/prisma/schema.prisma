@@ -401,15 +401,20 @@ model ApplicationEchange {
   @@index([targetId])
 }
 
-/// 3 niveaux de la hiérarchie d'urbanisation.
+/// Hiérarchie d'urbanisation du SI : Ville > Immeuble > Zone > Quartier > Îlot.
+/// Les applications restent affectées à un îlot, tandis que les niveaux supérieurs
+/// servent à structurer le portefeuille et le POS sur plusieurs niveaux de détail.
 enum TypeZone {
+  VILLE
+  IMMEUBLE
   ZONE
   QUARTIER
   ILOT
 }
 
-/// Nœud de la hiérarchie Zone > Quartier > Îlot (auto-référencée).
-/// Champs : id, nom, type, parentId (nullable), organisationId → Organisation
+/// Nœud de la hiérarchie Ville > Immeuble > Zone > Quartier > Îlot
+/// (auto-référencée). Champs : id, nom, type, parentId (nullable),
+/// organisationId → Organisation.
 model ZoneUrbanisation {
   id             String            @id @default(uuid())
   nom            String

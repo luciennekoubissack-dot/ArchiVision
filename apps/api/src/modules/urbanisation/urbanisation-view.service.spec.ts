@@ -85,6 +85,18 @@ describe('UrbanisationViewService', () => {
     expect(result.svg).not.toContain('Aucune zone rattachée');
   });
 
+  it('supporte les niveaux POS métier manquants comme ville et immeuble', async () => {
+    const ville = { id: 'ville-1', nom: 'Paris', type: TypeZone.VILLE, applications: [], enfants: [] };
+    const immeuble = { id: 'immeuble-1', nom: 'Immeuble A', type: TypeZone.IMMEUBLE, applications: [], enfants: [] };
+    prismaMock.zoneUrbanisation.findMany.mockResolvedValue([ville, immeuble]);
+
+    const result = await service.generate('org-001');
+
+    expect(result.zoneCount).toBe(2);
+    expect(result.svg).toContain('1. Paris');
+    expect(result.svg).toContain('2. Immeuble A');
+  });
+
   it("n'affiche que les 4 premières applications d'un îlot et indique le reste", async () => {
     const apps = Array.from({ length: 6 }, (_, i) => ({
       application: { id: `app-${i}`, nom: `App ${i}` },

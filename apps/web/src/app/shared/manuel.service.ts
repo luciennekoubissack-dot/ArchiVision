@@ -381,7 +381,7 @@ export class ManuelService {
 
     space();
     subtitle('Plan d\'occupation des sols — Zones d\'urbanisation');
-    body('Le POS organise les applications en zones fonctionnelles sur 3 niveaux : Zone > Quartier > Îlot.');
+    body('Le POS organise les applications selon la hiérarchie Ville > Immeuble > Zone > Quartier > Îlot.');
     field('Nom *', 'Nom fonctionnel de la zone.', true, 'Zone Métier / Quartier Production / Îlot ERP');
     field('Type *', 'ZONE : domaine fonctionnel de haut niveau. QUARTIER : sous-domaine. ILOT : regroupement applicatif fin.', true);
     field('Parent', 'Zone ou quartier dont cette unité dépend hiérarchiquement.', false);

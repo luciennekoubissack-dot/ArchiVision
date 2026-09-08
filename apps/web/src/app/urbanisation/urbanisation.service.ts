@@ -56,7 +56,7 @@ import { urbanisationControllerRemoveEchange } from '../api-client/fn/urbanisati
 import { urbanisationControllerGenerateApplicationsLayout } from '../api-client/fn/urbanisation/urbanisation-controller-generate-applications-layout';
 import { DiagramLayoutResultEntity } from '../api-client/models/diagram-layout-result-entity';
 
-export type TypeZone = 'ZONE' | 'QUARTIER' | 'ILOT';
+export type TypeZone = 'VILLE' | 'IMMEUBLE' | 'ZONE' | 'QUARTIER' | 'ILOT';
 
 export type Application = ApplicationEntity;
 

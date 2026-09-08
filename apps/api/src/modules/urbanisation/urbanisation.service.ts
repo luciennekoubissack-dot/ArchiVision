@@ -10,6 +10,29 @@ import { AffecterApplicationDto } from './dto/affecter-application.dto';
 import { CreateEchangeDto } from './dto/create-echange.dto';
 import { CreateApplicationServiceDto } from './dto/create-application-service.dto';
 
+const TYPE_HIERARCHY_ORDER: Record<TypeZone, number> = {
+  VILLE: 0,
+  IMMEUBLE: 1,
+  ZONE: 2,
+  QUARTIER: 3,
+  ILOT: 4,
+};
+
+const sortZonesByHierarchy = <T extends { type: TypeZone; nom: string; enfants?: T[] }>(zones: T[]): T[] =>
+  [...zones]
+    .sort(
+      (a, b) =>
+        TYPE_HIERARCHY_ORDER[a.type] - TYPE_HIERARCHY_ORDER[b.type] ||
+        a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }),
+    )
+    .map((zone) => {
+      const ordered = { ...zone };
+      if (zone.enfants) {
+        ordered.enfants = sortZonesByHierarchy(zone.enfants);
+      }
+      return ordered;
+    });
+
 @Injectable()
 export class UrbanisationService {
   constructor(private readonly prisma: PrismaService) {}
@@ -84,22 +107,28 @@ export class UrbanisationService {
    * Retourne l'arbre complet de zones pour une organisation.
    * On renvoie uniquement les racines (sans parent) avec leurs enfants.
    */
-  findAllZones(organisationId: string, type?: TypeZone) {
-    return this.prisma.zoneUrbanisation.findMany({
+  async findAllZones(organisationId: string, type?: TypeZone) {
+    const zones = await this.prisma.zoneUrbanisation.findMany({
       where: {
         organisationId,
         ...(type && { type }),
       },
-      orderBy: [{ type: 'asc' }, { nom: 'asc' }],
       include: {
         enfants: {
-          orderBy: { nom: 'asc' },
           include: {
-            enfants: { orderBy: { nom: 'asc' } },
+            enfants: true,
           },
         },
         _count: { select: { applications: true } },
       },
+    });
+
+    return sortZonesByHierarchy(zones as any).map((zone) => {
+      const result: Record<string, unknown> = { ...zone };
+      if (zone.enfants && zone.enfants.length === 0) {
+        delete result.enfants;
+      }
+      return result as typeof zone;
     });
   }
 

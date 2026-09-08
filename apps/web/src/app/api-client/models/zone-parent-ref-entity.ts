@@ -16,5 +16,5 @@ export interface ZoneParentRefEntity {
   /**
    * Type de la zone parente.
    */
-  type: 'ZONE' | 'QUARTIER' | 'ILOT';
+  type: 'VILLE' | 'IMMEUBLE' | 'ZONE' | 'QUARTIER' | 'ILOT';
 }

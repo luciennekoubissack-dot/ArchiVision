@@ -58,11 +58,13 @@ Une application du portefeuille applicatif de l'organisation.
 - `organisationId` → Organisation
 
 ### ZoneUrbanisation
-Un nœud de la hiérarchie Zone > Quartier > Îlot. Auto-référencée.
+Un nœud de la hiérarchie `VILLE > IMMEUBLE > ZONE > QUARTIER > ILOT`.
+Auto-référencée et utilisée pour structurer le Plan d'Occupation des Sols
+(POS) du SI.
 - `id`
 - `nom`
-- `type` → enum : `ZONE` | `QUARTIER` | `ILOT`
-- `parentId` → ZoneUrbanisation (nullable — null pour une Zone racine)
+- `type` → enum : `VILLE` | `IMMEUBLE` | `ZONE` | `QUARTIER` | `ILOT`
+- `parentId` → ZoneUrbanisation (nullable — null pour une racine de hiérarchie)
 - `organisationId` → Organisation
 
 ### ApplicationZone (table de jointure)
@@ -79,7 +81,7 @@ Organisation 1───* CapaciteMetier 1───* ElementArchimate *───*
      │
      ├───* Application ──*───* ZoneUrbanisation (via ApplicationZone)
      │
-     └───* ZoneUrbanisation (auto-référencée : Zone > Quartier > Îlot)
+     └───* ZoneUrbanisation (auto-référencée : Ville > Immeuble > Zone > Quartier > Îlot)
 ```
 
 ## Hors périmètre v1 (roadmap V1.1 / V2.0)

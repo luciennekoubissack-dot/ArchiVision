@@ -16,5 +16,5 @@ export interface CreateZoneDto {
   /**
    * Type de la zone d'urbanisation.
    */
-  type: 'ZONE' | 'QUARTIER' | 'ILOT';
+  type: 'VILLE' | 'IMMEUBLE' | 'ZONE' | 'QUARTIER' | 'ILOT';
 }

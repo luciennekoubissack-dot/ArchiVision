@@ -36,8 +36,8 @@ const ICONS: Record<string, string> = {
   imports: [CommonModule, DownloadMenuComponent],
   template: `
     <p class="muted step-question">
-      Comment le système d'information est-il découpé en zones, quartiers et îlots, et quelles
-      applications occupent chaque îlot du plan d'occupation des sols ?
+      Comment le système d'information est-il découpé en villes, immeubles, zones, quartiers et îlots,
+      et quelles applications occupent chaque îlot du plan d'occupation des sols ?
     </p>
 
     <div class="tabs">
@@ -140,14 +140,16 @@ const ICONS: Record<string, string> = {
           <label class="field">
             Type
             <select [value]="newZone.type" (change)="onTypeChange($any($event.target).value)">
+              <option value="VILLE">Ville</option>
+              <option value="IMMEUBLE">Immeuble</option>
               <option value="ZONE">Zone</option>
               <option value="QUARTIER">Quartier</option>
               <option value="ILOT">Îlot</option>
             </select>
           </label>
         </div>
-        <label class="field" *ngIf="newZone.type !== 'ZONE'">
-          Parent ({{ newZone.type === 'QUARTIER' ? 'une Zone' : 'un Quartier' }})
+        <label class="field" *ngIf="newZone.type !== 'VILLE'">
+          Parent ({{ parentLabelFor(newZone.type) }})
           <select [value]="newZone.parentId || ''" (change)="newZone.parentId = $any($event.target).value || undefined">
             <option value="" disabled>Choisir un parent</option>
             <option *ngFor="let p of validParents" [value]="p.id">{{ p.nom }}</option>
@@ -210,7 +212,7 @@ export class UrbanisationComponent implements OnInit {
   flatZones: ZoneUrbanisation[] = [];
   applications: Application[] = [];
 
-  newZone: { nom: string; type: TypeZone; parentId?: string } = { nom: '', type: 'ZONE' };
+  newZone: { nom: string; type: TypeZone; parentId?: string } = { nom: '', type: 'VILLE' };
   creatingZone = false;
   createZonePopover = false;
   editZoneTarget: ZoneUrbanisation | null = null;
@@ -243,7 +245,7 @@ export class UrbanisationComponent implements OnInit {
   }
 
   openCreateZone(): void {
-    this.newZone = { nom: '', type: 'ZONE' };
+    this.newZone = { nom: '', type: 'VILLE' };
     this.createZonePopover = true;
   }
 
@@ -270,6 +272,8 @@ export class UrbanisationComponent implements OnInit {
   }
 
   get validParents(): ZoneUrbanisation[] {
+    if (this.newZone.type === 'IMMEUBLE') return this.flatZones.filter((z) => z.type === 'VILLE');
+    if (this.newZone.type === 'ZONE') return this.flatZones.filter((z) => z.type === 'IMMEUBLE');
     if (this.newZone.type === 'QUARTIER') return this.flatZones.filter((z) => z.type === 'ZONE');
     if (this.newZone.type === 'ILOT') return this.flatZones.filter((z) => z.type === 'QUARTIER');
     return [];
@@ -278,7 +282,15 @@ export class UrbanisationComponent implements OnInit {
   get editZoneParentOptions(): ZoneUrbanisation[] {
     if (!this.editZoneTarget) return [];
     const parentType: TypeZone | null =
-      this.editZoneTarget.type === 'QUARTIER' ? 'ZONE' : this.editZoneTarget.type === 'ILOT' ? 'QUARTIER' : null;
+      this.editZoneTarget.type === 'IMMEUBLE'
+        ? 'VILLE'
+        : this.editZoneTarget.type === 'ZONE'
+          ? 'IMMEUBLE'
+          : this.editZoneTarget.type === 'QUARTIER'
+            ? 'ZONE'
+            : this.editZoneTarget.type === 'ILOT'
+              ? 'QUARTIER'
+              : null;
     return this.flatZones.filter(
       (zone) => zone.id !== this.editZoneTarget!.id && (!parentType || zone.type === parentType),
     );
@@ -294,7 +306,19 @@ export class UrbanisationComponent implements OnInit {
   }
 
   zoneTypeLabel(type: TypeZone): string {
-    return type === 'ZONE' ? 'Zone' : type === 'QUARTIER' ? 'Quartier' : 'Îlot';
+    if (type === 'VILLE') return 'Ville';
+    if (type === 'IMMEUBLE') return 'Immeuble';
+    if (type === 'ZONE') return 'Zone';
+    if (type === 'QUARTIER') return 'Quartier';
+    return 'Îlot';
+  }
+
+  parentLabelFor(type: TypeZone): string {
+    if (type === 'IMMEUBLE') return 'une Ville';
+    if (type === 'ZONE') return 'un Immeuble';
+    if (type === 'QUARTIER') return 'une Zone';
+    if (type === 'ILOT') return 'un Quartier';
+    return '—';
   }
 
   onTypeChange(type: TypeZone): void {
@@ -330,8 +354,9 @@ export class UrbanisationComponent implements OnInit {
 
   createZone(event: Event): void {
     event.preventDefault();
-    if (this.newZone.type !== 'ZONE' && !this.newZone.parentId) {
-      this.toast.error('Choisissez un parent cohérent avec la hiérarchie Zone > Quartier > Îlot.');
+    const requiresParent = this.newZone.type !== 'VILLE';
+    if (requiresParent && !this.newZone.parentId) {
+      this.toast.error('Choisissez un parent cohérent avec la hiérarchie Ville > Immeuble > Zone > Quartier > Îlot.');
       return;
     }
     this.creatingZone = true;

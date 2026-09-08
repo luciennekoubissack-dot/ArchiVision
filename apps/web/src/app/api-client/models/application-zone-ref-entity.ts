@@ -16,5 +16,5 @@ export interface ApplicationZoneRefEntity {
   /**
    * Type de la zone.
    */
-  type: 'ZONE' | 'QUARTIER' | 'ILOT';
+  type: 'VILLE' | 'IMMEUBLE' | 'ZONE' | 'QUARTIER' | 'ILOT';
 }

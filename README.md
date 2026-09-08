@@ -45,9 +45,9 @@ CRUD complet (`POST`, `GET`, `GET /:id`, `PATCH /:id`, `DELETE /:id`).
 ### Urbanisation (`/applications`, `/zones-urbanisation`)
 
 - Applications du portefeuille (criticité HAUTE/MOYENNE/BASSE)
-- Zones d'urbanisation hiérarchiques (ZONE > QUARTIER > ÎLOT)
-- Affectation/désaffectation d'une application à une zone
-- `GET /zones-urbanisation/generate-vue?organisationId=` : génère le Plan d'Occupation des Sols (POS) en SVG — rectangles imbriqués Zone > Quartier > Îlot, applications affectées affichées en puces colorées par criticité → `{ svg, zoneCount, applicationCount }`.
+- Zones d'urbanisation hiérarchiques : `VILLE > IMMEUBLE > ZONE > QUARTIER > ILOT`
+- Affectation/désaffectation d'une application à une zone (les applications restent affectées à un îlot du POS)
+- `GET /zones-urbanisation/generate-vue?organisationId=` : génère le Plan d'Occupation des Sols (POS) en SVG — hiérarchie Ville/Immeuble/Zone/Quartier/Îlot, applications affectées affichées en puces colorées par criticité → `{ svg, zoneCount, applicationCount }`.
 
 ### Health (`/health`)
 

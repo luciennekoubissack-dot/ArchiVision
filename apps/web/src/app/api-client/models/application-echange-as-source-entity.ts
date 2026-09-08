@@ -25,6 +25,11 @@ export interface ApplicationEchangeAsSourceEntity {
   protocole?: string | null;
 
   /**
+   * Type du flux applicatif.
+   */
+  typeFlux?: 'SYNCHRONE' | 'ASYNCHRONE' | 'BATCH';
+
+  /**
    * Identifiant de l'application source.
    */
   sourceId: string;

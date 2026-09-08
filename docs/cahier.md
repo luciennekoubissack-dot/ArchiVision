@@ -98,10 +98,10 @@ L’application doit permettre :
 
 L’application doit permettre :
 
-- la création de zones, quartiers et îlots ;
-- la gestion d’une hiérarchie Zone > Quartier > Îlot ;
+- la création de villes, immeubles, zones, quartiers et îlots ;
+- la gestion d’une hiérarchie `VILLE > IMMEUBLE > ZONE > QUARTIER > ILOT` ;
 - l’affectation d’une application à un îlot ;
-- la génération du Plan d’Occupation des Sols au format SVG.
+- la génération du Plan d’Occupation des Sols au format SVG et ses niveaux de détail hiérarchiques.
 
 ### FR8 — Vues générées et exports
 

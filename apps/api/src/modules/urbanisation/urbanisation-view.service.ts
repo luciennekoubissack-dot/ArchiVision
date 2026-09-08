@@ -11,6 +11,8 @@ const MAX_VISIBLE_APPS = 4;
 const CHIP_COLOR = { fill: '#E3E8F0', stroke: '#455A73' };
 
 const STYLE_BY_TYPE: Record<TypeZone, { fill: string; stroke: string }> = {
+  VILLE: { fill: '#E0F2F1', stroke: '#00695C' },
+  IMMEUBLE: { fill: '#E8EAF6', stroke: '#3949AB' },
   ZONE: { fill: '#E3F2FD', stroke: '#1565C0' },
   QUARTIER: { fill: '#F3E5F5', stroke: '#6A1B9A' },
   ILOT: { fill: '#FFFFFF', stroke: '#616161' },
@@ -229,11 +231,11 @@ export class UrbanisationViewService {
     const appToIlotCenter = new Map<string, { x: number; y: number; ilotId: string }>();
 
     const layers = [
-      this.renderPosLayer('ECHANGE', topBand, byLayer.ECHANGE, 'row', appToIlotCenter),
-      this.renderPosLayer('PILOTAGE', leftCol, byLayer.PILOTAGE, 'col', appToIlotCenter),
-      this.renderPosLayer('OPERATION', centerCol, byLayer.OPERATION, 'quartiers', appToIlotCenter),
-      this.renderPosLayer('DONNEES', rightCol, byLayer.DONNEES, 'col', appToIlotCenter),
-      this.renderPosLayer('RESSOURCE', bottomBand, byLayer.RESSOURCE, 'row', appToIlotCenter),
+      this.renderPosLayer('ECHANGE', topBand, byLayer.ECHANGE, 'row'),
+      this.renderPosLayer('PILOTAGE', leftCol, byLayer.PILOTAGE, 'col'),
+      this.renderPosLayer('OPERATION', centerCol, byLayer.OPERATION, 'quartiers'),
+      this.renderPosLayer('DONNEES', rightCol, byLayer.DONNEES, 'col'),
+      this.renderPosLayer('RESSOURCE', bottomBand, byLayer.RESSOURCE, 'row'),
     ].join('\n');
 
     // Flux inter-îlots : flèches entre centres des îlots de deux applications différentes
@@ -273,7 +275,7 @@ ${annotations}
    * colonnes transverses (Pilotage & Contrôle, Données), `quartiers` pour
    * l'Opération (zones numérotées comme des quartiers).
    */
-  private renderPosLayer(layer: PosLayer, rect: Rect, zones: ZoneNode[], mode: 'row' | 'col' | 'quartiers', appToIlotCenter: Map<string, { x: number; y: number; ilotId: string }>): string {
+  private renderPosLayer(layer: PosLayer, rect: Rect, zones: ZoneNode[], mode: 'row' | 'col' | 'quartiers'): string {
     const meta = POS_LAYER_META[layer];
     const frame = `<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" fill="${meta.fill}" stroke="${meta.stroke}" stroke-width="1.6" rx="6" />
   <text x="${rect.x + 10}" y="${rect.y + 17}" font-size="12" font-weight="bold" fill="${meta.ink}">${this.escape(meta.title)}</text>`;
@@ -306,6 +308,31 @@ ${annotations}
       )
       .join('\n');
     return `<g>\n${frame}\n${body}\n</g>`;
+  }
+
+  private renderFluxInterIlots(echanges: EchangeRef[], appToIlotCenter: Map<string, { x: number; y: number; ilotId: string }>): string {
+    if (appToIlotCenter.size === 0 || echanges.length === 0) {
+      return '';
+    }
+
+    return echanges
+      .map((echange) => {
+        const start = appToIlotCenter.get(echange.sourceId);
+        const end = appToIlotCenter.get(echange.targetId);
+        if (!start || !end || start.ilotId === end.ilotId) {
+          return '';
+        }
+
+        const label = [echange.description, echange.protocole, echange.typeFlux].filter(Boolean).join(' · ');
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2;
+        return `<g>
+  <path d="M ${start.x} ${start.y} Q ${midX} ${midY - 18}, ${end.x} ${end.y}" fill="none" stroke="#4E79A7" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arrowhead)" />
+  ${label ? `<text x="${midX}" y="${midY - 12}" font-size="9" text-anchor="middle" fill="#40627A">${this.escape(label)}</text>` : ''}
+</g>`;
+      })
+      .filter(Boolean)
+      .join('\n');
   }
 
   /** Découpe un rectangle en `n` cases alignées en ligne (`row`) ou en colonne (`col`). */
