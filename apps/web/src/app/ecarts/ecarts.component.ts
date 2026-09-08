@@ -68,6 +68,28 @@ interface GapElement extends BpmnElement {
       rester inchangé, domaine par domaine.
     </p>
 
+    <section class="card ecarts-guide">
+      <h3>Comment lire cette analyse</h3>
+      <p>AS-IS décrit l'existant. TO-BE décrit la cible. Un écart est une différence à traiter, pas encore une solution.</p>
+      <div class="etat-guide">
+        <span><strong>Conservé</strong> : présent aujourd'hui et demain.</span>
+        <span><strong>Modifié</strong> : une cible TO-BE est reliée à l'AS-IS.</span>
+        <span><strong>Sans cible TO-BE</strong> : élément actuel sans évolution renseignée.</span>
+        <span><strong>Nouveau</strong> : élément prévu demain sans origine AS-IS.</span>
+        <span><strong>Réalisé</strong> : toutes les solutions liées sont terminées.</span>
+      </div>
+    </section>
+
+    <section class="card problemes-context" *ngIf="problemes.length > 0">
+      <div>
+        <h3>Problèmes à résoudre</h3>
+        <p class="muted">Ces problèmes viennent de la fiche organisation. Reliez-les aux écarts puis traitez-les dans Opportunités & Solutions.</p>
+      </div>
+      <ul>
+        <li *ngFor="let probleme of problemes">{{ probleme }}</li>
+      </ul>
+    </section>
+
     <!-- ── Barre de complétude globale ────────────────────────────────────── -->
     <section class="card completude-summary-bar" *ngIf="completude">
       <div class="csb-header">
@@ -110,7 +132,7 @@ interface GapElement extends BpmnElement {
         </div>
         <div class="stat">
           <span class="stat-value">{{ currentDomain.elimines.length }}</span>
-          <span class="stat-label">Éliminés</span>
+            <span class="stat-label">Sans cible TO-BE</span>
         </div>
         <div class="stat">
           <span class="stat-value">{{ currentDomain.modifies.length }}</span>
@@ -156,16 +178,22 @@ interface GapElement extends BpmnElement {
               <tr *ngFor="let row of currentDomain.rows">
                 <td>{{ row.asIs?.nom ?? '—' }}</td>
                 <td>{{ row.toBe.length > 0 ? namesOf(row.toBe) : '—' }}</td>
-                <td><span class="badge" [class]="etatBadge(row.etat)">{{ row.etat }}</span></td>
+                <td><span class="badge" [class]="etatBadge(row.etat)">{{ etatLabel(row.etat) }}</span></td>
                 <td>
                   <span class="badge badge-success"  *ngIf="coverageOf(row) === 'realise'">Réalisé</span>
                   <span class="badge badge-primary"   *ngIf="coverageOf(row) === 'en_cours'">En cours</span>
                   <span class="badge badge-warning"   *ngIf="coverageOf(row) === 'adresse'">Adressé</span>
                   <span class="badge badge-neutral"   *ngIf="coverageOf(row) === 'non_adresse'">Non adressé</span>
                 </td>
-                <td *ngIf="mainTab === 'objectifs'">
+                <td>
+                  <a
+                    *ngIf="coverageOf(row) === 'non_adresse' && row.etat !== 'Conservé'"
+                    class="btn btn-sm btn-outline"
+                    routerLink="/opportunites"
+                    title="Créer ou rattacher une solution à cet écart"
+                  >Traiter dans Solutions</a>
                   <button
-                    *ngIf="row.asIs && row.etat !== 'Conservé' && row.etat !== 'Réalisé' && canMarquerAtteint(row)"
+                    *ngIf="mainTab === 'objectifs' && row.asIs && row.etat !== 'Conservé' && row.etat !== 'Réalisé' && canMarquerAtteint(row)"
                     class="btn btn-sm btn-success"
                     [disabled]="marquerEnCours === row.asIs!.id"
                     (click)="marquerAtteint(row)"
@@ -316,6 +344,16 @@ interface GapElement extends BpmnElement {
   styles: [
     `
       /* ── Barre de complétude ───────────────────────────────────────────────── */
+      .ecarts-guide { border-left: 4px solid var(--color-primary); margin-bottom: 1rem; }
+      .ecarts-guide h3, .problemes-context h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+      .ecarts-guide p, .problemes-context p { margin: 0 0 0.7rem; }
+      .etat-guide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem 1.25rem; font-size: 0.82rem; }
+      .problemes-context { display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.25rem; }
+      .problemes-context > div { min-width: 260px; }
+      .problemes-context ul { margin: 0; padding-left: 1.25rem; }
+      .problemes-context li { margin-bottom: 0.3rem; }
+      .btn-outline { color: var(--color-primary); border: 1px solid var(--color-primary); background: transparent; text-decoration: none; }
+      .btn-outline:hover { color: #fff; background: var(--color-primary); }
       .completude-summary-bar { margin-bottom: 1.25rem; }
       .csb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; gap: 1rem; }
       .csb-title { font-weight: 700; font-size: 0.95rem; }
@@ -430,6 +468,7 @@ export class EcartsComponent implements OnInit {
 
   /** Données de complétude AS-IS / TO-BE chargées depuis l'API. */
   completude: CompletudeSummary | null = null;
+  organisationProblemes = '';
 
   private allGaps: SolutionGap[] = [];
 
@@ -454,6 +493,10 @@ export class EcartsComponent implements OnInit {
     this.organisationService.getCompletude().subscribe({
       next: (c) => (this.completude = c),
       error: () => { /* non-bloquant */ },
+    });
+    this.organisationService.getMine().subscribe({
+      next: (organisation) => (this.organisationProblemes = organisation.problemesResoudre ?? ''),
+      error: () => { /* contexte facultatif */ },
     });
   }
 
@@ -482,6 +525,17 @@ export class EcartsComponent implements OnInit {
       'Réalisé': 'badge-success',
     };
     return map[etat] ?? 'badge-neutral';
+  }
+
+  etatLabel(etat: EtatGap): string {
+    return etat === 'Éliminé' ? 'Sans cible TO-BE' : etat;
+  }
+
+  get problemes(): string[] {
+    return this.organisationProblemes
+      .split(/\r?\n|[;•]/)
+      .map((probleme) => probleme.trim().replace(/^[-*\d.)]+\s*/, ''))
+      .filter(Boolean);
   }
 
   /**

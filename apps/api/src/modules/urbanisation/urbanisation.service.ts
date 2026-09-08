@@ -40,7 +40,15 @@ export class UrbanisationService {
   // ─── Applications ─────────────────────────────────────────────────────────
 
   createApplication(organisationId: string, dto: CreateApplicationDto) {
+    if (dto.asIsId) {
+      return this.assertApplicationAsIsLink(dto.asIsId, organisationId).then(() => this.prisma.application.create({ data: { ...dto, organisationId } }));
+    }
     return this.prisma.application.create({ data: { ...dto, organisationId } });
+  }
+
+  private async assertApplicationAsIsLink(asIsId: string, organisationId: string) {
+    const source = await this.prisma.application.findFirst({ where: { id: asIsId, organisationId, statut: 'AS_IS' } });
+    if (!source) throw new BadRequestException("L'application AS-IS liée doit appartenir à votre organisation et avoir le statut AS-IS");
   }
 
   findAllApplications(organisationId: string, pagination?: PaginationQueryDto) {
@@ -51,6 +59,7 @@ export class UrbanisationService {
         orderBy: { nom: 'asc' },
         include: {
           services: true,
+          evolutionsToBe: { select: { id: true, nom: true } },
           _count: { select: { zones: true, services: true, echangesSource: true, echangesTarget: true } },
         },
       },
@@ -82,6 +91,7 @@ export class UrbanisationService {
 
   async updateApplication(id: string, organisationId: string, dto: UpdateApplicationDto) {
     await this.assertApplicationExists(id, organisationId);
+    if (dto.asIsId) await this.assertApplicationAsIsLink(dto.asIsId, organisationId);
     return this.prisma.application.update({ where: { id }, data: dto });
   }
 

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateApplicationDto {
@@ -14,6 +14,10 @@ export class CreateApplicationDto {
   @MaxLength(2000)
   description?: string;
 
+    @ApiPropertyOptional({ description: "Identifiant de l'application AS-IS dont cette application TO-BE est l'évolution." })
+    @IsUUID()
+    @IsOptional()
+    asIsId?: string;
   @ApiPropertyOptional({ description: "Position horizontale de l'application sur le canevas." })
   @IsNumber()
   @IsOptional()

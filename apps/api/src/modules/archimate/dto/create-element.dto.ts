@@ -19,6 +19,10 @@ export class CreateElementDto {
   @MaxLength(2000)
   description?: string;
 
+    @ApiPropertyOptional({ description: "Identifiant de l'élément AS-IS dont cet élément TO-BE est l'évolution." })
+    @IsUUID()
+    @IsOptional()
+    asIsId?: string;
   @ApiPropertyOptional({ enum: CategorieExigence, description: "Catégorie de l'exigence, applicable lorsque l'élément est une exigence." })
   @IsEnum(CategorieExigence)
   @IsOptional()

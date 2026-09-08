@@ -3,6 +3,10 @@ import { CategorieExigence, TypeElement } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateElementDto {
+  @ApiPropertyOptional({ description: "Identifiant de l'élément AS-IS dont cet élément TO-BE est l'évolution." })
+  @IsUUID()
+  @IsOptional()
+  asIsId?: string;
   @ApiPropertyOptional({ enum: TypeElement, description: "Type de l'élément ArchiMate." })
   @IsEnum(TypeElement)
   @IsOptional()

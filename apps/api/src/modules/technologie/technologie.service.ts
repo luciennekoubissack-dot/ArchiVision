@@ -10,13 +10,21 @@ export class TechnologieService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(organisationId: string, dto: CreateTechComponentDto) {
+    if (dto.asIsId) {
+      return this.assertAsIsLink(dto.asIsId, organisationId).then(() => this.prisma.techComponent.create({ data: { ...dto, organisationId } }));
+    }
     return this.prisma.techComponent.create({ data: { ...dto, organisationId } });
+  }
+
+  private async assertAsIsLink(asIsId: string, organisationId: string) {
+    const source = await this.prisma.techComponent.findFirst({ where: { id: asIsId, organisationId, statut: 'AS_IS' } });
+    if (!source) throw new BadRequestException("Le composant AS-IS lié doit appartenir à votre organisation et avoir le statut AS-IS");
   }
 
   findAll(organisationId: string, pagination?: PaginationQueryDto) {
     return paginateFindMany(
       this.prisma.techComponent,
-      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { deploiements: { include: { application: true } } } },
+      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { deploiements: { include: { application: true } }, evolutionsToBe: { select: { id: true, nom: true } } } },
       pagination,
     );
   }
@@ -34,6 +42,7 @@ export class TechnologieService {
 
   async update(id: string, organisationId: string, dto: UpdateTechComponentDto) {
     await this.assertExists(id, organisationId);
+    if (dto.asIsId) await this.assertAsIsLink(dto.asIsId, organisationId);
     return this.prisma.techComponent.update({ where: { id }, data: dto });
   }
 

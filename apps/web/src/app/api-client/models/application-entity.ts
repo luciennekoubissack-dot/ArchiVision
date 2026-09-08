@@ -7,6 +7,8 @@ import { ApplicationEchangeAsTargetEntity } from '../models/application-echange-
 import { ApplicationServiceEntity } from '../models/application-service-entity';
 import { ApplicationZoneEntity } from '../models/application-zone-entity';
 export interface ApplicationEntity {
+  asIsId?: string | null;
+  evolutionsToBe?: Array<{ id: string; nom: string }>;
 
   /**
    * Compteurs des relations de l'application.

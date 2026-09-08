@@ -3,6 +3,8 @@
 
 import { TechDeploiementDetailEntity } from '../models/tech-deploiement-detail-entity';
 export interface TechComponentEntity {
+  asIsId?: string | null;
+  evolutionsToBe?: Array<{ id: string; nom: string }>;
 
   /**
    * Date de creation.

@@ -6,6 +6,8 @@ import { RelationCountEntity } from '../models/relation-count-entity';
 import { RelationSourceEntity } from '../models/relation-source-entity';
 import { RelationTargetEntity } from '../models/relation-target-entity';
 export interface ElementArchimateEntity {
+  asIsId?: string | null;
+  evolutionsToBe?: Array<{ id: string; nom: string }>;
 
   /**
    * Compteur des relations de l'élément.

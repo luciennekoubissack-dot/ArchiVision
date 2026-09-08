@@ -4,6 +4,8 @@
 import { DataAttributeEntity } from '../models/data-attribute-entity';
 import { DataEntityCountEntity } from '../models/data-entity-count-entity';
 export interface DataEntityEntity {
+  asIsId?: string | null;
+  evolutionsToBe?: Array<{ id: string; nom: string }>;
 
   /**
    * Compteur des relations imbriquees (present sur la liste, absent sur la recuperation par identifiant).

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@archivision/infrastructure';
 import { TypeElement } from '@prisma/client';
 import { PaginationQueryDto, paginateFindMany } from '@archivision/shared';
@@ -57,6 +57,7 @@ export class ArchimateService {
     if (dto.capaciteMetierId) {
       await this.assertCapaciteExists(dto.capaciteMetierId, organisationId);
     }
+    await this.assertAsIsLink(dto.asIsId, organisationId);
     return this.prisma.elementArchimate.create({
       data: {
         organisationId,
@@ -64,11 +65,18 @@ export class ArchimateService {
         type: dto.type,
         description: dto.description,
         categorieExigence: dto.categorieExigence,
+        asIsId: dto.asIsId,
         positionX: dto.positionX,
         positionY: dto.positionY,
         ...(dto.capaciteMetierId && { capaciteMetierId: dto.capaciteMetierId }),
       },
     });
+  }
+
+  private async assertAsIsLink(asIsId: string | undefined, organisationId: string) {
+    if (!asIsId) return;
+    const source = await this.prisma.elementArchimate.findFirst({ where: { id: asIsId, organisationId, statut: 'AS_IS' } });
+    if (!source) throw new BadRequestException("L'élément AS-IS lié doit appartenir à votre organisation et avoir le statut AS-IS");
   }
 
   findAllElements(organisationId: string, type?: TypeElement, pagination?: PaginationQueryDto) {
@@ -79,6 +87,7 @@ export class ArchimateService {
         orderBy: { nom: 'asc' },
         include: {
           capacite: { select: { id: true, nom: true } },
+          evolutionsToBe: { select: { id: true, nom: true } },
           _count: { select: { relationsSource: true, relationsTarget: true } },
         },
       },
@@ -107,6 +116,7 @@ export class ArchimateService {
 
   async updateElement(id: string, organisationId: string, dto: UpdateElementDto) {
     await this.assertElementExists(id, organisationId);
+    await this.assertAsIsLink(dto.asIsId, organisationId);
     if (dto.capaciteMetierId) {
       await this.assertCapaciteExists(dto.capaciteMetierId, organisationId);
     }
@@ -121,6 +131,7 @@ export class ArchimateService {
         ...(dto.positionY !== undefined && { positionY: dto.positionY }),
         // null permet de détacher la capacité, undefined l'ignore
         ...('capaciteMetierId' in dto && { capaciteMetierId: dto.capaciteMetierId }),
+        ...('asIsId' in dto && { asIsId: dto.asIsId }),
       },
     });
   }

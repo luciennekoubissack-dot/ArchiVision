@@ -1,8 +1,12 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { StatutElement } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateDataEntityDto {
+  @ApiPropertyOptional({ description: "Identifiant de l'entité de données AS-IS dont cette entité TO-BE est l'évolution." })
+  @IsUUID()
+  @IsOptional()
+  asIsId?: string;
   @ApiPropertyOptional({ description: "Nom de l'entite de donnees" })
   @IsString()
   @IsNotEmpty()

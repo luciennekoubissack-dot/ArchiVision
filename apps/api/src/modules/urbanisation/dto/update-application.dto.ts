@@ -1,7 +1,11 @@
-import { IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateApplicationDto {
+  @ApiPropertyOptional({ description: "Identifiant de l'application AS-IS dont cette application TO-BE est l'évolution." })
+  @IsUUID()
+  @IsOptional()
+  asIsId?: string;
   @ApiPropertyOptional({ description: "Nouveau nom de l'application." })
   @IsString()
   @IsOptional()

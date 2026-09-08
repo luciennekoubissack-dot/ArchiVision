@@ -123,13 +123,14 @@ export class GapAnalysisService {
     return rows;
   }
 
-  private buildSimpleGapRows(items: { id: string; nom: string; statut: string }[]): GapRow[] {
+  private buildSimpleGapRows(items: { id: string; nom: string; statut: string; evolutionsToBe?: GapItem[] }[]): GapRow[] {
     const rows: GapRow[] = [];
     for (const item of items.filter((i) => i.statut === 'LES_DEUX')) {
       rows.push({ asIs: item, toBe: [item], etat: 'Conservé' });
     }
     for (const item of items.filter((i) => i.statut === 'AS_IS')) {
-      rows.push({ asIs: item, toBe: [], etat: 'Éliminé' });
+      const evolutions = item.evolutionsToBe ?? [];
+      rows.push({ asIs: item, toBe: evolutions, etat: evolutions.length > 0 ? 'Modifié' : 'Éliminé' });
     }
     for (const item of items.filter((i) => i.statut === 'TO_BE')) {
       rows.push({ asIs: null, toBe: [item], etat: 'Nouveau' });

@@ -13,13 +13,16 @@ export class DonneesService {
   // ── Entités ──────────────────────────────────────────────────────────────
 
   create(organisationId: string, dto: CreateDataEntityDto) {
+    if (dto.asIsId) {
+      return this.assertAsIsLink(dto.asIsId, organisationId).then(() => this.prisma.dataEntity.create({ data: { ...dto, organisationId } }));
+    }
     return this.prisma.dataEntity.create({ data: { ...dto, organisationId } });
   }
 
   findAll(organisationId: string, pagination?: PaginationQueryDto) {
     return paginateFindMany(
       this.prisma.dataEntity,
-      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { attributs: true, _count: { select: { attributs: true } } } },
+      { where: { organisationId }, orderBy: { nom: 'asc' }, include: { attributs: true, evolutionsToBe: { select: { id: true, nom: true } }, _count: { select: { attributs: true } } } },
       pagination,
     );
   }
@@ -37,6 +40,7 @@ export class DonneesService {
 
   async update(id: string, organisationId: string, dto: UpdateDataEntityDto) {
     await this.assertEntityExists(id, organisationId);
+    if (dto.asIsId) await this.assertAsIsLink(dto.asIsId, organisationId);
     return this.prisma.dataEntity.update({ where: { id }, data: dto });
   }
 
@@ -98,5 +102,10 @@ export class DonneesService {
   private async assertEntityExists(id: string, organisationId: string) {
     const count = await this.prisma.dataEntity.count({ where: { id, organisationId } });
     if (!count) throw new NotFoundException(`Entité de données ${id} introuvable`);
+  }
+
+  private async assertAsIsLink(asIsId: string, organisationId: string) {
+    const source = await this.prisma.dataEntity.findFirst({ where: { id: asIsId, organisationId, statut: 'AS_IS' } });
+    if (!source) throw new BadRequestException("L'entité AS-IS liée doit appartenir à votre organisation et avoir le statut AS-IS");
   }
 }

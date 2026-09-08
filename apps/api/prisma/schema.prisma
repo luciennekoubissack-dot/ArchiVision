@@ -267,6 +267,8 @@ model ElementArchimate {
   /// Uniquement pertinent quand type = EXIGENCE (module Vision).
   categorieExigence CategorieExigence? @map("categorie_exigence")
   statut            StatutElement      @default(LES_DEUX)
+  asIsId            String?            @map("as_is_id")
+  asIs              ElementArchimate?  @relation("ElementArchimateEvolution", fields: [asIsId], references: [id], onDelete: SetNull)
   /// Position/taille manuelles dans le canevas — null tant que l'utilisateur
   /// n'a pas déplacé/redimensionné l'élément (l'auto-layout s'applique alors).
   positionX         Float?             @map("position_x")
@@ -282,9 +284,11 @@ model ElementArchimate {
 
   relationsSource RelationArchimate[] @relation("RelationSource")
   relationsTarget RelationArchimate[] @relation("RelationTarget")
+  evolutionsToBe  ElementArchimate[]  @relation("ElementArchimateEvolution")
 
   @@index([organisationId])
   @@index([type])
+  @@index([asIsId])
 }
 
 /// Lien typé entre deux éléments ArchiMate.
@@ -346,6 +350,8 @@ model Application {
   nom            String
   description    String?
   statut         StatutElement @default(LES_DEUX)
+  asIsId         String?       @map("as_is_id")
+  asIs           Application?  @relation("ApplicationEvolution", fields: [asIsId], references: [id], onDelete: SetNull)
   positionX      Float?        @map("position_x")
   positionY      Float?        @map("position_y")
   organisationId String
@@ -358,8 +364,10 @@ model Application {
   echangesSource ApplicationEchange[] @relation("EchangeSource")
   echangesTarget ApplicationEchange[] @relation("EchangeTarget")
   services       ApplicationService[]
+  evolutionsToBe Application[] @relation("ApplicationEvolution")
 
   @@index([organisationId])
+  @@index([asIsId])
 }
 
 /// Service métier/technique fourni par une application (ex. "Facturation",
@@ -662,6 +670,8 @@ model DataEntity {
   description    String?
   proprietaire   String?
   statut         StatutElement @default(LES_DEUX)
+  asIsId         String?        @map("as_is_id")
+  asIs           DataEntity?    @relation("DataEntityEvolution", fields: [asIsId], references: [id], onDelete: SetNull)
   positionX      Float?        @map("position_x")
   positionY      Float?        @map("position_y")
   organisationId String
@@ -672,8 +682,10 @@ model DataEntity {
   attributs       DataAttribute[]
   relationsSource DataRelation[]  @relation("DataRelSource")
   relationsTarget DataRelation[]  @relation("DataRelTarget")
+  evolutionsToBe  DataEntity[]    @relation("DataEntityEvolution")
 
   @@index([organisationId])
+  @@index([asIsId])
 }
 
 /// Attribut d'une entité de données. `type` en texte libre (ex. "string",
@@ -734,6 +746,8 @@ model TechComponent {
   type           TypeTechComponent
   description    String?
   statut         StatutElement     @default(LES_DEUX)
+  asIsId         String?            @map("as_is_id")
+  asIs           TechComponent?     @relation("TechComponentEvolution", fields: [asIsId], references: [id], onDelete: SetNull)
   positionX      Float?            @map("position_x")
   positionY      Float?            @map("position_y")
   organisationId String
@@ -742,8 +756,10 @@ model TechComponent {
   updatedAt      DateTime          @updatedAt
 
   deploiements TechDeploiement[]
+  evolutionsToBe TechComponent[] @relation("TechComponentEvolution")
 
   @@index([organisationId])
+  @@index([asIsId])
 }
 
 /// Diagramme de déploiement — quelle application tourne sur quel composant technique.

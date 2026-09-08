@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { TypeTechComponent } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -19,6 +19,10 @@ export class CreateTechComponentDto {
   @MaxLength(2000)
   description?: string;
 
+    @ApiPropertyOptional({ description: "Identifiant du composant AS-IS dont ce composant TO-BE est l'évolution." })
+    @IsUUID()
+    @IsOptional()
+    asIsId?: string;
   @ApiPropertyOptional({ description: 'Position horizontale sur le canevas' })
   @IsNumber()
   @IsOptional()
