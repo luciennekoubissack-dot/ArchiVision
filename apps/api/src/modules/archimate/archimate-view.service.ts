@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { TypeElement, TypeRelation } from '@prisma/client';
+import { ElementKind, TypeElement, TypeRelation } from '@prisma/client';
+import { PrismaService } from '@archivision/infrastructure';
 import { ArchimateService } from './archimate.service';
 import { computeGridLayout } from './layout.util';
 
@@ -10,7 +11,7 @@ const GAP_Y = 90;
 const MARGIN = 40;
 
 /** Couche Motivation en premier (au-dessus), puis couche Métier. */
-export const ROW_ORDER: TypeElement[] = [
+export const ROW_ORDER: string[] = [
   TypeElement.VISION,
   TypeElement.OBJECTIF_ARCHIMATE,
   TypeElement.PRINCIPE,
@@ -20,20 +21,30 @@ export const ROW_ORDER: TypeElement[] = [
   TypeElement.PROCESSUS_METIER,
   TypeElement.SERVICE_METIER,
   TypeElement.OBJET_METIER,
+  'DATA_ENTITY',
+  'APPLICATION',
+  'TECH_COMPONENT',
 ];
 
-const MOTIVATION_TYPES = new Set<TypeElement>([
+const MOTIVATION_TYPES = new Set<string>([
   TypeElement.VISION,
   TypeElement.OBJECTIF_ARCHIMATE,
   TypeElement.PRINCIPE,
   TypeElement.EXIGENCE,
 ]);
 
-/** Violet ArchiMate pour la couche Motivation, jaune pour la couche Métier — mêmes teintes que la notation officielle (cf. archimate-template.png). */
-const TYPE_COLOR = (type: TypeElement): { fill: string; stroke: string; text: string } =>
-  MOTIVATION_TYPES.has(type)
-    ? { fill: '#D6CCF5', stroke: '#6C5CE7', text: '#3D2E7C' }
-    : { fill: '#FFF3A3', stroke: '#D4A017', text: '#5C4A00' };
+/**
+ * Palette de couches inspirée de la convention ArchiMate : la Motivation et
+ * le Métier sont jaunes, avec une nuance différente pour rester lisibles dans
+ * une vue combinée. Les autres couches ne sont pas encore modélisées ici.
+ */
+const TYPE_COLOR = (type: string): { fill: string; stroke: string; text: string } => {
+  if (MOTIVATION_TYPES.has(type)) return { fill: '#FFF2CC', stroke: '#C9A227', text: '#5C4700' };
+  if (type === 'DATA_ENTITY') return { fill: '#E8F1FB', stroke: '#4A78A8', text: '#234568' };
+  if (type === 'APPLICATION') return { fill: '#DCEBFA', stroke: '#3D78B5', text: '#1E4D7A' };
+  if (type === 'TECH_COMPONENT') return { fill: '#E2F0D9', stroke: '#548235', text: '#31521F' };
+  return { fill: '#FFF8E1', stroke: '#D4A017', text: '#5C4A00' };
+};
 
 interface Position {
   x: number;
@@ -45,7 +56,7 @@ interface Position {
 interface ElementLike {
   id: string;
   nom: string;
-  type: TypeElement;
+  type: string;
 }
 
 interface RelationLike {
@@ -63,15 +74,40 @@ export interface ArchimateViewResult {
 
 @Injectable()
 export class ArchimateViewService {
-  constructor(private readonly archimateService: ArchimateService) {}
+  constructor(
+    private readonly archimateService: ArchimateService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async generate(organisationId: string): Promise<ArchimateViewResult> {
-    const [elements, relations] = await Promise.all([
+    const [archimateElements, archimateRelations, dataEntities, applications, techComponents, canevasRelations] = await Promise.all([
       this.archimateService.findAllElements(organisationId) as unknown as ElementLike[],
       this.archimateService.findAllRelations(organisationId) as unknown as RelationLike[],
+      this.prisma.dataEntity.findMany({ where: { organisationId }, select: { id: true, nom: true } }),
+      this.prisma.application.findMany({ where: { organisationId }, select: { id: true, nom: true } }),
+      this.prisma.techComponent.findMany({ where: { organisationId }, select: { id: true, nom: true } }),
+      this.prisma.canevasRelation.findMany({ where: { organisationId } }),
     ]);
 
-    return this.render(elements, relations, 'Aucun élément ArchiMate pour cette organisation.');
+    const elements: ElementLike[] = [
+      ...archimateElements,
+      ...dataEntities.map((item) => ({ ...item, type: 'DATA_ENTITY' })),
+      ...applications.map((item) => ({ ...item, type: 'APPLICATION' })),
+      ...techComponents.map((item) => ({ ...item, type: 'TECH_COMPONENT' })),
+    ];
+    const byKey = new Map<string, ElementLike>([
+      ...archimateElements.map((item) => [`${ElementKind.ARCHIMATE}:${item.id}`, item] as const),
+      ...dataEntities.map((item) => [`${ElementKind.DATA_ENTITY}:${item.id}`, { ...item, type: 'DATA_ENTITY' }] as const),
+      ...applications.map((item) => [`${ElementKind.APPLICATION}:${item.id}`, { ...item, type: 'APPLICATION' }] as const),
+      ...techComponents.map((item) => [`${ElementKind.TECH_COMPONENT}:${item.id}`, { ...item, type: 'TECH_COMPONENT' }] as const),
+    ]);
+    const interLayerRelations: RelationLike[] = canevasRelations.flatMap((relation) => {
+      const source = byKey.get(`${relation.sourceKind}:${relation.sourceId}`);
+      const target = byKey.get(`${relation.targetKind}:${relation.targetId}`);
+      return source && target ? [{ id: relation.id, type: relation.type, source, target }] : [];
+    });
+
+    return this.render(elements, [...archimateRelations, ...interLayerRelations], 'Aucun élément ArchiMate ou d\'architecture pour cette organisation.');
   }
 
   private render(elements: ElementLike[], relations: RelationLike[], emptyMessage: string): ArchimateViewResult {
@@ -110,10 +146,12 @@ export class ArchimateViewService {
       })
       .join('\n');
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="Arial, sans-serif">
+    const legendHeight = 92;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height + legendHeight}" width="${width}" height="${height + legendHeight}" font-family="Arial, sans-serif">
 ${this.defs()}
 ${relationsSvg}
 ${boxesSvg}
+  ${this.renderLegend(height)}
 </svg>`;
 
     return { svg, elementCount: elements.length, relationCount: relations.length };
@@ -138,17 +176,17 @@ ${boxesSvg}
   }
 
   /** Forme de la boîte selon le type — pilule pour un service, coin coupé pour une exigence, rectangle sinon. */
-  private renderShape(type: TypeElement, x: number, y: number, color: { fill: string; stroke: string }): string {
-    if (type === TypeElement.SERVICE_METIER) {
+  private renderShape(type: string, x: number, y: number, color: { fill: string; stroke: string }): string {
+    if (type === TypeElement.SERVICE_METIER || type === 'APPLICATION') {
       return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="${BOX_HEIGHT / 2}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
     }
-    if (type === TypeElement.EXIGENCE) {
+    if (type === TypeElement.EXIGENCE || type === 'DATA_ENTITY') {
       const cut = 16;
       const w = BOX_WIDTH;
       const h = BOX_HEIGHT;
       return `<path d="M${x},${y} L${x + w - cut},${y} L${x + w},${y + cut} L${x + w},${y + h} L${x},${y + h} Z" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" stroke-linejoin="round" />`;
     }
-    if (type === TypeElement.OBJET_METIER) {
+    if (type === TypeElement.OBJET_METIER || type === 'TECH_COMPONENT') {
       return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="2" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
     }
     return `<rect x="${x}" y="${y}" width="${BOX_WIDTH}" height="${BOX_HEIGHT}" rx="4" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.5" />`;
@@ -160,7 +198,7 @@ ${boxesSvg}
    * Sans classificateur reconnu, aucun glyphe n'est dessiné (forme + couleur
    * de couche suffisent à identifier l'élément).
    */
-  private renderPictogram(type: TypeElement, x: number, y: number, c: string): string {
+  private renderPictogram(type: string, x: number, y: number, c: string): string {
     const icx = x + BOX_WIDTH - 11;
     const icy = y + 11;
     switch (type) {
@@ -196,6 +234,12 @@ ${boxesSvg}
       case TypeElement.OBJET_METIER:
         return `<rect x="${icx - 5}" y="${icy - 5}" width="10" height="10" fill="none" stroke="${c}" stroke-width="1" />
   <line x1="${icx - 5}" y1="${icy - 2}" x2="${icx + 5}" y2="${icy - 2}" stroke="${c}" stroke-width="1" />`;
+      case 'DATA_ENTITY':
+        return `<path d="M${icx - 5},${icy - 4} Q${icx},${icy - 8} ${icx + 5},${icy - 4} L${icx + 5},${icy + 5} Q${icx},${icy + 9} ${icx - 5},${icy + 5} Z" fill="none" stroke="${c}" stroke-width="1.1" />`;
+      case 'APPLICATION':
+        return `<rect x="${icx - 5}" y="${icy - 5}" width="10" height="10" rx="1" fill="none" stroke="${c}" stroke-width="1.1" /><path d="M${icx - 3},${icy + 2} L${icx - 1},${icy - 1} L${icx + 1},${icy + 1} L${icx + 3},${icy - 3}" fill="none" stroke="${c}" stroke-width="1" />`;
+      case 'TECH_COMPONENT':
+        return `<path d="M${icx - 5},${icy - 3} L${icx},${icy - 6} L${icx + 5},${icy - 3} L${icx},${icy} Z M${icx - 5},${icy - 3} V${icy + 4} L${icx},${icy + 7} L${icx + 5},${icy + 4} V${icy - 3}" fill="none" stroke="${c}" stroke-width="1.1" />`;
       default:
         return '';
     }
@@ -291,6 +335,30 @@ ${boxesSvg}
     <path d="M0,5 L5,0 L10,5 L5,10 z" fill="#555" />
   </marker>
 </defs>`;
+  }
+
+  private renderLegend(y: number): string {
+    return `<g transform="translate(40,${y + 18})">
+  <text x="0" y="0" font-size="12" font-weight="bold" fill="#333">Légende ArchiMate</text>
+  <rect x="0" y="12" width="16" height="12" fill="#FFF2CC" stroke="#C9A227" />
+  <text x="23" y="22" font-size="10" fill="#333">Motivation</text>
+  <rect x="105" y="12" width="16" height="12" fill="#FFF8E1" stroke="#D4A017" />
+  <text x="128" y="22" font-size="10" fill="#333">Métier</text>
+  <line x1="205" y1="18" x2="245" y2="18" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)" />
+  <text x="252" y="22" font-size="10" fill="#333">Assignation</text>
+  <line x1="330" y1="18" x2="370" y2="18" stroke="#555" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#hollow-triangle)" />
+  <text x="377" y="22" font-size="10" fill="#333">Réalisation</text>
+  <line x1="475" y1="18" x2="515" y2="18" stroke="#555" stroke-width="1.5" marker-start="url(#diamond)" />
+  <text x="522" y="22" font-size="10" fill="#333">Composition</text>
+  <rect x="0" y="58" width="16" height="12" fill="#E8F1FB" stroke="#4A78A8" />
+  <text x="23" y="68" font-size="10" fill="#333">Données</text>
+  <rect x="105" y="58" width="16" height="12" fill="#DCEBFA" stroke="#3D78B5" />
+  <text x="128" y="68" font-size="10" fill="#333">Applicatif</text>
+  <rect x="220" y="58" width="16" height="12" fill="#E2F0D9" stroke="#548235" />
+  <text x="243" y="68" font-size="10" fill="#333">Technologique</text>
+  <line x1="0" y1="42" x2="40" y2="42" stroke="#555" stroke-width="1.5" />
+  <text x="47" y="46" font-size="10" fill="#333">Association</text>
+</g>`;
   }
 
   private buildEmptySvg(message: string): string {

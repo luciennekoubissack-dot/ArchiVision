@@ -169,6 +169,9 @@ export class ArchimateService {
   // ─── RelationArchimate ────────────────────────────────────────────────────
 
   async createRelation(organisationId: string, dto: CreateRelationDto) {
+    if (dto.sourceId === dto.targetId) {
+      throw new BadRequestException('Une relation ArchiMate doit relier deux éléments distincts');
+    }
     // Source et cible doivent toutes deux appartenir à l'organisation de l'appelant
     await Promise.all([
       this.assertElementExists(dto.sourceId, organisationId),

@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '@archivision/infrastructure';
 import { TypeElement, TypeRelation } from '@prisma/client';
@@ -153,6 +153,17 @@ describe('ArchimateService', () => {
 
       await expect(service.removeCapacite('inconnue', ORG_ID)).rejects.toThrow(NotFoundException);
     });
+  });
+
+  it('refuse une relation réflexive', async () => {
+    await expect(
+      service.createRelation(ORG_ID, {
+        type: TypeRelation.ASSOCIATION,
+        sourceId: mockElement.id,
+        targetId: mockElement.id,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prismaMock.relationArchimate.create).not.toHaveBeenCalled();
   });
 
   describe('Éléments ArchiMate', () => {

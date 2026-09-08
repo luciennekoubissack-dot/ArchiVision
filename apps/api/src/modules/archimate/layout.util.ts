@@ -1,8 +1,6 @@
-import { TypeElement } from '@prisma/client';
-
 export interface LayoutElement {
   id: string;
-  type: TypeElement;
+  type: string;
 }
 
 export interface LayoutPosition {
@@ -29,12 +27,12 @@ export interface GridLayoutResult {
 /** Layout en grille : une ligne par type de `rowOrder`, éléments centrés sur chaque ligne. */
 export function computeGridLayout(
   elements: LayoutElement[],
-  rowOrder: TypeElement[],
+  rowOrder: string[],
   opts: GridLayoutOptions,
 ): GridLayoutResult {
   const { boxWidth, boxHeight, gapX, gapY, margin } = opts;
 
-  const byRow = new Map<TypeElement, LayoutElement[]>();
+  const byRow = new Map<string, LayoutElement[]>();
   for (const type of rowOrder) byRow.set(type, []);
   for (const element of elements) {
     byRow.get(element.type)?.push(element);

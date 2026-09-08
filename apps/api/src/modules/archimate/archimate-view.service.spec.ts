@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaService } from '@archivision/infrastructure';
 import { TypeElement, TypeRelation } from '@prisma/client';
 import { ArchimateService } from './archimate.service';
 import { ArchimateViewService } from './archimate-view.service';
@@ -21,11 +22,22 @@ describe('ArchimateViewService', () => {
     findAllRelations: jest.fn(),
   };
 
+  const prismaMock = {
+    dataEntity: { findMany: jest.fn().mockResolvedValue([]) },
+    application: { findMany: jest.fn().mockResolvedValue([]) },
+    techComponent: { findMany: jest.fn().mockResolvedValue([]) },
+    canevasRelation: { findMany: jest.fn().mockResolvedValue([]) },
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ArchimateViewService, { provide: ArchimateService, useValue: archimateServiceMock }],
+      providers: [
+        ArchimateViewService,
+        { provide: ArchimateService, useValue: archimateServiceMock },
+        { provide: PrismaService, useValue: prismaMock },
+      ],
     }).compile();
 
     service = module.get(ArchimateViewService);
@@ -43,6 +55,18 @@ describe('ArchimateViewService', () => {
     expect(result.svg).toContain('Planifier une');
     expect(result.svg).toContain('formation');
     expect(result.svg).toContain('<svg');
+  });
+
+  it('ajoute une légende et la palette des couches ArchiMate', async () => {
+    archimateServiceMock.findAllElements.mockResolvedValue([acteur, processus]);
+    archimateServiceMock.findAllRelations.mockResolvedValue([relation]);
+
+    const result = await service.generate('org-001');
+
+    expect(result.svg).toContain('Légende ArchiMate');
+    expect(result.svg).toContain('#FFF2CC');
+    expect(result.svg).toContain('Assignation');
+    expect(result.svg).toContain('Réalisation');
   });
 
   it("applique un style pointillé et un marqueur creux pour une relation de type REALISATION", async () => {
@@ -76,8 +100,8 @@ describe('ArchimateViewService', () => {
 
     expect(result.svg).toContain('Devenir leader');
     expect(result.svg).toContain('régional');
-    expect(result.svg).toContain('#D6CCF5');
-    expect(result.svg).toContain('#FFF3A3');
+    expect(result.svg).toContain('#FFF2CC');
+    expect(result.svg).toContain('#FFF8E1');
   });
 
   it('ignore une relation dont un élément référencé serait absent de la liste (défensif)', async () => {

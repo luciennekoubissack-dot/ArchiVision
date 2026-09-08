@@ -69,6 +69,10 @@ describe('ArchimateController (HTTP)', () => {
       findUnique: jest.fn(),
       delete: jest.fn(),
     },
+    dataEntity: { findMany: jest.fn().mockResolvedValue([]) },
+    application: { findMany: jest.fn().mockResolvedValue([]) },
+    techComponent: { findMany: jest.fn().mockResolvedValue([]) },
+    canevasRelation: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((operations: unknown[]) => Promise.all(operations)),
   };
 
