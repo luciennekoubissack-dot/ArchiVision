@@ -110,7 +110,7 @@ interface GapElement extends BpmnElement {
         </div>
       </div>
       <p class="csb-hint" *ngIf="nonAdressesGlobal > 0">
-        {{ nonAdressesGlobal }} écart{{ nonAdressesGlobal > 1 ? 's' : '' }} non adressé{{ nonAdressesGlobal > 1 ? 's' : '' }} — rendez-vous dans <a routerLink="/opportunites">Opportunités & Solutions</a> pour les couvrir.
+        {{ nonAdressesGlobal }} écart{{ nonAdressesGlobal > 1 ? 's' : '' }} non adressé{{ nonAdressesGlobal > 1 ? 's' : '' }} — rendez-vous dans <a routerLink="/opportunites-solutions">Opportunités & Solutions</a> pour les couvrir.
       </p>
     </section>
 
@@ -189,7 +189,7 @@ interface GapElement extends BpmnElement {
                   <a
                     *ngIf="coverageOf(row) === 'non_adresse' && row.etat !== 'Conservé'"
                     class="btn btn-sm btn-outline"
-                    routerLink="/opportunites"
+                    routerLink="/opportunites-solutions"
                     title="Créer ou rattacher une solution à cet écart"
                   >Traiter dans Solutions</a>
                   <button
