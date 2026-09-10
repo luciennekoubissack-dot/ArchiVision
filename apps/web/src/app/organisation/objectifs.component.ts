@@ -8,6 +8,7 @@ import { ConfirmDialogService } from '../shared/confirm-dialog.service';
 import { exportToExcel } from '../shared/excel.util';
 import { PaginationComponent } from '../shared/pagination.component';
 import { DEFAULT_PAGE_SIZE } from '../shared/pagination.interface';
+import { SuggestionToBeComponent } from '../shared/suggestion-tobe.component';
 
 type StatutObjectif = 'AS_IS' | 'TO_BE' | 'LES_DEUX';
 
@@ -44,11 +45,14 @@ const ICONS: Record<string, string> = {
 @Component({
   selector: 'app-objectifs',
   standalone: true,
-  imports: [CommonModule, PaginationComponent],
+  imports: [CommonModule, PaginationComponent, SuggestionToBeComponent],
   template: `
     <div class="page-header">
       <h3>Objectifs ({{ total }})</h3>
       <div class="header-actions">
+        <button type="button" class="btn btn-outline" *ngIf="canWrite" (click)="showSuggestions = true" title="Suggérer des cibles TO-BE à partir des objectifs AS-IS">
+          Suggestions TO-BE
+        </button>
         <button type="button" class="btn btn-outline" *ngIf="total > 0" (click)="exportObjectifs()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" [innerHTML]="icon('download')"></svg>
           Exporter (Excel)
@@ -202,6 +206,12 @@ const ICONS: Record<string, string> = {
         </div>
       </form>
     </div>
+
+    <app-suggestion-tobe
+      *ngIf="showSuggestions"
+      domaine="objectifs"
+      (closed)="showSuggestions = false"
+    ></app-suggestion-tobe>
   `,
   styles: [
     `
@@ -232,6 +242,7 @@ export class ObjectifsComponent implements OnInit {
   editTarget: Objectif | null = null;
   editDraft: ObjectifDraft | null = null;
   saving = false;
+  showSuggestions = false;
 
   constructor(
     private auth: AuthService,
