@@ -1,5 +1,6 @@
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Chart, registerables } from 'chart.js';
 import { AuthService } from '../auth/auth.service';
@@ -70,6 +71,18 @@ const ICONS: Record<string, string> = {
   imports: [CommonModule, PaginationComponent],
   template: `
     <p class="muted step-question">Quelles solutions candidates peuvent combler les écarts identifiés, et comment se comparent-elles ?</p>
+
+    <section class="card problem-context" *ngIf="pendingProblem">
+      <span class="eyebrow">Problème formulé depuis l'analyse des écarts</span>
+      <h3>{{ pendingProblem.elementNom }}</h3>
+      <p>{{ pendingProblem.formulation }}</p>
+      <div class="problem-context-actions">
+        <span class="badge badge-warning">Écart non adressé</span>
+        <button type="button" class="btn btn-primary" *ngIf="canWrite" (click)="openCreate()">
+          Créer une solution pour ce problème
+        </button>
+      </div>
+    </section>
 
     <div class="tabs">
       <button class="tab" [class.active]="tab === 'solutions'" (click)="selectTab('solutions')">Solutions</button>
@@ -312,6 +325,11 @@ const ICONS: Record<string, string> = {
   styles: [
     `
       .muted { color: var(--color-text-muted); margin-top: 0.25rem; font-size: 0.9rem; }
+      .problem-context { border-left: 4px solid #ea580c; background: #fffaf5; margin-bottom: 1rem; }
+      .problem-context h3 { margin: .25rem 0 .45rem; }
+      .problem-context p { margin: 0 0 .8rem; line-height: 1.5; }
+      .problem-context-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+      .eyebrow { color: #c2410c; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
       .step-question { margin-bottom: 1rem; }
       .hint { color: var(--color-text-muted); margin: -0.75rem 0 1.5rem; font-size: 0.9rem; }
       .card { margin-bottom: 1.25rem; }
@@ -371,6 +389,7 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
   gapsLoadingDomain = false;
   draftGaps: GapLinkItem[] = [];
   gapsSaving = false;
+  pendingProblem: { domaine: DomaineEcart; elementId: string; elementNom: string; formulation: string } | null = null;
 
   private viewReady = false;
   private chart?: Chart;
@@ -383,6 +402,7 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     private toast: ToastService,
     private confirmDialog: ConfirmDialogService,
     private sanitizer: DomSanitizer,
+    private route: ActivatedRoute,
   ) {}
 
   get canWrite(): boolean {
@@ -396,6 +416,21 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     this.loadSolutions();
     this.loadSolutionsAll();
+    this.readPendingProblem();
+  }
+
+  private readPendingProblem(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const domaine = params.get('domaine') as DomaineEcart | null;
+    const elementId = params.get('elementId');
+    const elementNom = params.get('elementNom');
+    if (!domaine || !elementId || !elementNom) return;
+    this.pendingProblem = {
+      domaine,
+      elementId,
+      elementNom,
+      formulation: `Le problème « ${elementNom} » doit être traité par une solution. Aucune solution n'est encore associée à cet écart.`,
+    };
   }
 
   private loadSolutions(): void {
@@ -480,12 +515,13 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.creating = true;
     const payload: CreateSolutionPayload = { ...this.newSolution };
     this.solutionService.create(payload).subscribe({
-      next: () => {
+      next: (solution) => {
         this.creating = false;
         this.closeCreate();
         this.toast.success('Solution créée.');
         this.loadSolutions();
         this.loadSolutionsAll();
+        if (this.pendingProblem) this.openGaps(solution);
       },
       error: () => {
         this.creating = false;
@@ -558,7 +594,24 @@ export class OpportunitesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.draftGaps = (solution.gaps ?? []).map((g) => ({ domaine: g.domaine, elementId: g.elementId, elementNom: g.elementNom }));
     this.gapsRowsByDomain = {};
     this.gapsCandidates = [];
-    this.selectGapsDomain('objectifs');
+    if (this.pendingProblem && !this.isGapSelectedForDomain(this.pendingProblem.domaine, this.pendingProblem.elementId)) {
+      this.draftGaps.push({
+        domaine: this.pendingProblem.domaine,
+        elementId: this.pendingProblem.elementId,
+        elementNom: this.pendingProblem.elementNom,
+      });
+    }
+    this.selectGapsDomain(this.domainTabFor(this.pendingProblem?.domaine));
+  }
+
+  private isGapSelectedForDomain(domaine: DomaineEcart, elementId: string): boolean {
+    return this.draftGaps.some((gap) => gap.domaine === domaine && gap.elementId === elementId);
+  }
+
+  private domainTabFor(domaine?: DomaineEcart): DomainTab {
+    const entry = (Object.entries(DOMAIN_TO_DOMAINE_ECART) as [DomainTab, DomaineEcart][])
+      .find(([, value]) => value === domaine);
+    return entry?.[0] ?? 'objectifs';
   }
 
   closeGaps(): void {

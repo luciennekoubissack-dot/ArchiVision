@@ -68,6 +68,35 @@ interface GapElement extends BpmnElement {
       rester inchangé, domaine par domaine.
     </p>
 
+    <div class="problem-modal-backdrop" *ngIf="problemTarget" (click)="closeProblem()">
+      <section class="problem-modal" (click)="$event.stopPropagation()">
+        <div class="problem-modal-head">
+          <div>
+            <span class="eyebrow">Étape 1 · Formulation</span>
+            <h3>Problème à traiter</h3>
+          </div>
+          <button type="button" class="icon-btn" title="Fermer" (click)="closeProblem()">×</button>
+        </div>
+        <p class="problem-formulation">{{ problemFormulation(problemTarget) }}</p>
+        <dl class="problem-details">
+          <dt>Écart identifié</dt>
+          <dd>{{ problemTarget.asIs?.nom || 'Aucun élément AS-IS' }} → {{ problemTarget.toBe.length ? namesOf(problemTarget.toBe) : 'Aucune cible TO-BE' }}</dd>
+          <dt>État</dt>
+          <dd><span class="badge" [class]="etatBadge(problemTarget.etat)">{{ etatLabel(problemTarget.etat) }}</span></dd>
+        </dl>
+        <p class="muted">La prochaine étape consiste à créer ou sélectionner une solution qui répond à ce problème, puis à la rattacher à cet écart.</p>
+        <div class="problem-modal-actions">
+          <button type="button" class="btn btn-ghost" (click)="closeProblem()">Annuler</button>
+          <a
+            class="btn btn-primary"
+            routerLink="/opportunites-solutions"
+            [queryParams]="problemQueryParams(problemTarget)"
+            (click)="closeProblem()"
+          >Formuler et traiter dans Solutions</a>
+        </div>
+      </section>
+    </div>
+
     <section class="card ecarts-guide">
       <h3>Comment lire cette analyse</h3>
       <p>AS-IS décrit l'existant. TO-BE décrit la cible. Un écart est une différence à traiter, pas encore une solution.</p>
@@ -171,7 +200,7 @@ interface GapElement extends BpmnElement {
                 <th>Target (TO-BE)</th>
                 <th>État</th>
                 <th>Couverture solution</th>
-                <th *ngIf="mainTab === 'objectifs'">Action</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -186,12 +215,12 @@ interface GapElement extends BpmnElement {
                   <span class="badge badge-neutral"   *ngIf="coverageOf(row) === 'non_adresse'">Non adressé</span>
                 </td>
                 <td>
-                  <a
+                  <button
                     *ngIf="coverageOf(row) === 'non_adresse' && row.etat !== 'Conservé'"
                     class="btn btn-sm btn-outline"
-                    routerLink="/opportunites-solutions"
+                    (click)="openProblem(row)"
                     title="Créer ou rattacher une solution à cet écart"
-                  >Traiter dans Solutions</a>
+                  >Formuler le problème</button>
                   <button
                     *ngIf="mainTab === 'objectifs' && row.asIs && row.etat !== 'Conservé' && row.etat !== 'Réalisé' && canMarquerAtteint(row)"
                     class="btn btn-sm btn-success"
@@ -345,6 +374,16 @@ interface GapElement extends BpmnElement {
     `
       /* ── Barre de complétude ───────────────────────────────────────────────── */
       .ecarts-guide { border-left: 4px solid var(--color-primary); margin-bottom: 1rem; }
+      .problem-modal-backdrop { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(15, 23, 42, 0.48); }
+      .problem-modal { width: min(620px, 100%); background: var(--color-bg, #fff); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+      .problem-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+      .problem-modal h3 { margin: .2rem 0 1rem; }
+      .eyebrow { color: var(--color-primary); font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+      .problem-formulation { margin: 0 0 1rem; padding: 1rem; border-left: 4px solid #ea580c; background: #fff7ed; font-size: 1rem; line-height: 1.5; }
+      .problem-details { display: grid; grid-template-columns: 130px 1fr; gap: .5rem .8rem; margin: 0 0 1rem; font-size: .88rem; }
+      .problem-details dt { color: var(--color-text-muted); font-weight: 700; }
+      .problem-details dd { margin: 0; }
+      .problem-modal-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1.2rem; flex-wrap: wrap; }
       .ecarts-guide h3, .problemes-context h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
       .ecarts-guide p, .problemes-context p { margin: 0 0 0.7rem; }
       .etat-guide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem 1.25rem; font-size: 0.82rem; }
@@ -469,6 +508,7 @@ export class EcartsComponent implements OnInit {
   /** Données de complétude AS-IS / TO-BE chargées depuis l'API. */
   completude: CompletudeSummary | null = null;
   organisationProblemes = '';
+  problemTarget: GapRow | null = null;
 
   private allGaps: SolutionGap[] = [];
 
@@ -529,6 +569,28 @@ export class EcartsComponent implements OnInit {
 
   etatLabel(etat: EtatGap): string {
     return etat === 'Éliminé' ? 'Sans cible TO-BE' : etat;
+  }
+
+  openProblem(row: GapRow): void {
+    this.problemTarget = row;
+  }
+
+  closeProblem(): void {
+    this.problemTarget = null;
+  }
+
+  problemFormulation(row: GapRow): string {
+    const source = row.asIs?.nom ?? 'un besoin absent de l’existant';
+    const target = row.toBe.length ? ` pour atteindre « ${this.namesOf(row.toBe)} »` : '';
+    if (row.etat === 'Nouveau') return `L'organisation doit introduire « ${this.namesOf(row.toBe)} », qui n'existe pas encore dans l'état actuel.`;
+    if (row.etat === 'Conservé') return `Aucun problème de transformation n'est identifié pour « ${source} » : l'élément est conservé.`;
+    return `L'élément « ${source} » doit être traité${target}. Aucune solution n'est encore associée à cet écart.`;
+  }
+
+  problemQueryParams(row: GapRow): Record<string, string> {
+    const domain = DOMAIN_TO_DOMAINE_ECART[this.mainTab as DomainTab];
+    const candidate = row.toBe[0] ?? row.asIs;
+    return { domaine: domain, elementId: candidate?.id ?? '', elementNom: candidate?.nom ?? '' };
   }
 
   get problemes(): string[] {
