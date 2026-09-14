@@ -44,6 +44,23 @@ export class MailService implements OnModuleInit {
         : undefined,
     });
     this.logger.log(`Transport SMTP configuré (${host}).`);
+    this.transporter.verify().then(
+      () => this.logger.log('Connexion SMTP vérifiée.'),
+      (err: Error) => this.logger.error(`Connexion SMTP impossible : ${err.message}`),
+    );
+  }
+
+  /** Organisation validée : lien de connexion à l'application. */
+  async sendInscriptionRecue(to: string, organisationNom: string): Promise<SentEmail> {
+    return this.send({
+      to,
+      subject: 'ArchiVision : inscription reçue',
+      body:
+        `Bonjour,\n\nNous avons bien reçu l'inscription de l'organisation « ${organisationNom} ». ` +
+        `Votre dossier est en cours de vérification par l'équipe ArchiVision. ` +
+        `Vous recevrez un second e-mail dès que votre organisation sera validée.\n\n` +
+        `Cordialement,\nL'équipe ArchiVision`,
+    });
   }
 
   /** Organisation validée : lien de connexion à l'application. */

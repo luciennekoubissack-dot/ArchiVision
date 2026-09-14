@@ -178,6 +178,21 @@ npm run prisma:seed
 
 Initialise un utilisateur admin (`admin@archivision.local` / `Admin123!`).
 
+### Configuration e-mail Brevo
+
+L'API utilise Brevo via SMTP. Dans Railway, configurez ces variables sur le service API :
+
+```text
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=votre-adresse-compte-brevo@example.com
+SMTP_PASS=votre-cle-smtp-brevo
+MAIL_FROM=ArchiVision <adresse-expediteur@votre-domaine.com>
+```
+
+`SMTP_PASS` doit être la **clé SMTP** Brevo, et non la clé API. L'expéditeur doit être vérifié dans Brevo. Après redémarrage, les logs API doivent afficher `Connexion SMTP vérifiée.`.
+
 Le seed crée également le compte plateforme `superadmin@archivision.local` avec
 le mot de passe `SuperAdmin123!` pour accéder à l'administration des organisations.
 

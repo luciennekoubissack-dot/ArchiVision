@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '@archivision/infrastructure';
@@ -19,6 +19,8 @@ function hashToken(token: string): string {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -129,6 +131,12 @@ export class AuthService {
 
       return { organisation, user };
     });
+
+    try {
+      await this.mail.sendInscriptionRecue(dto.email, organisation.nom);
+    } catch (err) {
+      this.logger.error(`Impossible d'envoyer l'e-mail de confirmation à ${dto.email} : ${(err as Error).message}`);
+    }
 
     // Aucune session n'est ouverte : l'organisation démarre EN_ATTENTE et ne
     // pourra se connecter qu'une fois validée par le superadmin, qui envoie

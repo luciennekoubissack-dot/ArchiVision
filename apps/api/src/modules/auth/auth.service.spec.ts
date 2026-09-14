@@ -51,7 +51,7 @@ describe('AuthService', () => {
   };
 
   const configMock = { get: jest.fn().mockReturnValue('http://localhost:4201') };
-  const mailMock = { sendPasswordReset: jest.fn() };
+  const mailMock = { sendPasswordReset: jest.fn(), sendInscriptionRecue: jest.fn() };
 
   beforeAll(async () => {
     mockUser.passwordHash = await bcrypt.hash('Admin123!', 4);
@@ -198,6 +198,8 @@ describe('AuthService', () => {
       txMock.user.create.mockResolvedValue(createdUser);
 
       const result = await service.register(registerDto);
+
+      expect(mailMock.sendInscriptionRecue).toHaveBeenCalledWith(registerDto.email, createdOrg.nom);
 
       expect(txMock.organisation.create).toHaveBeenCalledWith(
         expect.objectContaining({
