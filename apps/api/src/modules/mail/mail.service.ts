@@ -36,6 +36,9 @@ export class MailService implements OnModuleInit {
       host,
       port: Number(this.config.get<string>('SMTP_PORT') ?? 587),
       secure: this.config.get<string>('SMTP_SECURE') === 'true',
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
       auth: this.config.get<string>('SMTP_USER')
         ? {
             user: this.config.get<string>('SMTP_USER'),

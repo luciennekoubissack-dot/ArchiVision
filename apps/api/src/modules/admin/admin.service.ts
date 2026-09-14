@@ -88,15 +88,15 @@ export class AdminService {
     });
 
     const loginUrl = `${requireFrontendOrigin(this.config)}/login`;
-    let email: SentEmail;
-    try {
-      email = await this.mail.sendOrganisationValidee(admin.email, organisation.nom, loginUrl);
-    } catch (err) {
-      // L'envoi du mail est non-bloquant : l'organisation est déjà validée en base.
-      // On journalise l'erreur sans faire échouer la requête.
-      this.logger.error(`Impossible d'envoyer l'e-mail de validation à ${admin.email} : ${(err as Error).message}`);
-      email = { to: admin.email, subject: 'Validation (mail non envoyé)', body: '' };
-    }
+    const email: SentEmail = {
+      to: admin.email,
+      subject: 'Bienvenue sur ArchiVision : votre organisation est validée',
+      body: loginUrl,
+    };
+    this.logger.log(`Validation enregistrée pour ${organisation.nom}; envoi du mail lancé vers ${admin.email}.`);
+    void this.mail.sendOrganisationValidee(admin.email, organisation.nom, loginUrl).catch((err: Error) => {
+      this.logger.error(`Impossible d'envoyer l'e-mail de validation à ${admin.email} : ${err.message}`);
+    });
     return { organisation, email };
   }
 
