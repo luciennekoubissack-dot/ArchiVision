@@ -1,7 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { map, tap } from 'rxjs/operators';
 import { ApiConfiguration } from '../api-client/api-configuration';
 import { OrganisationEntity } from '../api-client/models/organisation-entity';
 import { OrganisationExportEntity } from '../api-client/models/organisation-export-entity';
@@ -18,15 +18,21 @@ export type ReferentielExport = OrganisationExportEntity;
 
 @Injectable({ providedIn: 'root' })
 export class OrganisationService {
+  readonly current = signal<Organisation | null>(null);
+
   constructor(private http: HttpClient, private config: ApiConfiguration) {}
 
   getMine(): Observable<Organisation> {
-    return organisationControllerFindMine(this.http, this.config.rootUrl).pipe(map((r) => r.body));
+    return organisationControllerFindMine(this.http, this.config.rootUrl).pipe(
+      map((r) => r.body),
+      tap((organisation) => this.current.set(organisation)),
+    );
   }
 
   updateMine(payload: UpdateOrganisationPayload): Observable<Organisation> {
     return organisationControllerUpdateMine(this.http, this.config.rootUrl, { body: payload }).pipe(
       map((r) => r.body),
+      tap((organisation) => this.current.set(organisation)),
     );
   }
 

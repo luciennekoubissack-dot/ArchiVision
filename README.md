@@ -170,6 +170,9 @@ Cette commande lance l’API et la base PostgreSQL, mais pas le frontend Angular
 
 Le schéma Prisma est défini dans `apps/api/prisma/schema.prisma`. Modèles : `User`, `Organisation`, `CapaciteMetier`, `ElementArchimate`, `RelationArchimate`, `Application`, `ZoneUrbanisation`, `ApplicationZone`.
 
+Les logos et avatars sont servis depuis `/uploads`. En Docker Compose, ils sont conservés dans le volume `api_uploads`. En production Railway, configurez un volume persistant monté sur `/app/apps/api/uploads`, sinon les fichiers peuvent disparaître après un redéploiement ou un redémarrage.
+
+
 ### Seed
 
 ```bash

@@ -4,6 +4,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
+import { OrganisationService } from '../organisation/organisation.service';
 
 interface NavItem {
   label: string;
@@ -103,7 +104,10 @@ const ROLE_LABEL: Record<string, string> = {
     <div class="shell" [class.sidebar-open]="sidebarOpen()" [class.collapsed]="collapsed()">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-mark"><img src="assets/logo.png" alt="" /></span>
+          <span class="brand-mark">
+            <img *ngIf="!organisationService.current()?.logoUrl" src="assets/logo.png" alt="ArchiVision" />
+            <img *ngIf="organisationService.current()?.logoUrl" [src]="organisationService.current()?.logoUrl" [alt]="organisationService.current()?.nom" />
+          </span>
           <span class="brand-text">
             <span class="brand-name">ArchiVision</span>
             <span class="brand-sub">{{ auth.hasRole('SUPERADMIN') ? 'Console plateforme' : "Architecture d'entreprise" }}</span>
@@ -221,7 +225,7 @@ const ROLE_LABEL: Record<string, string> = {
         justify-content: center;
         flex-shrink: 0;
       }
-      .brand-mark img { width: 20px; height: 20px; filter: brightness(0) invert(1); }
+      .brand-mark img { width: 100%; height: 100%; object-fit: contain; }
       .brand-text { display: flex; flex-direction: column; min-width: 0; }
       .brand-name { font-weight: 800; color: white; font-size: 0.98rem; }
       .brand-sub { font-size: 0.7rem; color: #6b7394; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -403,9 +407,15 @@ export class AppShellComponent implements OnInit, OnDestroy {
   private iconCache = new Map<string, SafeHtml>();
   private routerSub?: Subscription;
 
-  constructor(public auth: AuthService, private router: Router, private sanitizer: DomSanitizer) {}
+  constructor(
+    public auth: AuthService,
+    public organisationService: OrganisationService,
+    private router: Router,
+    private sanitizer: DomSanitizer,
+  ) {}
 
   ngOnInit(): void {
+    if (!this.auth.hasRole('SUPERADMIN')) this.organisationService.getMine().subscribe({ error: () => {} });
     this.updatePageTitle(this.router.url);
     this.routerSub = this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe((e) => {
       this.updatePageTitle((e as NavigationEnd).urlAfterRedirects);
